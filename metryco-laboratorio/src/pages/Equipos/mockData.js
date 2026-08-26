@@ -1,0 +1,14 @@
+export const MOCK = [
+  { id:  1, codigo: "EQ-001", descripcion: "Vernier digital",              marca: "Mitutoyo",    modelo: "530-322",     serie: "MX-12345", rango: "0–150 mm",     resolucion: "0.01 mm",   proximaCal: "2025-09-15", status: "activo" },
+  { id:  2, codigo: "EQ-002", descripcion: "Micrómetro exterior 0-25 mm",  marca: "Mitutoyo",    modelo: "103-137",     serie: "MX-23456", rango: "0–25 mm",      resolucion: "0.001 mm",  proximaCal: "2025-08-20", status: "activo" },
+  { id:  3, codigo: "EQ-003", descripcion: "Multímetro digital",           marca: "Fluke",       modelo: "87V",         serie: "FL-34567", rango: "0–1000 V",     resolucion: "0.1 mV",    proximaCal: "2025-07-10", status: "vencido" },
+  { id:  4, codigo: "EQ-004", descripcion: "Termómetro de contacto",       marca: "Fluke",       modelo: "52-II",       serie: "FL-45678", rango: "-200–1090 °C", resolucion: "0.1 °C",    proximaCal: "2025-10-01", status: "activo" },
+  { id:  5, codigo: "EQ-005", descripcion: "Balanza analítica",            marca: "Ohaus",       modelo: "PA224",       serie: "OH-56789", rango: "0–220 g",      resolucion: "0.0001 g",  proximaCal: "2025-07-30", status: "calibracion" },
+  { id:  6, codigo: "EQ-006", descripcion: "Manómetro digital",            marca: "Keller",      modelo: "LEO 3",       serie: "KE-67890", rango: "0–700 bar",    resolucion: "0.001 bar", proximaCal: "2025-11-15", status: "activo" },
+  { id:  7, codigo: "EQ-007", descripcion: "Calibrador de profundidad",    marca: "Mitutoyo",    modelo: "571-201",     serie: "MX-78901", rango: "0–200 mm",     resolucion: "0.01 mm",   proximaCal: "2025-08-05", status: "activo" },
+  { id:  8, codigo: "EQ-008", descripcion: "Regla de acero inoxidable",    marca: "Starrett",    modelo: "C604R-12",    serie: "ST-89012", rango: "0–300 mm",     resolucion: "0.5 mm",    proximaCal: "2025-12-10", status: "activo" },
+  { id:  9, codigo: "EQ-009", descripcion: "Calibrador de rosca",          marca: "Insize",      modelo: "2703-M12",    serie: "IN-90123", rango: "M12 × 1.75",   resolucion: "GO/NOGO",   proximaCal: "2026-01-20", status: "activo" },
+  { id: 10, codigo: "EQ-010", descripcion: "Micrómetro de interiores",     marca: "Mitutoyo",    modelo: "511-215",     serie: "MX-01234", rango: "5–30 mm",      resolucion: "0.001 mm",  proximaCal: "2025-07-05", status: "vencido" },
+  { id: 11, codigo: "EQ-011", descripcion: "Termómetro infrarrojo",        marca: "Fluke",       modelo: "62 MAX",      serie: "FL-12340", rango: "-30–650 °C",   resolucion: "1 °C",      proximaCal: "2025-09-28", status: "activo" },
+  { id: 12, codigo: "EQ-012", descripcion: "Medidor de altura",            marca: "Mitutoyo",    modelo: "192-130",     serie: "MX-23451", rango: "0–600 mm",     resolucion: "0.01 mm",   proximaCal: "2024-12-31", status: "baja" },
+];

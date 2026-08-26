@@ -1,0 +1,16 @@
+export const MOCK = [
+  { id:  1, codigo: "MCA-001",    titulo: "Manual de Calidad del Laboratorio",                      tipo: "manual",        revision: "04", fecha: "2025-01-15", responsable: "Dirección",    status: "vigente" },
+  { id:  2, codigo: "PG-CAL-001", titulo: "Procedimiento General de Calibración",                   tipo: "procedimiento", revision: "05", fecha: "2025-02-10", responsable: "Ing. Sánchez", status: "vigente" },
+  { id:  3, codigo: "PG-CAL-002", titulo: "Control de Documentos y Registros",                      tipo: "procedimiento", revision: "03", fecha: "2025-01-20", responsable: "Ing. Sánchez", status: "vigente" },
+  { id:  4, codigo: "PG-CAL-003", titulo: "Auditorías Internas",                                    tipo: "procedimiento", revision: "02", fecha: "2024-11-05", responsable: "Dirección",    status: "revision" },
+  { id:  5, codigo: "IT-DIM-001", titulo: "Calibración de instrumentos dimensionales",              tipo: "instruccion",   revision: "04", fecha: "2025-03-01", responsable: "Ing. Pérez",   status: "vigente" },
+  { id:  6, codigo: "IT-ELE-001", titulo: "Calibración de instrumentos eléctricos",                 tipo: "instruccion",   revision: "03", fecha: "2025-02-20", responsable: "Ing. Ruiz",    status: "vigente" },
+  { id:  7, codigo: "IT-TEM-001", titulo: "Calibración de instrumentos de temperatura",             tipo: "instruccion",   revision: "02", fecha: "2025-01-10", responsable: "Ing. Sánchez", status: "vigente" },
+  { id:  8, codigo: "IT-PRE-001", titulo: "Calibración de instrumentos de presión",                 tipo: "instruccion",   revision: "01", fecha: "2025-04-05", responsable: "Ing. Pérez",   status: "vigente" },
+  { id:  9, codigo: "IT-MAS-001", titulo: "Calibración de instrumentos de masa",                    tipo: "instruccion",   revision: "02", fecha: "2024-12-15", responsable: "Ing. Ruiz",    status: "vigente" },
+  { id: 10, codigo: "PO-CAL-001", titulo: "Política de Aseguramiento Metrológico",                  tipo: "politica",      revision: "02", fecha: "2025-01-01", responsable: "Dirección",    status: "vigente" },
+  { id: 11, codigo: "PO-CAL-002", titulo: "Política de Imparcialidad",                              tipo: "politica",      revision: "01", fecha: "2024-10-20", responsable: "Dirección",    status: "vigente" },
+  { id: 12, codigo: "FO-CAL-001", titulo: "Formato de Solicitud de Servicio",                       tipo: "formato",       revision: "06", fecha: "2025-03-15", responsable: "Ing. Sánchez", status: "vigente" },
+  { id: 13, codigo: "FO-CAL-002", titulo: "Formato de Certificado de Calibración",                  tipo: "formato",       revision: "08", fecha: "2025-04-01", responsable: "Ing. Sánchez", status: "vigente" },
+  { id: 14, codigo: "FO-CAL-003", titulo: "Formato de Registro de Mantenimiento de Patrones",       tipo: "formato",       revision: "03", fecha: "2025-02-28", responsable: "Ing. Pérez",   status: "vigente" },
+];
