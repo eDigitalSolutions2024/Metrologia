@@ -1,0 +1,741 @@
+<title>Modelo de Datos METRYCO</title>
+<style>
+  :root{
+    --paper:#EEF2F4; --paper-raised:#FFFFFF; --paper-sunken:#E3E9EC;
+    --ink:#16232C; --ink-soft:#4B5D6B; --ink-faint:#7C8D98;
+    --line:#C7D2D9; --line-strong:#93A6B1;
+    --accent:#0E7C86; --accent-soft:#DCEEEF; --accent-ink:#0A5A62;
+    --ok:#2F7D4F; --ok-soft:#E4F3E9;
+    --warn:#A8671A; --warn-soft:#FBEEDC;
+    --crit:#A23B2C;
+    --muted:#8B98A1;
+    --font-display:"Archivo Narrow","Roboto Condensed","Arial Narrow",sans-serif;
+    --font-body:"Segoe UI","Helvetica Neue",Arial,sans-serif;
+    --font-mono:"Cascadia Code","SF Mono",Consolas,"Liberation Mono",monospace;
+    --radius:3px;
+  }
+  @media (prefers-color-scheme: dark){
+    :root:not([data-theme="light"]){
+      --paper:#0B141C; --paper-raised:#101C26; --paper-sunken:#0E1922;
+      --ink:#DCE7EE; --ink-soft:#93A7B4; --ink-faint:#5E7683;
+      --line:#1E313D; --line-strong:#35505F;
+      --accent:#3FC2CD; --accent-soft:#123339; --accent-ink:#8FE0E7;
+      --ok:#4FBE7C; --ok-soft:#12291C;
+      --warn:#E0A548; --warn-soft:#2E2313;
+      --crit:#E2695A;
+      --muted:#6C7C86;
+    }
+  }
+  :root[data-theme="dark"]{
+    --paper:#0B141C; --paper-raised:#101C26; --paper-sunken:#0E1922;
+    --ink:#DCE7EE; --ink-soft:#93A7B4; --ink-faint:#5E7683;
+    --line:#1E313D; --line-strong:#35505F;
+    --accent:#3FC2CD; --accent-soft:#123339; --accent-ink:#8FE0E7;
+    --ok:#4FBE7C; --ok-soft:#12291C;
+    --warn:#E0A548; --warn-soft:#2E2313;
+    --crit:#E2695A;
+    --muted:#6C7C86;
+  }
+
+  *{box-sizing:border-box;}
+  body{
+    margin:0; background:var(--paper); color:var(--ink);
+    font-family:var(--font-body); line-height:1.5;
+    -webkit-font-smoothing:antialiased;
+  }
+  ::selection{ background:var(--accent-soft); color:var(--ink); }
+
+  .sheet{ max-width:1180px; margin:0 auto; padding:2.5rem 1.5rem 5rem; }
+
+  /* ---------- title block ---------- */
+  .titleblock{
+    border:1px solid var(--line-strong);
+    border-radius:var(--radius);
+    background:var(--paper-raised);
+    padding:1.4rem 1.6rem;
+    display:grid;
+    grid-template-columns:1fr auto;
+    gap:1rem 2rem;
+    margin-bottom:2.25rem;
+  }
+  .titleblock h1{
+    font-family:var(--font-display);
+    font-weight:700;
+    font-size:clamp(1.7rem,3.4vw,2.35rem);
+    letter-spacing:.01em;
+    margin:0 0 .3rem;
+    text-wrap:balance;
+  }
+  .titleblock .sub{
+    color:var(--ink-soft); font-size:.98rem; max-width:56ch;
+  }
+  .titleblock .meta{
+    font-family:var(--font-mono); font-size:.72rem; color:var(--ink-faint);
+    text-align:right; white-space:nowrap; align-self:start;
+    display:flex; flex-direction:column; gap:.35rem;
+  }
+  .titleblock .meta b{ color:var(--accent-ink); font-weight:600; }
+
+  /* ---------- open questions callout ---------- */
+  .callout{
+    border:1px solid var(--warn);
+    background:var(--warn-soft);
+    border-radius:var(--radius);
+    padding:1.1rem 1.3rem;
+    margin-bottom:2.5rem;
+    display:grid; gap:.6rem;
+  }
+  .callout .tag{
+    font-family:var(--font-mono); font-size:.68rem; letter-spacing:.08em;
+    text-transform:uppercase; color:var(--warn); font-weight:700;
+  }
+  .callout ol{ margin:.2rem 0 0; padding-left:1.2rem; display:grid; gap:.5rem; }
+  .callout li{ font-size:.93rem; }
+  .callout code{ font-family:var(--font-mono); font-size:.85em; background:var(--paper-sunken); padding:.05em .3em; border-radius:2px; }
+
+  /* ---------- figure / diagram ---------- */
+  figure{ margin:0 0 1rem; }
+  .diagram-frame{
+    border:1px solid var(--line-strong);
+    border-radius:var(--radius);
+    background:
+      linear-gradient(var(--line) 1px, transparent 1px) 0 0/32px 32px,
+      linear-gradient(90deg, var(--line) 1px, transparent 1px) 0 0/32px 32px,
+      var(--paper-raised);
+    background-blend-mode:normal;
+    padding:0.5rem;
+    overflow-x:auto;
+  }
+  .diagram-frame svg{ display:block; width:100%; height:auto; min-width:920px; }
+  figcaption{
+    font-size:.85rem; color:var(--ink-soft); margin-top:.6rem;
+    max-width:75ch;
+  }
+
+  .legend{
+    display:flex; flex-wrap:wrap; gap:1.1rem 1.8rem;
+    font-size:.78rem; color:var(--ink-soft);
+    margin:1.1rem 0 3rem; padding-top:1rem; border-top:1px dashed var(--line);
+  }
+  .legend span{ display:inline-flex; align-items:center; gap:.45rem; }
+  .legend svg{ width:26px; height:12px; flex:none; }
+
+  /* ---------- module sections ---------- */
+  .module{ margin-bottom:3rem; }
+  .module__head{
+    display:flex; align-items:baseline; gap:.75rem;
+    border-bottom:1px solid var(--line-strong);
+    padding-bottom:.5rem; margin-bottom:1.1rem;
+  }
+  .module__num{
+    font-family:var(--font-mono); font-size:.8rem; color:var(--accent-ink);
+    background:var(--accent-soft); border-radius:2px; padding:.15em .5em;
+    font-weight:700;
+  }
+  .module__head h2{
+    font-family:var(--font-display); font-size:1.35rem; font-weight:700;
+    margin:0; letter-spacing:.01em;
+  }
+  .module__note{ color:var(--ink-faint); font-size:.82rem; margin-left:auto; }
+
+  .card-grid{
+    display:grid; grid-template-columns:repeat(auto-fill,minmax(320px,1fr));
+    gap:1.1rem;
+  }
+
+  .card{
+    border:1px solid var(--line-strong);
+    border-radius:var(--radius);
+    background:var(--paper-raised);
+    overflow:hidden;
+    display:flex; flex-direction:column;
+  }
+  .card--pending{ border-style:dashed; }
+
+  .card__head{
+    display:flex; align-items:center; justify-content:space-between;
+    gap:.6rem; padding:.65rem .9rem;
+    background:var(--paper-sunken);
+    border-bottom:1px solid var(--line);
+  }
+  .card__head h3{ font-size:1rem; margin:0; font-weight:700; }
+  .card__head code{
+    font-family:var(--font-mono); font-size:.72rem; color:var(--ink-faint);
+  }
+  .pill{
+    font-family:var(--font-mono); font-size:.64rem; text-transform:uppercase;
+    letter-spacing:.06em; padding:.15em .5em; border-radius:99px;
+    background:var(--warn-soft); color:var(--warn); border:1px solid var(--warn);
+    white-space:nowrap;
+  }
+
+  table.attrs{ width:100%; border-collapse:collapse; font-size:.82rem; }
+  table.attrs th{
+    text-align:left; font-family:var(--font-mono); font-size:.66rem;
+    text-transform:uppercase; letter-spacing:.06em; color:var(--ink-faint);
+    padding:.5rem .9rem .35rem; font-weight:600;
+  }
+  table.attrs td{
+    padding:.4rem .9rem; border-top:1px solid var(--line);
+    vertical-align:top;
+  }
+  table.attrs tr:first-child td{ border-top:none; }
+  table.attrs td.field{ font-family:var(--font-mono); font-weight:600; white-space:nowrap; }
+  table.attrs td.type{ font-family:var(--font-mono); color:var(--ink-soft); white-space:nowrap; }
+  table.attrs td.key{ white-space:nowrap; }
+  table.attrs td.notes{ color:var(--ink-soft); }
+  .k-pk{ color:var(--accent-ink); font-weight:700; }
+  .k-fk{ color:var(--ink-soft); }
+  .k-uq{ color:var(--ink-faint); font-style:italic; }
+
+  footer.notes{
+    margin-top:3rem; padding-top:1.5rem; border-top:1px solid var(--line);
+    font-size:.85rem; color:var(--ink-soft); display:grid; gap:.6rem; max-width:75ch;
+  }
+
+  @media (max-width:640px){
+    .titleblock{ grid-template-columns:1fr; }
+    .titleblock .meta{ text-align:left; }
+  }
+</style>
+
+<div class="sheet">
+
+  <div class="titleblock">
+    <div>
+      <h1>METRYCO &mdash; Modelo de Datos</h1>
+      <div class="sub">Diagrama entidad&ndash;relaci&oacute;n y cat&aacute;logo de atributos, derivados del sistema legado (PHP/MySQL) y del alcance definido en <code>menuConfig.js</code> del frontend nuevo.</div>
+    </div>
+    <div class="meta">
+      <span>ERP LABORATORIO DE METROLOG&Iacute;A</span>
+      <span>MOTOR: <b>PostgreSQL 18</b> &middot; ORM: <b>Prisma</b></span>
+      <span>REV. 2 &middot; 2026&#8209;08&#8209;19</span>
+    </div>
+  </div>
+
+  <div class="callout">
+    <div class="tag">2 decisiones pendientes antes de migrar</div>
+    <ol>
+      <li><b>Facturaci&oacute;n (m&oacute;dulo 04):</b> el sistema viejo timbra CFDI real con un PAC (complementos de pago, <code>cfdi_relacionado_items</code>). Aqu&iacute; <code>Factura</code>/<code>Pago</code> est&aacute; simplificado para solo control interno de cobranza &mdash; si se debe seguir timbrando fiscal, ese par de entidades hay que rediseñarlo completo.</li>
+      <li><b>Trazabilidad de patrones (m&oacute;dulo 03&ndash;04):</b> el sistema viejo <u>no</u> registra qu&eacute; patr&oacute;n de referencia se us&oacute; en cada calibraci&oacute;n de equipo &mdash; <code>Asignacion</code> no tiene FK a <code>Patron</code>. Lo marco como relaci&oacute;n <em>propuesta</em> (punteada, en el diagrama) porque sin ella no hay cadena de trazabilidad completa (relevante si buscan cumplir ISO/IEC 17025).</li>
+    </ol>
+  </div>
+
+  <figure>
+    <div class="diagram-frame">
+      <svg viewBox="0 0 1460 720" role="img" aria-label="Diagrama entidad-relación de METRYCO: 16 entidades agrupadas en cuatro etapas del proceso (identidad, comercial, operación de laboratorio, trazabilidad y gestión), con Usuario y Cliente como referencias transversales conectadas por rieles laterales.">
+        <defs>
+          <marker id="tick" markerWidth="10" markerHeight="10" refX="5" refY="5" orient="auto">
+            <path d="M5,1 L5,9" stroke="currentColor" stroke-width="1.4"/>
+          </marker>
+        </defs>
+        <g font-family="Segoe UI, Arial, sans-serif" fill="currentColor" color="var(--ink)">
+
+          <!-- band headers -->
+          <g font-family="Cascadia Code, Consolas, monospace" font-size="11" letter-spacing="1" fill="var(--ink-faint)">
+            <text x="60" y="30">01 &middot; IDENTIDAD</text>
+            <text x="60" y="220">02 &middot; COMERCIAL</text>
+            <text x="60" y="410">03 &middot; OPERACI&Oacute;N DE LABORATORIO</text>
+            <text x="60" y="600">04 &middot; TRAZABILIDAD Y GESTI&Oacute;N</text>
+          </g>
+          <g stroke="var(--line)" stroke-width="1">
+            <line x1="0" y1="38" x2="1460" y2="38"/>
+            <line x1="0" y1="228" x2="1460" y2="228"/>
+            <line x1="0" y1="418" x2="1460" y2="418"/>
+            <line x1="0" y1="608" x2="1460" y2="608"/>
+          </g>
+
+          <!-- ============ RAILS (Usuario left / Cliente right) ============ -->
+          <g stroke="var(--accent)" fill="var(--accent)" opacity="0.6">
+            <!-- usuario collector + rail -->
+            <path d="M155,104 V140 H20 V545" fill="none" stroke-width="1.3"/>
+            <!-- spurs to band2/3/4 -->
+            <path d="M20,185 H405 V240" fill="none" stroke-width="1.3"/>
+            <path d="M20,355 H155 V430" fill="none" stroke-width="1.3"/>
+            <path d="M20,355 H405 V430" fill="none" stroke-width="1.3"/>
+            <path d="M20,355 H665 V430" fill="none" stroke-width="1.3"/>
+            <path d="M20,355 H925 V430" fill="none" stroke-width="1.3"/>
+            <path d="M20,545 H665 V620" fill="none" stroke-width="1.3"/>
+
+            <!-- cliente collector + rail -->
+            <path d="M695,104 V140 H1380 V560" fill="none" stroke-width="1.3"/>
+            <path d="M1380,200 H445 V240" fill="none" stroke-width="1.3"/>
+            <path d="M1380,370 H175 V430" fill="none" stroke-width="1.3"/>
+            <path d="M1380,370 H725 V430" fill="none" stroke-width="1.3"/>
+            <path d="M1380,560 H940 V620" fill="none" stroke-width="1.3"/>
+          </g>
+          <g font-family="Cascadia Code, Consolas, monospace" font-size="9" fill="var(--accent-ink)">
+            <text x="12" y="128" text-anchor="middle" transform="rotate(-90 12 128)">usuario_id</text>
+            <text x="1388" y="128" text-anchor="middle" transform="rotate(-90 1388 128)">cliente_id</text>
+          </g>
+          <g font-family="Segoe UI, Arial, sans-serif" font-style="italic" font-size="9" fill="var(--ink-faint)">
+            <text x="410" y="235">vendedor</text>
+            <text x="160" y="425">registr&oacute;</text>
+            <text x="410" y="425">t&eacute;cnico / realiz&oacute;</text>
+            <text x="670" y="425">cre&oacute;</text>
+            <text x="800" y="425">coment&oacute;</text>
+            <text x="670" y="615">responsable</text>
+          </g>
+
+          <!-- ============ PROPUESTA: Asignacion -> Patron (punteada) ============ -->
+          <path d="M330,457 C 150,540 90,560 150,620" fill="none" stroke="var(--crit)" stroke-width="1.3" stroke-dasharray="2 4" opacity="0.75"/>
+          <text x="70" y="545" font-size="9" font-style="italic" fill="var(--crit)" opacity="0.85">propuesto: patronId</text>
+
+          <!-- ============ Cotizacion -> Reporte (opcional, punteada) ============ -->
+          <path d="M425,294 L695,430" fill="none" stroke="var(--ink-faint)" stroke-width="1.4" stroke-dasharray="3 4"/>
+          <text x="500" y="368" font-size="10" fill="var(--ink-faint)">1</text>
+          <text x="650" y="415" font-size="10" fill="var(--ink-faint)">N (opc.)</text>
+
+          <!-- ============ SPINE (relaciones principales, s&oacute;lidas) ============ -->
+          <g stroke="var(--ink)" stroke-width="1.8">
+            <line x1="520" y1="77" x2="600" y2="77"/>   <!-- Contacto - Cliente -->
+            <line x1="790" y1="77" x2="870" y2="77"/>   <!-- Cliente - ClientePortalAcceso -->
+            <line x1="250" y1="267" x2="330" y2="267"/> <!-- TipoCotizacion - Cotizacion -->
+            <line x1="520" y1="267" x2="600" y2="267"/> <!-- Cotizacion - CotizacionItem -->
+            <line x1="250" y1="457" x2="330" y2="457"/> <!-- Equipo - Asignacion -->
+            <line x1="520" y1="457" x2="600" y2="457"/> <!-- Asignacion - Reporte -->
+            <line x1="790" y1="457" x2="870" y2="457"/> <!-- Reporte - ComentarioCalidad -->
+            <line x1="250" y1="647" x2="330" y2="647"/> <!-- Patron - CalibracionPatron -->
+            <line x1="1060" y1="647" x2="1140" y2="647"/><!-- Factura - Pago -->
+          </g>
+          <g font-family="Cascadia Code, Consolas, monospace" font-size="10" fill="var(--ink-soft)">
+            <text x="530" y="72">1</text><text x="583" y="72" text-anchor="end">N</text>
+            <text x="800" y="72">1</text><text x="860" y="72" text-anchor="end">1</text>
+            <text x="260" y="262">1</text><text x="313" y="262" text-anchor="end">N</text>
+            <text x="530" y="262">1</text><text x="583" y="262" text-anchor="end">N</text>
+            <text x="260" y="452">1</text><text x="313" y="452" text-anchor="end">N</text>
+            <text x="610" y="452">1</text><text x="536" y="452" text-anchor="end">N</text>
+            <text x="800" y="452">1</text><text x="860" y="452" text-anchor="end">N</text>
+            <text x="260" y="642">1</text><text x="313" y="642" text-anchor="end">N</text>
+            <text x="1070" y="642">1</text><text x="1123" y="642" text-anchor="end">N</text>
+          </g>
+
+          <!-- ============ BOXES ============ -->
+          <g font-family="Archivo Narrow, Roboto Condensed, Arial Narrow, sans-serif" font-weight="700" font-size="14.5">
+
+            <!-- band 1 -->
+            <g>
+              <rect x="60" y="50" width="190" height="54" rx="3" fill="var(--paper-raised)" stroke="var(--ink)" stroke-width="1.6"/>
+              <text x="80" y="72">Usuario</text>
+              <text x="80" y="90" font-family="Cascadia Code, Consolas, monospace" font-weight="400" font-size="9.5" fill="var(--ink-faint)">usuarios &middot; PK id</text>
+            </g>
+            <g>
+              <rect x="330" y="50" width="190" height="54" rx="3" fill="var(--paper-raised)" stroke="var(--line-strong)" stroke-width="1.4"/>
+              <text x="350" y="72">Contacto</text>
+              <text x="350" y="90" font-family="Cascadia Code, Consolas, monospace" font-weight="400" font-size="9.5" fill="var(--ink-faint)">contactos &middot; PK id</text>
+            </g>
+            <g>
+              <rect x="600" y="50" width="190" height="54" rx="3" fill="var(--paper-raised)" stroke="var(--ink)" stroke-width="1.6"/>
+              <text x="620" y="72">Cliente</text>
+              <text x="620" y="90" font-family="Cascadia Code, Consolas, monospace" font-weight="400" font-size="9.5" fill="var(--ink-faint)">clientes &middot; PK id</text>
+            </g>
+            <g>
+              <rect x="870" y="50" width="190" height="54" rx="3" fill="var(--paper-raised)" stroke="var(--line-strong)" stroke-width="1.4"/>
+              <text x="890" y="68">Cliente Portal</text>
+              <text x="890" y="84" font-size="12.5">Acceso</text>
+              <text x="890" y="98" font-family="Cascadia Code, Consolas, monospace" font-weight="400" font-size="9" fill="var(--ink-faint)">clientes_portal_acceso</text>
+            </g>
+
+            <!-- band 2 -->
+            <g>
+              <rect x="60" y="240" width="190" height="54" rx="3" fill="var(--paper-raised)" stroke="var(--line-strong)" stroke-width="1.4"/>
+              <text x="80" y="258">Tipo</text>
+              <text x="80" y="274" font-size="12.5">Cotizaci&oacute;n</text>
+              <text x="80" y="288" font-family="Cascadia Code, Consolas, monospace" font-weight="400" font-size="9" fill="var(--ink-faint)">cot_tipo &middot; PK numero</text>
+            </g>
+            <g>
+              <rect x="330" y="240" width="190" height="54" rx="3" fill="var(--paper-raised)" stroke="var(--ink)" stroke-width="1.6"/>
+              <text x="350" y="262">Cotizaci&oacute;n</text>
+              <text x="350" y="280" font-family="Cascadia Code, Consolas, monospace" font-weight="400" font-size="9.5" fill="var(--ink-faint)">cotizaciones &middot; PK id</text>
+            </g>
+            <g>
+              <rect x="600" y="240" width="190" height="54" rx="3" fill="var(--paper-raised)" stroke="var(--line-strong)" stroke-width="1.4"/>
+              <text x="620" y="258">Cotizaci&oacute;n</text>
+              <text x="620" y="274" font-size="12.5">Item</text>
+              <text x="620" y="288" font-family="Cascadia Code, Consolas, monospace" font-weight="400" font-size="9" fill="var(--ink-faint)">cotizacion_items</text>
+            </g>
+
+            <!-- band 3 -->
+            <g>
+              <rect x="60" y="430" width="190" height="54" rx="3" fill="var(--paper-raised)" stroke="var(--ink)" stroke-width="1.6"/>
+              <text x="80" y="452">Equipo</text>
+              <text x="80" y="470" font-family="Cascadia Code, Consolas, monospace" font-weight="400" font-size="9.5" fill="var(--ink-faint)">equipos &middot; PK id</text>
+            </g>
+            <g>
+              <rect x="330" y="430" width="190" height="54" rx="3" fill="var(--paper-raised)" stroke="var(--line-strong)" stroke-width="1.4"/>
+              <text x="350" y="452">Asignaci&oacute;n</text>
+              <text x="350" y="470" font-family="Cascadia Code, Consolas, monospace" font-weight="400" font-size="9.5" fill="var(--ink-faint)">asignaciones &middot; PK id</text>
+            </g>
+            <g>
+              <rect x="600" y="430" width="190" height="54" rx="3" fill="var(--paper-raised)" stroke="var(--ink)" stroke-width="1.6"/>
+              <text x="620" y="452">Reporte</text>
+              <text x="620" y="470" font-family="Cascadia Code, Consolas, monospace" font-weight="400" font-size="9.5" fill="var(--ink-faint)">reportes &middot; PK id</text>
+            </g>
+            <g>
+              <rect x="870" y="430" width="190" height="54" rx="3" fill="var(--paper-raised)" stroke="var(--line-strong)" stroke-width="1.4"/>
+              <text x="890" y="448">Comentario</text>
+              <text x="890" y="464" font-size="12.5">Calidad</text>
+              <text x="890" y="478" font-family="Cascadia Code, Consolas, monospace" font-weight="400" font-size="9" fill="var(--ink-faint)">comentarios_calidad</text>
+            </g>
+
+            <!-- band 4 -->
+            <g>
+              <rect x="60" y="620" width="190" height="54" rx="3" fill="var(--paper-raised)" stroke="var(--line-strong)" stroke-width="1.4"/>
+              <text x="80" y="642">Patr&oacute;n</text>
+              <text x="80" y="660" font-family="Cascadia Code, Consolas, monospace" font-weight="400" font-size="9.5" fill="var(--ink-faint)">patrones &middot; PK id</text>
+            </g>
+            <g>
+              <rect x="330" y="620" width="190" height="54" rx="3" fill="var(--paper-raised)" stroke="var(--line-strong)" stroke-width="1.4"/>
+              <text x="350" y="638">Calibraci&oacute;n</text>
+              <text x="350" y="654" font-size="12.5">Patr&oacute;n</text>
+              <text x="350" y="668" font-family="Cascadia Code, Consolas, monospace" font-weight="400" font-size="9" fill="var(--ink-faint)">calibraciones_patron</text>
+            </g>
+            <g>
+              <rect x="600" y="620" width="190" height="54" rx="3" fill="var(--paper-raised)" stroke="var(--line-strong)" stroke-width="1.4"/>
+              <text x="620" y="642">Actividad</text>
+              <text x="620" y="660" font-family="Cascadia Code, Consolas, monospace" font-weight="400" font-size="9.5" fill="var(--ink-faint)">actividades &middot; PK id</text>
+            </g>
+            <g>
+              <rect x="870" y="620" width="190" height="54" rx="3" fill="var(--paper-raised)" stroke="var(--line-strong)" stroke-width="1.4" stroke-dasharray="4 3"/>
+              <text x="890" y="642">Factura</text>
+              <text x="890" y="660" font-family="Cascadia Code, Consolas, monospace" font-weight="400" font-size="9.5" fill="var(--ink-faint)">facturas &middot; PK id</text>
+            </g>
+            <g>
+              <rect x="1140" y="620" width="190" height="54" rx="3" fill="var(--paper-raised)" stroke="var(--line-strong)" stroke-width="1.4" stroke-dasharray="4 3"/>
+              <text x="1160" y="642">Pago</text>
+              <text x="1160" y="660" font-family="Cascadia Code, Consolas, monospace" font-weight="400" font-size="9.5" fill="var(--ink-faint)">pagos &middot; PK id</text>
+            </g>
+
+          </g>
+        </g>
+      </svg>
+    </div>
+    <figcaption>Diagrama entidad&ndash;relaci&oacute;n de METRYCO: 16 entidades organizadas en las cuatro etapas del proceso del laboratorio. Las cajas con borde grueso son los "hub" del m&oacute;dulo (m&aacute;s relaciones entrantes); los rieles laterales representan las referencias a <code>Usuario</code> y <code>Cliente</code> que atraviesan todo el sistema, con el rol de esa relaci&oacute;n anotado junto al punto de entrada.</figcaption>
+  </figure>
+
+  <div class="legend">
+    <span><svg viewBox="0 0 26 12"><line x1="1" y1="6" x2="25" y2="6" stroke="currentColor" stroke-width="2"/></svg> relaci&oacute;n requerida (spine)</span>
+    <span><svg viewBox="0 0 26 12"><line x1="1" y1="6" x2="25" y2="6" stroke="currentColor" stroke-width="1.6" stroke-dasharray="3 4"/></svg> relaci&oacute;n opcional / nula permitida</span>
+    <span><svg viewBox="0 0 26 12"><line x1="1" y1="6" x2="25" y2="6" stroke="var(--accent)" stroke-width="1.6" opacity="0.7"/></svg> riel Usuario / Cliente (referencia transversal)</span>
+    <span><svg viewBox="0 0 26 12"><line x1="1" y1="6" x2="25" y2="6" stroke="var(--crit)" stroke-width="1.6" stroke-dasharray="2 4" opacity="0.8"/></svg> relaci&oacute;n propuesta (no existe en el sistema viejo)</span>
+    <span><svg viewBox="0 0 26 12"><rect x="1" y="1" width="24" height="10" fill="none" stroke="currentColor" stroke-width="1.4" stroke-dasharray="4 3"/></svg> alcance a confirmar (facturaci&oacute;n)</span>
+  </div>
+
+  <!-- ================= MODULE 01 ================= -->
+  <div class="module">
+    <div class="module__head">
+      <span class="module__num">01</span>
+      <h2>Identidad</h2>
+      <span class="module__note">qui&eacute;n opera el sistema y a qui&eacute;n le presta servicio</span>
+    </div>
+    <div class="card-grid">
+
+      <article class="card">
+        <header class="card__head"><h3>Usuario</h3><code>usuarios</code></header>
+        <table class="attrs">
+          <thead><tr><th>Campo</th><th>Tipo</th><th>Clave</th><th>Notas</th></tr></thead>
+          <tbody>
+            <tr><td class="field">id</td><td class="type">Int</td><td class="key k-pk">PK</td><td class="notes">autoincremental</td></tr>
+            <tr><td class="field">nombre</td><td class="type">String</td><td class="key"></td><td class="notes"></td></tr>
+            <tr><td class="field">usuario</td><td class="type">String</td><td class="key k-uq">UNIQUE</td><td class="notes">login</td></tr>
+            <tr><td class="field">password_hash</td><td class="type">String</td><td class="key"></td><td class="notes">nunca texto plano (as&iacute; est&aacute; hoy en el viejo)</td></tr>
+            <tr><td class="field">correo</td><td class="type">String?</td><td class="key k-uq">UNIQUE</td><td class="notes"></td></tr>
+            <tr><td class="field">rol</td><td class="type">enum</td><td class="key"></td><td class="notes">admin &middot; tecnico &middot; ventas &middot; calidad</td></tr>
+            <tr><td class="field">activo</td><td class="type">Boolean</td><td class="key"></td><td class="notes">default true</td></tr>
+            <tr><td class="field">created_at</td><td class="type">DateTime</td><td class="key"></td><td class="notes"></td></tr>
+            <tr><td class="field">updated_at</td><td class="type">DateTime</td><td class="key"></td><td class="notes"></td></tr>
+          </tbody>
+        </table>
+      </article>
+
+      <article class="card">
+        <header class="card__head"><h3>Cliente</h3><code>clientes</code></header>
+        <table class="attrs">
+          <thead><tr><th>Campo</th><th>Tipo</th><th>Clave</th><th>Notas</th></tr></thead>
+          <tbody>
+            <tr><td class="field">id</td><td class="type">Int</td><td class="key k-pk">PK</td><td class="notes"></td></tr>
+            <tr><td class="field">razon_social</td><td class="type">String</td><td class="key"></td><td class="notes"></td></tr>
+            <tr><td class="field">rfc</td><td class="type">String</td><td class="key k-uq">UNIQUE</td><td class="notes"></td></tr>
+            <tr><td class="field">correo</td><td class="type">String?</td><td class="key"></td><td class="notes"></td></tr>
+            <tr><td class="field">correo_facturacion</td><td class="type">String?</td><td class="key"></td><td class="notes"></td></tr>
+            <tr><td class="field">calle / num_ext / num_int</td><td class="type">String?</td><td class="key"></td><td class="notes">domicilio fiscal</td></tr>
+            <tr><td class="field">colonia / ciudad / estado / pais / cp</td><td class="type">String?</td><td class="key"></td><td class="notes"></td></tr>
+            <tr><td class="field">metodo_pago / condiciones_pago</td><td class="type">String?</td><td class="key"></td><td class="notes"></td></tr>
+            <tr><td class="field">uso_cfdi / regimen_fiscal</td><td class="type">String?</td><td class="key"></td><td class="notes">requerido si se timbra CFDI</td></tr>
+            <tr><td class="field">sucursal</td><td class="type">String?</td><td class="key"></td><td class="notes"></td></tr>
+            <tr><td class="field">activo</td><td class="type">Boolean</td><td class="key"></td><td class="notes"></td></tr>
+            <tr><td class="field">created_at / updated_at</td><td class="type">DateTime</td><td class="key"></td><td class="notes"></td></tr>
+          </tbody>
+        </table>
+      </article>
+
+      <article class="card">
+        <header class="card__head"><h3>Contacto</h3><code>contactos</code></header>
+        <table class="attrs">
+          <thead><tr><th>Campo</th><th>Tipo</th><th>Clave</th><th>Notas</th></tr></thead>
+          <tbody>
+            <tr><td class="field">id</td><td class="type">Int</td><td class="key k-pk">PK</td><td class="notes"></td></tr>
+            <tr><td class="field">cliente_id</td><td class="type">Int</td><td class="key k-fk">FK &rarr; Cliente</td><td class="notes">ON DELETE CASCADE</td></tr>
+            <tr><td class="field">nombre</td><td class="type">String</td><td class="key"></td><td class="notes"></td></tr>
+            <tr><td class="field">puesto</td><td class="type">String?</td><td class="key"></td><td class="notes"></td></tr>
+            <tr><td class="field">telefono</td><td class="type">String?</td><td class="key"></td><td class="notes"></td></tr>
+            <tr><td class="field">correo</td><td class="type">String?</td><td class="key"></td><td class="notes"></td></tr>
+            <tr><td class="field">principal</td><td class="type">Boolean</td><td class="key"></td><td class="notes">contacto por defecto del cliente</td></tr>
+          </tbody>
+        </table>
+      </article>
+
+      <article class="card">
+        <header class="card__head"><h3>ClientePortalAcceso</h3><code>clientes_portal_acceso</code></header>
+        <table class="attrs">
+          <thead><tr><th>Campo</th><th>Tipo</th><th>Clave</th><th>Notas</th></tr></thead>
+          <tbody>
+            <tr><td class="field">id</td><td class="type">Int</td><td class="key k-pk">PK</td><td class="notes"></td></tr>
+            <tr><td class="field">cliente_id</td><td class="type">Int</td><td class="key k-fk">FK+UQ &rarr; Cliente</td><td class="notes">1&ndash;a&ndash;1, login self&#8209;service del cliente</td></tr>
+            <tr><td class="field">usuario</td><td class="type">String</td><td class="key k-uq">UNIQUE</td><td class="notes"></td></tr>
+            <tr><td class="field">password_hash</td><td class="type">String</td><td class="key"></td><td class="notes"></td></tr>
+            <tr><td class="field">created_at</td><td class="type">DateTime</td><td class="key"></td><td class="notes"></td></tr>
+          </tbody>
+        </table>
+      </article>
+
+    </div>
+  </div>
+
+  <!-- ================= MODULE 02 ================= -->
+  <div class="module">
+    <div class="module__head">
+      <span class="module__num">02</span>
+      <h2>Comercial</h2>
+      <span class="module__note">c&oacute;mo se vende el servicio de laboratorio</span>
+    </div>
+    <div class="card-grid">
+
+      <article class="card">
+        <header class="card__head"><h3>TipoCotizacion</h3><code>cot_tipo</code></header>
+        <table class="attrs">
+          <thead><tr><th>Campo</th><th>Tipo</th><th>Clave</th><th>Notas</th></tr></thead>
+          <tbody>
+            <tr><td class="field">numero</td><td class="type">Int</td><td class="key k-pk">PK</td><td class="notes">cat&aacute;logo, no autoincremental</td></tr>
+            <tr><td class="field">nombre</td><td class="type">String</td><td class="key"></td><td class="notes"></td></tr>
+            <tr><td class="field">comentarios</td><td class="type">String?</td><td class="key"></td><td class="notes">texto plantilla para PDF de cotizaci&oacute;n</td></tr>
+          </tbody>
+        </table>
+      </article>
+
+      <article class="card">
+        <header class="card__head"><h3>Cotizacion</h3><code>cotizaciones</code></header>
+        <table class="attrs">
+          <thead><tr><th>Campo</th><th>Tipo</th><th>Clave</th><th>Notas</th></tr></thead>
+          <tbody>
+            <tr><td class="field">id</td><td class="type">Int</td><td class="key k-pk">PK</td><td class="notes"></td></tr>
+            <tr><td class="field">folio</td><td class="type">String</td><td class="key k-uq">UNIQUE</td><td class="notes">ej. COT&#8209;2026&#8209;0001</td></tr>
+            <tr><td class="field">cliente_id</td><td class="type">Int</td><td class="key k-fk">FK &rarr; Cliente</td><td class="notes">RESTRICT</td></tr>
+            <tr><td class="field">contacto_id</td><td class="type">Int?</td><td class="key k-fk">FK &rarr; Contacto</td><td class="notes">SET NULL, opcional</td></tr>
+            <tr><td class="field">vendedor_id</td><td class="type">Int</td><td class="key k-fk">FK &rarr; Usuario</td><td class="notes">RESTRICT</td></tr>
+            <tr><td class="field">tipo_id</td><td class="type">Int</td><td class="key k-fk">FK &rarr; TipoCotizacion</td><td class="notes"></td></tr>
+            <tr><td class="field">fecha</td><td class="type">DateTime</td><td class="key"></td><td class="notes">reemplaza day/mon/yea/hou/min/sec del viejo</td></tr>
+            <tr><td class="field">status</td><td class="type">enum</td><td class="key"></td><td class="notes">borrador &middot; enviada &middot; aprobada &middot; rechazada &middot; cancelada</td></tr>
+            <tr><td class="field">moneda</td><td class="type">enum</td><td class="key"></td><td class="notes">MXN &middot; USD</td></tr>
+            <tr><td class="field">iva</td><td class="type">Decimal(5,2)</td><td class="key"></td><td class="notes">default 16.00</td></tr>
+            <tr><td class="field">created_at / updated_at</td><td class="type">DateTime</td><td class="key"></td><td class="notes"></td></tr>
+          </tbody>
+        </table>
+      </article>
+
+      <article class="card">
+        <header class="card__head"><h3>CotizacionItem</h3><code>cotizacion_items</code></header>
+        <table class="attrs">
+          <thead><tr><th>Campo</th><th>Tipo</th><th>Clave</th><th>Notas</th></tr></thead>
+          <tbody>
+            <tr><td class="field">id</td><td class="type">Int</td><td class="key k-pk">PK</td><td class="notes"></td></tr>
+            <tr><td class="field">cotizacion_id</td><td class="type">Int</td><td class="key k-fk">FK &rarr; Cotizacion</td><td class="notes">CASCADE</td></tr>
+            <tr><td class="field">cantidad</td><td class="type">Int</td><td class="key"></td><td class="notes"></td></tr>
+            <tr><td class="field">marca / modelo</td><td class="type">String?</td><td class="key"></td><td class="notes"></td></tr>
+            <tr><td class="field">descripcion</td><td class="type">String</td><td class="key"></td><td class="notes"></td></tr>
+            <tr><td class="field">tiempo_entrega</td><td class="type">String?</td><td class="key"></td><td class="notes"></td></tr>
+            <tr><td class="field">precio_unitario</td><td class="type">Decimal(12,2)</td><td class="key"></td><td class="notes"><b>nunca string</b> &mdash; causa del bug #2 del log viejo</td></tr>
+            <tr><td class="field">precio_total</td><td class="type">Decimal(12,2)</td><td class="key"></td><td class="notes">= cantidad &times; precio_unitario</td></tr>
+          </tbody>
+        </table>
+      </article>
+
+    </div>
+  </div>
+
+  <!-- ================= MODULE 03 ================= -->
+  <div class="module">
+    <div class="module__head">
+      <span class="module__num">03</span>
+      <h2>Operaci&oacute;n de laboratorio</h2>
+      <span class="module__note">el trabajo real: equipos, reportes, asignaciones</span>
+    </div>
+    <div class="card-grid">
+
+      <article class="card">
+        <header class="card__head"><h3>Equipo</h3><code>equipos</code></header>
+        <table class="attrs">
+          <thead><tr><th>Campo</th><th>Tipo</th><th>Clave</th><th>Notas</th></tr></thead>
+          <tbody>
+            <tr><td class="field">id</td><td class="type">Int</td><td class="key k-pk">PK</td><td class="notes"></td></tr>
+            <tr><td class="field">id_interno</td><td class="type">String</td><td class="key k-uq">UNIQUE</td><td class="notes">c&oacute;digo de activo / QR</td></tr>
+            <tr><td class="field">cliente_id</td><td class="type">Int</td><td class="key k-fk">FK &rarr; Cliente</td><td class="notes">RESTRICT &mdash; equipo del cliente, no del lab</td></tr>
+            <tr><td class="field">registrado_por_id</td><td class="type">Int</td><td class="key k-fk">FK &rarr; Usuario</td><td class="notes">RESTRICT</td></tr>
+            <tr><td class="field">marca / modelo / serie / descripcion / categoria</td><td class="type">String?</td><td class="key"></td><td class="notes"></td></tr>
+            <tr><td class="field">costo</td><td class="type">Decimal(12,2)?</td><td class="key"></td><td class="notes"></td></tr>
+            <tr><td class="field">moneda</td><td class="type">enum?</td><td class="key"></td><td class="notes">MXN &middot; USD</td></tr>
+            <tr><td class="field">comentarios / localizacion</td><td class="type">String?</td><td class="key"></td><td class="notes"></td></tr>
+            <tr><td class="field">unidades / rango / division_minima</td><td class="type">String?</td><td class="key"></td><td class="notes">especificaciones de medici&oacute;n</td></tr>
+            <tr><td class="field">rango_uso / rango_calibracion</td><td class="type">String?</td><td class="key"></td><td class="notes"></td></tr>
+            <tr><td class="field">created_at</td><td class="type">DateTime</td><td class="key"></td><td class="notes"></td></tr>
+          </tbody>
+        </table>
+      </article>
+
+      <article class="card">
+        <header class="card__head"><h3>Reporte</h3><code>reportes</code></header>
+        <table class="attrs">
+          <thead><tr><th>Campo</th><th>Tipo</th><th>Clave</th><th>Notas</th></tr></thead>
+          <tbody>
+            <tr><td class="field">id</td><td class="type">Int</td><td class="key k-pk">PK</td><td class="notes"></td></tr>
+            <tr><td class="field">folio</td><td class="type">String</td><td class="key k-uq">UNIQUE</td><td class="notes">ej. REP&#8209;2026&#8209;0001</td></tr>
+            <tr><td class="field">cotizacion_id</td><td class="type">Int?</td><td class="key k-fk">FK &rarr; Cotizacion</td><td class="notes">SET NULL, opcional</td></tr>
+            <tr><td class="field">cliente_id</td><td class="type">Int</td><td class="key k-fk">FK &rarr; Cliente</td><td class="notes">RESTRICT</td></tr>
+            <tr><td class="field">contacto_id</td><td class="type">Int?</td><td class="key k-fk">FK &rarr; Contacto</td><td class="notes">SET NULL, opcional</td></tr>
+            <tr><td class="field">creado_por_id</td><td class="type">Int</td><td class="key k-fk">FK &rarr; Usuario</td><td class="notes">RESTRICT</td></tr>
+            <tr><td class="field">fecha</td><td class="type">DateTime</td><td class="key"></td><td class="notes"></td></tr>
+            <tr><td class="field">status</td><td class="type">enum</td><td class="key"></td><td class="notes">pendiente &middot; en_proceso &middot; autorizado &middot; entregado &middot; cancelado</td></tr>
+            <tr><td class="field">created_at / updated_at</td><td class="type">DateTime</td><td class="key"></td><td class="notes"></td></tr>
+          </tbody>
+        </table>
+      </article>
+
+      <article class="card">
+        <header class="card__head"><h3>Asignacion</h3><code>asignaciones</code></header>
+        <table class="attrs">
+          <thead><tr><th>Campo</th><th>Tipo</th><th>Clave</th><th>Notas</th></tr></thead>
+          <tbody>
+            <tr><td class="field">id</td><td class="type">Int</td><td class="key k-pk">PK</td><td class="notes"></td></tr>
+            <tr><td class="field">reporte_id</td><td class="type">Int</td><td class="key k-fk">FK &rarr; Reporte</td><td class="notes">CASCADE</td></tr>
+            <tr><td class="field">tecnico_id</td><td class="type">Int</td><td class="key k-fk">FK &rarr; Usuario</td><td class="notes">a qui&eacute;n se le asign&oacute;</td></tr>
+            <tr><td class="field">realizo_id</td><td class="type">Int?</td><td class="key k-fk">FK &rarr; Usuario</td><td class="notes">SET NULL &mdash; qui&eacute;n ejecut&oacute; realmente (puede diferir del asignado)</td></tr>
+            <tr><td class="field">equipo_id</td><td class="type">Int</td><td class="key k-fk">FK &rarr; Equipo</td><td class="notes">RESTRICT</td></tr>
+            <tr><td class="field">patron_id</td><td class="type">Int?</td><td class="key k-fk">FK &rarr; Patron <span class="pill">propuesto</span></td><td class="notes">no existe en el viejo &mdash; ver nota de trazabilidad arriba</td></tr>
+            <tr><td class="field">fecha / fecha_entrega</td><td class="type">DateTime</td><td class="key"></td><td class="notes"></td></tr>
+            <tr><td class="field">status / status_entrega / status_certificado</td><td class="type">String</td><td class="key"></td><td class="notes">tres estados independientes, as&iacute; en el viejo</td></tr>
+          </tbody>
+        </table>
+      </article>
+
+      <article class="card">
+        <header class="card__head"><h3>ComentarioCalidad</h3><code>comentarios_calidad</code></header>
+        <table class="attrs">
+          <thead><tr><th>Campo</th><th>Tipo</th><th>Clave</th><th>Notas</th></tr></thead>
+          <tbody>
+            <tr><td class="field">id</td><td class="type">Int</td><td class="key k-pk">PK</td><td class="notes"></td></tr>
+            <tr><td class="field">reporte_id</td><td class="type">Int</td><td class="key k-fk">FK &rarr; Reporte</td><td class="notes">CASCADE</td></tr>
+            <tr><td class="field">usuario_id</td><td class="type">Int</td><td class="key k-fk">FK &rarr; Usuario</td><td class="notes">RESTRICT</td></tr>
+            <tr><td class="field">comentario</td><td class="type">String</td><td class="key"></td><td class="notes"></td></tr>
+            <tr><td class="field">created_at</td><td class="type">DateTime</td><td class="key"></td><td class="notes"></td></tr>
+          </tbody>
+        </table>
+      </article>
+
+    </div>
+  </div>
+
+  <!-- ================= MODULE 04 ================= -->
+  <div class="module">
+    <div class="module__head">
+      <span class="module__num">04</span>
+      <h2>Trazabilidad y gesti&oacute;n</h2>
+      <span class="module__note">patrones internos, agenda y cobranza</span>
+    </div>
+    <div class="card-grid">
+
+      <article class="card">
+        <header class="card__head"><h3>Patron</h3><code>patrones</code></header>
+        <table class="attrs">
+          <thead><tr><th>Campo</th><th>Tipo</th><th>Clave</th><th>Notas</th></tr></thead>
+          <tbody>
+            <tr><td class="field">id</td><td class="type">Int</td><td class="key k-pk">PK</td><td class="notes"></td></tr>
+            <tr><td class="field">nombre</td><td class="type">String</td><td class="key"></td><td class="notes"></td></tr>
+            <tr><td class="field">marca / modelo / serie</td><td class="type">String?</td><td class="key"></td><td class="notes"></td></tr>
+            <tr><td class="field">rango / incertidumbre</td><td class="type">String?</td><td class="key"></td><td class="notes"></td></tr>
+            <tr><td class="field">activo</td><td class="type">Boolean</td><td class="key"></td><td class="notes"></td></tr>
+            <tr><td class="field">created_at</td><td class="type">DateTime</td><td class="key"></td><td class="notes"></td></tr>
+          </tbody>
+        </table>
+      </article>
+
+      <article class="card">
+        <header class="card__head"><h3>CalibracionPatron</h3><code>calibraciones_patron</code></header>
+        <table class="attrs">
+          <thead><tr><th>Campo</th><th>Tipo</th><th>Clave</th><th>Notas</th></tr></thead>
+          <tbody>
+            <tr><td class="field">id</td><td class="type">Int</td><td class="key k-pk">PK</td><td class="notes"></td></tr>
+            <tr><td class="field">patron_id</td><td class="type">Int</td><td class="key k-fk">FK &rarr; Patron</td><td class="notes">CASCADE</td></tr>
+            <tr><td class="field">fecha_calibracion</td><td class="type">DateTime</td><td class="key"></td><td class="notes"></td></tr>
+            <tr><td class="field">fecha_vencimiento</td><td class="type">DateTime</td><td class="key"></td><td class="notes">indexado &mdash; alimenta alertas de vencimiento</td></tr>
+            <tr><td class="field">certificado_no</td><td class="type">String?</td><td class="key"></td><td class="notes"></td></tr>
+            <tr><td class="field">laboratorio_externo</td><td class="type">String?</td><td class="key"></td><td class="notes">qui&eacute;n calibr&oacute; el patr&oacute;n</td></tr>
+            <tr><td class="field">archivo_url</td><td class="type">String?</td><td class="key"></td><td class="notes">certificado PDF</td></tr>
+          </tbody>
+        </table>
+      </article>
+
+      <article class="card">
+        <header class="card__head"><h3>Actividad</h3><code>actividades</code></header>
+        <table class="attrs">
+          <thead><tr><th>Campo</th><th>Tipo</th><th>Clave</th><th>Notas</th></tr></thead>
+          <tbody>
+            <tr><td class="field">id</td><td class="type">Int</td><td class="key k-pk">PK</td><td class="notes"></td></tr>
+            <tr><td class="field">titulo</td><td class="type">String</td><td class="key"></td><td class="notes"></td></tr>
+            <tr><td class="field">descripcion</td><td class="type">String?</td><td class="key"></td><td class="notes"></td></tr>
+            <tr><td class="field">fecha_inicio</td><td class="type">DateTime</td><td class="key"></td><td class="notes"></td></tr>
+            <tr><td class="field">fecha_fin</td><td class="type">DateTime?</td><td class="key"></td><td class="notes"></td></tr>
+            <tr><td class="field">responsable_id</td><td class="type">Int</td><td class="key k-fk">FK &rarr; Usuario</td><td class="notes">RESTRICT</td></tr>
+            <tr><td class="field">status</td><td class="type">String</td><td class="key"></td><td class="notes"></td></tr>
+          </tbody>
+        </table>
+      </article>
+
+      <article class="card card--pending">
+        <header class="card__head"><h3>Factura <span class="pill">alcance a confirmar</span></h3><code>facturas</code></header>
+        <table class="attrs">
+          <thead><tr><th>Campo</th><th>Tipo</th><th>Clave</th><th>Notas</th></tr></thead>
+          <tbody>
+            <tr><td class="field">id</td><td class="type">Int</td><td class="key k-pk">PK</td><td class="notes"></td></tr>
+            <tr><td class="field">folio</td><td class="type">String</td><td class="key k-uq">UNIQUE</td><td class="notes"></td></tr>
+            <tr><td class="field">cliente_id</td><td class="type">Int</td><td class="key k-fk">FK &rarr; Cliente</td><td class="notes">RESTRICT</td></tr>
+            <tr><td class="field">monto</td><td class="type">Decimal(12,2)</td><td class="key"></td><td class="notes"></td></tr>
+            <tr><td class="field">fecha_emision / fecha_vencimiento</td><td class="type">DateTime</td><td class="key"></td><td class="notes"></td></tr>
+            <tr><td class="field">status</td><td class="type">enum</td><td class="key"></td><td class="notes">pendiente &middot; pagada &middot; vencida &middot; cancelada</td></tr>
+            <tr><td class="field">created_at</td><td class="type">DateTime</td><td class="key"></td><td class="notes"></td></tr>
+          </tbody>
+        </table>
+      </article>
+
+      <article class="card card--pending">
+        <header class="card__head"><h3>Pago <span class="pill">alcance a confirmar</span></h3><code>pagos</code></header>
+        <table class="attrs">
+          <thead><tr><th>Campo</th><th>Tipo</th><th>Clave</th><th>Notas</th></tr></thead>
+          <tbody>
+            <tr><td class="field">id</td><td class="type">Int</td><td class="key k-pk">PK</td><td class="notes"></td></tr>
+            <tr><td class="field">factura_id</td><td class="type">Int</td><td class="key k-fk">FK &rarr; Factura</td><td class="notes">RESTRICT</td></tr>
+            <tr><td class="field">monto</td><td class="type">Decimal(12,2)</td><td class="key"></td><td class="notes"></td></tr>
+            <tr><td class="field">fecha</td><td class="type">DateTime</td><td class="key"></td><td class="notes"></td></tr>
+            <tr><td class="field">referencia / metodo</td><td class="type">String?</td><td class="key"></td><td class="notes"></td></tr>
+          </tbody>
+        </table>
+      </article>
+
+    </div>
+  </div>
+
+  <footer class="notes">
+    <div><b>Convenciones:</b> PK = <code>Int @id @default(autoincrement())</code> en todas las tablas. FK con <code>RESTRICT</code> en cat&aacute;logos con historial (no se pueden borrar si tienen referencias); <code>CASCADE</code> en hijos que no existen sin su padre; <code>SET NULL</code> en relaciones opcionales. Dinero siempre <code>Decimal</code>, nunca <code>String</code>/<code>Float</code>. Fechas siempre <code>DateTime</code> &uacute;nico, nunca partidas en columnas separadas.</div>
+    <div>Este modelo cubre los 16 entidades derivadas de los m&oacute;dulos activos del sidebar (<code>menuConfig.js</code>) m&aacute;s las tablas reales confirmadas en el c&oacute;digo PHP del sistema viejo (<code>client</code>, <code>cotizacion</code>, <code>cotItems</code>, <code>reportes</code>, <code>asignaciones</code>, <code>equipo</code>, <code>admin</code>, <code>admin_client</code>, <code>cot_tipo</code>, <code>contact</code>). No incluye <code>almacen</code>, <code>proveedores</code> ni <code>performance</code> por no estar en el alcance actual del frontend.</div>
+  </footer>
+
+</div>
