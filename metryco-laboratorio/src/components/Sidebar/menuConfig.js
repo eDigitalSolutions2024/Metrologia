@@ -25,6 +25,7 @@ import ScienceIcon from "@mui/icons-material/Science";
 import PrecisionManufacturingIcon from "@mui/icons-material/PrecisionManufacturing";
 import CalendarMonthIcon from "@mui/icons-material/CalendarMonth";
 import PaymentsIcon from "@mui/icons-material/Payments";
+import SpeedIcon from "@mui/icons-material/Speed";
 
 const menu = [
 
@@ -145,6 +146,17 @@ const menu = [
             {
                 title: "Consultar Calendario",
                 path: "/cobranza/calendario"
+            }
+        ]
+    },
+
+    {
+        title: "Performance",
+        icon: SpeedIcon,
+        children: [
+            {
+                title: "Consultar",
+                path: "/performance"
             }
         ]
     }
