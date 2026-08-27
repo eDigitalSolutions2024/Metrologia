@@ -9,9 +9,30 @@ if (missing.length > 0) {
   );
 }
 
+const nodeEnv = process.env.NODE_ENV || "development";
+const isProd = nodeEnv === "production";
+
+// Placeholders de .env.example que nunca deben llegar a producción.
+const PLACEHOLDERS = ["change-me", "change-me-too"];
+if (isProd) {
+  const inseguros = ["JWT_SECRET", "JWT_REFRESH_SECRET"].filter((key) =>
+    PLACEHOLDERS.includes(process.env[key])
+  );
+  if (inseguros.length > 0) {
+    throw new Error(
+      `No se puede arrancar en producción con secretos de ejemplo sin cambiar: ${inseguros.join(", ")}.`
+    );
+  }
+  if (!process.env.CORS_ORIGIN) {
+    throw new Error(
+      "CORS_ORIGIN es obligatorio en producción (debe ser el dominio real del frontend, no localhost)."
+    );
+  }
+}
+
 module.exports = {
   port: Number(process.env.PORT) || 4000,
-  nodeEnv: process.env.NODE_ENV || "development",
+  nodeEnv,
   mongoUri: process.env.MONGODB_URI,
   corsOrigin: process.env.CORS_ORIGIN || "http://localhost:5173",
   jwt: {
