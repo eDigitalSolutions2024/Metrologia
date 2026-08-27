@@ -1,152 +1,271 @@
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
-  Box, Typography, TextField, InputAdornment, IconButton,
-  Chip, Tooltip, Grid, Paper, MenuItem, Select, FormControl, InputLabel,
+  Box, Typography, Grid, Paper, Chip, Tooltip, IconButton,
+  Dialog, DialogTitle, DialogContent, DialogActions, MenuItem, Select, FormControl, InputLabel, Tab, Tabs,
 } from "@mui/material";
 import { useTheme } from "@mui/material/styles";
-import SearchIcon from "@mui/icons-material/Search";
-import { CheckCircleOutlined as CheckCircleOutlineIcon } from "@mui/icons-material";
-import VisibilityOutlinedIcon from "@mui/icons-material/VisibilityOutlined";
+import { useForm, Controller } from "react-hook-form";
+import AddIcon from "@mui/icons-material/Add";
+import CheckCircleOutlineIcon from "@mui/icons-material/CheckCircleOutlineOutlined";
+import ReplayOutlinedIcon from "@mui/icons-material/ReplayOutlined";
 import FileDownloadOutlinedIcon from "@mui/icons-material/FileDownloadOutlined";
 
+import AppButton from "../../shared/components/AppButton";
 import AppTable from "../../shared/components/AppTable";
+import AppInput from "../../shared/components/AppInput";
+import AppDatePicker from "../../shared/components/AppDatePicker";
 import { formatDate } from "../../shared/utils/formatDate";
 import { formatCurrency } from "../../shared/utils/currency";
-import { MOCK } from "./mockData";
+import { exportCsv } from "../../shared/utils/exportCsv";
+import { listarClientes } from "../../services/clientes";
+import { MOCK, DIAS_PAGO_OPCIONES } from "./mockData";
 
-const STATUS_MAP = {
-  pendiente: { label: "Pendiente",    color: "warning" },
-  pagado:    { label: "Pagado",       color: "success" },
-  vencido:   { label: "Vencido",      color: "error" },
-  parcial:   { label: "Pago Parcial", color: "info" },
-};
+function sumarDias(fecha, dias) {
+  const d = new Date(fecha);
+  d.setDate(d.getDate() + Number(dias));
+  return d.toISOString().slice(0, 10);
+}
 
-
-export default function CobranzaPage() {
-  const theme = useTheme();
-  const [search, setSearch] = useState("");
-  const [statusFilter, setStatusFilter] = useState("todos");
-  const [page, setPage] = useState(0);
-
-  const filtered = MOCK.filter((f) => {
-    const matchSearch =
-      f.folio.toLowerCase().includes(search.toLowerCase()) ||
-      f.cliente.toLowerCase().includes(search.toLowerCase()) ||
-      f.cotizacion.toLowerCase().includes(search.toLowerCase());
-    const matchStatus = statusFilter === "todos" || f.status === statusFilter;
-    return matchSearch && matchStatus;
+function NuevoRegistroDialog({ open, onClose, onCreated }) {
+  const [clientes, setClientes] = useState([]);
+  const { register, control, handleSubmit, reset, formState: { errors } } = useForm({
+    defaultValues: { oc: "", clienteId: "", folio: "", monto: "", fechaCr: "", diasPago: 30, comentarios: "" },
   });
 
-  const totalPendiente = MOCK.filter((f) => f.status !== "pagado").reduce((s, f) => s + f.saldo, 0);
-  const totalVencido   = MOCK.filter((f) => f.status === "vencido").reduce((s, f) => s + f.saldo, 0);
-  const totalCobrado   = MOCK.filter((f) => f.status === "pagado").reduce((s, f) => s + f.monto, 0);
+  useEffect(() => {
+    if (!open) return;
+    listarClientes({ pageSize: 200 }).then(({ items }) => setClientes(items)).catch(() => setClientes([]));
+  }, [open]);
+
+  const cerrar = () => { reset(); onClose(); };
+
+  const onSubmit = (data) => {
+    const cliente = clientes.find((c) => c._id === data.clienteId);
+    onCreated({
+      ...data,
+      clienteNombre: cliente?.nombre ?? "",
+      monto: Number(data.monto),
+      fechaPago: sumarDias(data.fechaCr, data.diasPago),
+      statusPago: 0,
+      fechaPagada: "",
+    });
+    cerrar();
+  };
+
+  return (
+    <Dialog open={open} onClose={cerrar} fullWidth maxWidth="sm">
+      <DialogTitle>Generar Nuevo Registro en Calendario</DialogTitle>
+      <Box component="form" onSubmit={handleSubmit(onSubmit)}>
+        <DialogContent>
+          <Grid container spacing={2}>
+            <Grid size={{ xs: 12, sm: 6 }}>
+              <AppInput label="Orden de Compra" error={errors.oc} {...register("oc", { required: "Obligatorio" })} />
+            </Grid>
+            <Grid size={{ xs: 12, sm: 6 }}>
+              <FormControl fullWidth size="small" error={!!errors.clienteId}>
+                <InputLabel>Cliente</InputLabel>
+                <Select label="Cliente" defaultValue="" {...register("clienteId", { required: true })} sx={{ borderRadius: 2 }}>
+                  {clientes.map((c) => <MenuItem key={c._id} value={c._id}>{c.nombre}</MenuItem>)}
+                </Select>
+              </FormControl>
+            </Grid>
+            <Grid size={{ xs: 12, sm: 6 }}>
+              <AppInput label="Folio" error={errors.folio} {...register("folio", { required: "Obligatorio" })} />
+            </Grid>
+            <Grid size={{ xs: 12, sm: 6 }}>
+              <AppInput label="Monto" type="number" error={errors.monto} {...register("monto", { required: "Obligatorio", min: { value: 0.01, message: "Debe ser mayor a 0" } })} />
+            </Grid>
+            <Grid size={{ xs: 12, sm: 6 }}>
+              <Controller
+                name="fechaCr"
+                control={control}
+                rules={{ required: "Obligatorio" }}
+                render={({ field }) => <AppDatePicker label="Fecha C/R" error={errors.fechaCr} {...field} />}
+              />
+            </Grid>
+            <Grid size={{ xs: 12, sm: 6 }}>
+              <FormControl fullWidth size="small">
+                <InputLabel>Días de Pago</InputLabel>
+                <Select label="Días de Pago" defaultValue={30} {...register("diasPago")} sx={{ borderRadius: 2 }}>
+                  {DIAS_PAGO_OPCIONES.map((d) => <MenuItem key={d} value={d}>{d === 0 ? "Contado" : `${d} días`}</MenuItem>)}
+                </Select>
+              </FormControl>
+            </Grid>
+            <Grid size={{ xs: 12 }}>
+              <AppInput label="Comentarios" multiline minRows={2} {...register("comentarios")} />
+            </Grid>
+          </Grid>
+        </DialogContent>
+        <DialogActions sx={{ px: 3, pb: 2 }}>
+          <AppButton variant="outlined" onClick={cerrar} sx={{ borderRadius: 2 }}>Cancelar</AppButton>
+          <AppButton type="submit" sx={{ borderRadius: 2 }}>Guardar</AppButton>
+        </DialogActions>
+      </Box>
+    </Dialog>
+  );
+}
+
+function AplicarPagoDialog({ target, onClose, onConfirm }) {
+  const [fechaPagada, setFechaPagada] = useState(new Date().toISOString().slice(0, 10));
+
+  return (
+    <Dialog open={!!target} onClose={onClose} fullWidth maxWidth="xs">
+      <DialogTitle>Aplicar pago — {target?.folio}</DialogTitle>
+      <DialogContent>
+        <AppDatePicker label="Fecha pagada" value={fechaPagada} onChange={setFechaPagada} />
+      </DialogContent>
+      <DialogActions sx={{ px: 3, pb: 2 }}>
+        <AppButton variant="outlined" onClick={onClose} sx={{ borderRadius: 2 }}>Cancelar</AppButton>
+        <AppButton onClick={() => onConfirm(fechaPagada)} sx={{ borderRadius: 2 }}>Aplicar</AppButton>
+      </DialogActions>
+    </Dialog>
+  );
+}
+
+const HOY = new Date().toISOString().slice(0, 10);
+
+// Refleja el flujo real de php/calendario_generar.php + calendario_consultar.php:
+// alta de registro + 3 pestañas (Atrasadas / Por Pagar / Pagadas) sobre la misma
+// tabla `events`, con acciones Aplicar pago / Reabrir.
+export default function CobranzaPage() {
+  const theme = useTheme();
+  const [registros, setRegistros] = useState(MOCK);
+  const [tab, setTab] = useState(0);
+  const [page, setPage] = useState(0);
+  const [nuevoOpen, setNuevoOpen] = useState(false);
+  const [aplicarTarget, setAplicarTarget] = useState(null);
+
+  const atrasadas = useMemo(() => registros.filter((r) => r.statusPago === 0 && r.fechaPago < HOY), [registros]);
+  const porPagar = useMemo(() => registros.filter((r) => r.statusPago === 0 && r.fechaPago >= HOY), [registros]);
+  const pagadas = useMemo(() => registros.filter((r) => r.statusPago === 1), [registros]);
+
+  const tabs = [
+    { label: "Facturas Atrasadas", rows: atrasadas, color: "error" },
+    { label: "Facturas x Pagar", rows: porPagar, color: "warning" },
+    { label: "Facturas Pagadas", rows: pagadas, color: "success" },
+  ];
+  const rowsActuales = tabs[tab].rows;
+  const totalActual = rowsActuales.reduce((s, r) => s + r.monto, 0);
+
+  const aplicarPago = (fechaPagada) => {
+    setRegistros((prev) => prev.map((r) => (r.id === aplicarTarget.id ? { ...r, statusPago: 1, fechaPagada } : r)));
+    setAplicarTarget(null);
+  };
+
+  const reabrir = (id) => {
+    setRegistros((prev) => prev.map((r) => (r.id === id ? { ...r, statusPago: 0, fechaPagada: "" } : r)));
+  };
 
   const columns = [
-    { field: "folio",            headerName: "No. Factura" },
-    { field: "cotizacion",       headerName: "Cotización" },
-    { field: "cliente",          headerName: "Cliente" },
-    { field: "monto",            headerName: "Monto",   renderCell: (row) => formatCurrency(row.monto) },
-    { field: "abono",            headerName: "Abonado", renderCell: (row) => formatCurrency(row.abono) },
-    { field: "saldo",            headerName: "Saldo",   renderCell: (row) => (
-      <Typography fontWeight={700} fontSize={13} color={row.saldo > 0 ? "error.main" : "success.main"}>
-        {formatCurrency(row.saldo)}
-      </Typography>
-    )},
-    { field: "fechaEmision",     headerName: "Emisión",     renderCell: (row) => formatDate(row.fechaEmision) },
-    { field: "fechaVencimiento", headerName: "Vencimiento", renderCell: (row) => formatDate(row.fechaVencimiento) },
+    { field: "clienteNombre", headerName: "Cliente" },
+    { field: "oc", headerName: "OC" },
+    { field: "folio", headerName: "Folio" },
+    { field: "monto", headerName: "Monto", renderCell: (r) => formatCurrency(r.monto) },
+    { field: "fechaCr", headerName: "Fecha C/R", renderCell: (r) => formatDate(r.fechaCr) },
     {
-      field: "status",
-      headerName: "Estado",
-      renderCell: (row) => {
-        const s = STATUS_MAP[row.status] ?? { label: row.status, color: "default" };
-        return <Chip label={s.label} color={s.color} size="small" />;
-      },
-    },
-    {
-      field: "acciones",
-      headerName: "Acciones",
-      align: "center",
-      renderCell: (row) => (
-        <Box sx={{ display: "flex", gap: 0.5, justifyContent: "center" }}>
-          <Tooltip title="Ver detalle">
-            <IconButton size="small">
-              <VisibilityOutlinedIcon fontSize="small" sx={{ color: "secondary.main" }} />
-            </IconButton>
-          </Tooltip>
-          <Tooltip title="Descargar factura">
-            <IconButton size="small">
-              <FileDownloadOutlinedIcon fontSize="small" sx={{ color: "text.secondary" }} />
-            </IconButton>
-          </Tooltip>
-          {row.status !== "pagado" && (
-            <Tooltip title="Registrar pago">
-              <IconButton size="small">
-                <CheckCircleOutlineIcon fontSize="small" sx={{ color: "success.main" }} />
-              </IconButton>
-            </Tooltip>
-          )}
-        </Box>
+      field: "fechaPago",
+      headerName: "Fecha de Pago",
+      renderCell: (r) => (
+        <Typography variant="body2" color={tab === 0 ? "error.main" : "text.primary"} fontWeight={tab === 0 ? 700 : 400}>
+          {formatDate(r.fechaPago)}
+        </Typography>
       ),
     },
+    { field: "comentarios", headerName: "Comentarios" },
+    ...(tab === 2
+      ? [
+          { field: "fechaPagada", headerName: "Fecha Pagada", renderCell: (r) => formatDate(r.fechaPagada) },
+          {
+            field: "acciones", headerName: "Acción", align: "center",
+            renderCell: (r) => (
+              <Tooltip title="Reabrir">
+                <IconButton size="small" onClick={() => reabrir(r.id)}>
+                  <ReplayOutlinedIcon fontSize="small" sx={{ color: "warning.main" }} />
+                </IconButton>
+              </Tooltip>
+            ),
+          },
+        ]
+      : [
+          {
+            field: "acciones", headerName: "Acción", align: "center",
+            renderCell: (r) => (
+              <Tooltip title="Aplicar pago">
+                <IconButton size="small" onClick={() => setAplicarTarget(r)}>
+                  <CheckCircleOutlineIcon fontSize="small" sx={{ color: "success.main" }} />
+                </IconButton>
+              </Tooltip>
+            ),
+          },
+        ]),
   ];
+
+  const exportar = () => {
+    exportCsv(
+      registros.map((r) => ({
+        Cliente: r.clienteNombre, OC: r.oc, Folio: r.folio, Monto: r.monto,
+        FechaCR: r.fechaCr, FechaPago: r.fechaPago, Status: r.statusPago === 1 ? "Pagado" : "Pendiente",
+        FechaPagada: r.fechaPagada,
+      })),
+      "cuentas_por_cobrar.csv"
+    );
+  };
 
   return (
     <Box>
-      <Typography variant="h5" fontWeight={700} mb={1}>Cuentas por Cobrar</Typography>
+      <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 3, flexWrap: "wrap", gap: 2 }}>
+        <Typography variant="h5" fontWeight={700}>Cuentas por Cobrar</Typography>
+        <Box sx={{ display: "flex", gap: 1.5 }}>
+          <AppButton variant="outlined" startIcon={<FileDownloadOutlinedIcon />} onClick={exportar} sx={{ borderRadius: 2 }}>
+            Exportar Reporte Excel
+          </AppButton>
+          <AppButton startIcon={<AddIcon />} onClick={() => setNuevoOpen(true)} sx={{ borderRadius: 2 }}>
+            Nuevo Registro
+          </AppButton>
+        </Box>
+      </Box>
 
-      {/* Resumen financiero */}
       <Grid container spacing={2} mb={3}>
         {[
-          { label: "Total Pendiente", valor: totalPendiente, color: theme.palette.warning.main },
-          { label: "Total Vencido",   valor: totalVencido,   color: theme.palette.error.main },
-          { label: "Total Cobrado",   valor: totalCobrado,   color: theme.palette.success.main },
+          { label: "Total Atrasado", valor: atrasadas.reduce((s, r) => s + r.monto, 0), color: theme.palette.error.main },
+          { label: "Total por Pagar", valor: porPagar.reduce((s, r) => s + r.monto, 0), color: theme.palette.warning.main },
+          { label: "Total Cobrado", valor: pagadas.reduce((s, r) => s + r.monto, 0), color: theme.palette.success.main },
         ].map((s) => (
           <Grid key={s.label} size={{ xs: 12, sm: 4 }}>
             <Paper elevation={0} sx={{ p: 2.5, borderRadius: 3, border: 1, borderColor: "divider", bgcolor: s.color + "1A" }}>
               <Typography variant="caption" color="text.secondary">{s.label}</Typography>
-              <Typography variant="h5" fontWeight={800} sx={{ color: s.color, mt: 0.5 }}>
-                {formatCurrency(s.valor)}
-              </Typography>
+              <Typography variant="h5" fontWeight={800} sx={{ color: s.color, mt: 0.5 }}>{formatCurrency(s.valor)}</Typography>
             </Paper>
           </Grid>
         ))}
       </Grid>
 
-      <Box sx={{ display: "flex", gap: 2, mb: 2, flexWrap: "wrap" }}>
-        <TextField
-          placeholder="Buscar por factura, cotización o cliente..."
-          size="small"
-          value={search}
-          onChange={(e) => { setSearch(e.target.value); setPage(0); }}
-          sx={{ width: 380, "& .MuiOutlinedInput-root": { borderRadius: 2 } }}
-          InputProps={{
-            startAdornment: (
-              <InputAdornment position="start">
-                <SearchIcon fontSize="small" sx={{ color: "text.secondary" }} />
-              </InputAdornment>
-            ),
-          }}
-        />
-        <FormControl size="small" sx={{ minWidth: 160 }}>
-          <InputLabel>Estado</InputLabel>
-          <Select label="Estado" value={statusFilter} onChange={(e) => { setStatusFilter(e.target.value); setPage(0); }} sx={{ borderRadius: 2 }}>
-            <MenuItem value="todos">Todos</MenuItem>
-            <MenuItem value="pendiente">Pendiente</MenuItem>
-            <MenuItem value="parcial">Pago Parcial</MenuItem>
-            <MenuItem value="vencido">Vencido</MenuItem>
-            <MenuItem value="pagado">Pagado</MenuItem>
-          </Select>
-        </FormControl>
-      </Box>
+      <Tabs value={tab} onChange={(_, v) => { setTab(v); setPage(0); }} sx={{ mb: 2, borderBottom: 1, borderColor: "divider" }}>
+        {tabs.map((t) => (
+          <Tab key={t.label} label={<Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>{t.label} <Chip label={t.rows.length} size="small" color={t.color} /></Box>} />
+        ))}
+      </Tabs>
+
+      <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5 }}>
+        Suma de {rowsActuales.length} registro(s): <strong>{formatCurrency(totalActual)}</strong>
+      </Typography>
 
       <AppTable
         columns={columns}
-        rows={filtered.slice(page * 10, page * 10 + 10)}
-        totalCount={filtered.length}
+        rows={rowsActuales.slice(page * 10, page * 10 + 10)}
+        totalCount={rowsActuales.length}
         page={page}
         rowsPerPage={10}
         onPageChange={setPage}
+        emptyText="Sin registros en esta pestaña"
       />
+
+      <NuevoRegistroDialog
+        open={nuevoOpen}
+        onClose={() => setNuevoOpen(false)}
+        onCreated={(nuevo) => setRegistros((prev) => [...prev, { ...nuevo, id: Math.max(0, ...prev.map((r) => r.id)) + 1 }])}
+      />
+      <AplicarPagoDialog target={aplicarTarget} onClose={() => setAplicarTarget(null)} onConfirm={aplicarPago} />
     </Box>
   );
 }

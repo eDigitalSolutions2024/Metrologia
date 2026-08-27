@@ -3,15 +3,17 @@ const Cliente = require("../models/Cliente");
 const Contacto = require("../models/Contacto");
 const Cotizacion = require("../models/Cotizacion");
 const AppError = require("../utils/AppError");
+const escapeRegex = require("../utils/escapeRegex");
 
 async function listar({ search = "", sector = "", page = 0, pageSize = 10 }) {
   const filtro = {};
 
   if (search) {
+    const regex = new RegExp(escapeRegex(search), "i");
     filtro.$or = [
-      { nombre: { $regex: search, $options: "i" } },
-      { rfc: { $regex: search, $options: "i" } },
-      { "contacto.nombre": { $regex: search, $options: "i" } },
+      { nombre: regex },
+      { rfc: regex },
+      { "contacto.nombre": regex },
     ];
   }
 

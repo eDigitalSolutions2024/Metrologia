@@ -17,8 +17,11 @@ import CalidadPage from "../pages/Calidad/CalidadPage";
 import EquiposPage from "../pages/Equipos/EquiposPage";
 import EquipoForm from "../pages/Equipos/EquipoForm";
 import PatronesPage from "../pages/Equipos/PatronesPage";
+import PatronForm from "../pages/Equipos/PatronForm";
+import HistorialCertificadosPage from "../pages/Equipos/HistorialCertificadosPage";
 import ActividadesPage from "../pages/Actividades/ActividadesPage";
 import CobranzaPage from "../pages/Cobranza/CobranzaPage";
+import CalendarioPagosPage from "../pages/Cobranza/CalendarioPagosPage";
 
 import ROUTES from "../shared/constants/routes";
 
@@ -55,9 +58,13 @@ export default function AppRouter() {
         <Route path="equipos" element={<EquiposPage />} />
         <Route path="equipos/nuevo" element={<EquipoForm />} />
         <Route path="equipos/:id/editar" element={<EquipoForm />} />
+        <Route path="equipos/historial-certificados" element={<HistorialCertificadosPage />} />
         <Route path="equipos/patrones" element={<PatronesPage />} />
+        <Route path="equipos/patrones/nuevo" element={<PatronForm />} />
+        <Route path="equipos/patrones/:id/editar" element={<PatronForm />} />
         <Route path="actividades" element={<ActividadesPage />} />
         <Route path="cobranza" element={<CobranzaPage />} />
+        <Route path="cobranza/calendario" element={<CalendarioPagosPage />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Route>
     </Routes>

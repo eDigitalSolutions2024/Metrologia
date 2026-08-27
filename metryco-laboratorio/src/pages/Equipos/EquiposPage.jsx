@@ -1,116 +1,78 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   Box, Typography, TextField, InputAdornment, IconButton,
-  Chip, Tooltip, MenuItem, Select, FormControl, InputLabel,
+  Tooltip, MenuItem, Select, FormControl, InputLabel, Button,
 } from "@mui/material";
 import SearchIcon from "@mui/icons-material/Search";
 import AddIcon from "@mui/icons-material/Add";
 import EditOutlinedIcon from "@mui/icons-material/EditOutlined";
-import WarningAmberOutlinedIcon from "@mui/icons-material/WarningAmberOutlined";
-import { DeleteOutlined as DeleteOutlineIcon } from "@mui/icons-material";
 
 import AppButton from "../../shared/components/AppButton";
 import AppTable from "../../shared/components/AppTable";
-import ConfirmDialog from "../../shared/components/ConfirmDialog";
-import { formatDate } from "../../shared/utils/formatDate";
-import { MOCK } from "./mockData";
+import { listarClientes } from "../../services/clientes";
+import { EQUIPOS_MOCK } from "./mockData";
 
-const STATUS_MAP = {
-  activo:      { label: "Activo",          color: "success" },
-  calibracion: { label: "En Calibración",  color: "warning" },
-  baja:        { label: "Baja",            color: "error" },
-  vencido:     { label: "Cal. Vencida",    color: "error" },
-};
-
-const today = new Date();
-function diasParaVencer(fechaStr) {
-  if (!fechaStr) return null;
-  const diff = new Date(fechaStr) - today;
-  return Math.ceil(diff / (1000 * 60 * 60 * 24));
-}
-
-
+// Consultar Equipos = php/equipo_buscar.php: el equipo pertenece a un cliente
+// (tabla `equipo`, campo empId). Certificado/Portada/Gráfica dependen de las
+// asignaciones de calibración (aún no migradas), por eso van en Historial
+// de Certificados, no aquí.
 export default function EquiposPage() {
   const navigate = useNavigate();
+  const [clientes, setClientes] = useState([]);
+  const [clienteFiltro, setClienteFiltro] = useState("");
   const [search, setSearch] = useState("");
-  const [statusFilter, setStatusFilter] = useState("todos");
   const [page, setPage] = useState(0);
-  const [deleteTarget, setDeleteTarget] = useState(null);
 
-  const filtered = MOCK.filter((e) => {
+  useEffect(() => {
+    listarClientes({ pageSize: 200 })
+      .then(({ items }) => setClientes(items))
+      .catch(() => setClientes([]));
+  }, []);
+
+  const filtered = EQUIPOS_MOCK.filter((e) => {
+    const matchCliente = !clienteFiltro || String(e.clienteId) === String(clienteFiltro);
+    const term = search.toLowerCase();
     const matchSearch =
-      e.codigo.toLowerCase().includes(search.toLowerCase()) ||
-      e.descripcion.toLowerCase().includes(search.toLowerCase()) ||
-      e.marca.toLowerCase().includes(search.toLowerCase()) ||
-      e.serie.toLowerCase().includes(search.toLowerCase());
-    const matchStatus = statusFilter === "todos" || e.status === statusFilter;
-    return matchSearch && matchStatus;
+      !term ||
+      e.idInterno.toLowerCase().includes(term) ||
+      e.descripcion.toLowerCase().includes(term) ||
+      e.marca.toLowerCase().includes(term) ||
+      e.serie.toLowerCase().includes(term);
+    return matchCliente && matchSearch;
   });
 
   const columns = [
-    { field: "codigo",      headerName: "Código" },
+    { field: "id", headerName: "MET" },
+    { field: "clienteNombre", headerName: "Cliente" },
+    { field: "idInterno", headerName: "ID Cliente" },
     { field: "descripcion", headerName: "Descripción" },
-    { field: "marca",       headerName: "Marca" },
-    { field: "modelo",      headerName: "Modelo" },
-    { field: "serie",       headerName: "No. Serie" },
-    { field: "rango",       headerName: "Rango" },
-    { field: "resolucion",  headerName: "Resolución" },
-    {
-      field: "proximaCal",
-      headerName: "Próxima Cal.",
-      renderCell: (row) => {
-        const dias = diasParaVencer(row.proximaCal);
-        const color = dias !== null && dias < 30 ? "error.main" : dias !== null && dias < 60 ? "warning.main" : "success.main";
-        return (
-          <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
-            {dias !== null && dias < 30 && <WarningAmberOutlinedIcon sx={{ fontSize: 14, color }} />}
-            <Typography variant="body2" sx={{ color }}>{formatDate(row.proximaCal)}</Typography>
-          </Box>
-        );
-      },
-    },
-    {
-      field: "status",
-      headerName: "Estado",
-      renderCell: (row) => {
-        const s = STATUS_MAP[row.status] ?? { label: row.status, color: "default" };
-        return <Chip label={s.label} color={s.color} size="small" />;
-      },
-    },
+    { field: "marca", headerName: "Marca" },
+    { field: "modelo", headerName: "Modelo" },
+    { field: "serie", headerName: "Serie" },
+    { field: "categoria", headerName: "Categoría" },
+    { field: "rango", headerName: "Rango" },
     {
       field: "acciones",
       headerName: "Acciones",
       align: "center",
       renderCell: (row) => (
-        <Box sx={{ display: "flex", gap: 0.5, justifyContent: "center" }}>
-          <Tooltip title="Editar">
-            <IconButton size="small" onClick={() => navigate(`/equipos/${row.id}/editar`)}>
-              <EditOutlinedIcon fontSize="small" sx={{ color: "secondary.main" }} />
-            </IconButton>
-          </Tooltip>
-          <Tooltip title="Dar de baja">
-            <IconButton size="small" onClick={() => setDeleteTarget(row)}>
-              <DeleteOutlineIcon fontSize="small" sx={{ color: "error.main" }} />
-            </IconButton>
-          </Tooltip>
-        </Box>
+        <Tooltip title="Editar equipo">
+          <IconButton size="small" onClick={() => navigate(`/equipos/${row.id}/editar`)}>
+            <EditOutlinedIcon fontSize="small" sx={{ color: "secondary.main" }} />
+          </IconButton>
+        </Tooltip>
       ),
     },
   ];
-
-  const porVencer = MOCK.filter((e) => { const d = diasParaVencer(e.proximaCal); return d !== null && d < 30 && d >= 0; }).length;
-  const vencidos  = MOCK.filter((e) => e.status === "vencido").length;
 
   return (
     <Box>
       <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 3 }}>
         <Box>
-          <Typography variant="h5" fontWeight={700}>Equipos de Medición</Typography>
+          <Typography variant="h5" fontWeight={700}>Consultar Equipos</Typography>
           <Typography variant="body2" color="text.secondary">
-            {filtered.length} de {MOCK.length} equipos
-            {porVencer > 0 && <Box component="span" sx={{ color: "warning.main", fontWeight: 700 }}> · {porVencer} por vencer</Box>}
-            {vencidos  > 0 && <Box component="span" sx={{ color: "error.main", fontWeight: 700 }}> · {vencidos} vencidos</Box>}
+            {filtered.length} de {EQUIPOS_MOCK.length} equipos de clientes
           </Typography>
         </Box>
         <AppButton startIcon={<AddIcon />} onClick={() => navigate("/equipos/nuevo")} sx={{ borderRadius: 2 }}>
@@ -118,13 +80,13 @@ export default function EquiposPage() {
         </AppButton>
       </Box>
 
-      <Box sx={{ display: "flex", gap: 2, mb: 2, flexWrap: "wrap" }}>
+      <Box sx={{ display: "flex", gap: 2, mb: 2, flexWrap: "wrap", alignItems: "center" }}>
         <TextField
-          placeholder="Buscar por código, descripción, marca o serie..."
+          placeholder="Buscar por ID, descripción, marca o serie..."
           size="small"
           value={search}
           onChange={(e) => { setSearch(e.target.value); setPage(0); }}
-          sx={{ width: 400, "& .MuiOutlinedInput-root": { borderRadius: 2 } }}
+          sx={{ width: 360, "& .MuiOutlinedInput-root": { borderRadius: 2 } }}
           InputProps={{
             startAdornment: (
               <InputAdornment position="start">
@@ -133,16 +95,19 @@ export default function EquiposPage() {
             ),
           }}
         />
-        <FormControl size="small" sx={{ minWidth: 160 }}>
-          <InputLabel>Estado</InputLabel>
-          <Select label="Estado" value={statusFilter} onChange={(e) => { setStatusFilter(e.target.value); setPage(0); }} sx={{ borderRadius: 2 }}>
-            <MenuItem value="todos">Todos</MenuItem>
-            <MenuItem value="activo">Activo</MenuItem>
-            <MenuItem value="calibracion">En Calibración</MenuItem>
-            <MenuItem value="vencido">Cal. Vencida</MenuItem>
-            <MenuItem value="baja">Baja</MenuItem>
+        <FormControl size="small" sx={{ minWidth: 260 }}>
+          <InputLabel>Filtrar búsqueda por cliente</InputLabel>
+          <Select
+            label="Filtrar búsqueda por cliente"
+            value={clienteFiltro}
+            onChange={(e) => { setClienteFiltro(e.target.value); setPage(0); }}
+            sx={{ borderRadius: 2 }}
+          >
+            <MenuItem value="">Todos los clientes</MenuItem>
+            {clientes.map((c) => <MenuItem key={c._id} value={c._id}>{c.nombre}</MenuItem>)}
           </Select>
         </FormControl>
+        <Button variant="contained" onClick={() => setPage(0)} sx={{ borderRadius: 2 }}>Buscar</Button>
       </Box>
 
       <AppTable
@@ -152,14 +117,6 @@ export default function EquiposPage() {
         page={page}
         rowsPerPage={10}
         onPageChange={setPage}
-      />
-
-      <ConfirmDialog
-        open={!!deleteTarget}
-        title="Dar de baja equipo"
-        message={`¿Deseas dar de baja el equipo "${deleteTarget?.descripcion}" (${deleteTarget?.codigo})?`}
-        onConfirm={() => setDeleteTarget(null)}
-        onCancel={() => setDeleteTarget(null)}
       />
     </Box>
   );

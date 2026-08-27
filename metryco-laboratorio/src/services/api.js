@@ -1,4 +1,5 @@
 import axios from "axios";
+import { getToken, setToken, clearToken } from "../core/auth/tokenStore";
 
 export const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:4000/api";
 
@@ -18,7 +19,8 @@ export const ENDPOINTS = {
   USUARIOS: "/usuarios",
 };
 
-export const TOKEN_KEY = "metryco_token";
+// Solo se persiste el usuario (datos no sensibles) para mostrarlo mientras se
+// restaura la sesión. El access token vive en memoria (ver core/auth/tokenStore).
 export const USER_KEY = "metryco_user";
 
 const api = axios.create({
@@ -27,7 +29,7 @@ const api = axios.create({
 });
 
 api.interceptors.request.use((config) => {
-  const token = localStorage.getItem(TOKEN_KEY);
+  const token = getToken();
   if (token) config.headers.Authorization = `Bearer ${token}`;
   return config;
 });
@@ -51,12 +53,12 @@ api.interceptors.response.use(
         const { data } = await refreshInFlight;
         refreshInFlight = null;
 
-        localStorage.setItem(TOKEN_KEY, data.data.token);
+        setToken(data.data.token);
         original.headers.Authorization = `Bearer ${data.data.token}`;
         return api(original);
       } catch (refreshError) {
         refreshInFlight = null;
-        localStorage.removeItem(TOKEN_KEY);
+        clearToken();
         localStorage.removeItem(USER_KEY);
         window.location.href = "/login";
         return Promise.reject(refreshError);

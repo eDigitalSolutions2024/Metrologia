@@ -109,7 +109,15 @@ const menu = [
                 path: "/equipos"
             },
             {
-                title: "Patrones",
+                title: "Historial Certificados",
+                path: "/equipos/historial-certificados"
+            },
+            {
+                title: "Alta de Patrón",
+                path: "/equipos/patrones/nuevo"
+            },
+            {
+                title: "Consultar Patrones",
                 path: "/equipos/patrones"
             }
         ]
@@ -133,6 +141,10 @@ const menu = [
             {
                 title: "Administrar Pagos",
                 path: "/cobranza"
+            },
+            {
+                title: "Consultar Calendario",
+                path: "/cobranza/calendario"
             }
         ]
     }

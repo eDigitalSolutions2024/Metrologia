@@ -12,7 +12,7 @@ import { useDebounce } from "../../shared/hooks/useDebounce";
 
 import { MOCK as REPORTES_MOCK } from "../../pages/Reportes/mockData";
 import { MOCK as CALIDAD_MOCK } from "../../pages/Calidad/mockData";
-import { MOCK as EQUIPOS_MOCK } from "../../pages/Equipos/mockData";
+import { EQUIPOS_MOCK } from "../../pages/Equipos/mockData";
 import { MOCK as COBRANZA_MOCK } from "../../pages/Cobranza/mockData";
 
 function coincide(texto, query) {
@@ -72,14 +72,14 @@ export default function SearchBar() {
   const equipos = useMemo(() => {
     if (!debouncedQuery.trim()) return [];
     return EQUIPOS_MOCK.filter(
-      (e) => coincide(e.codigo, debouncedQuery) || coincide(e.descripcion, debouncedQuery) || coincide(e.marca, debouncedQuery)
+      (e) => coincide(e.idInterno, debouncedQuery) || coincide(e.descripcion, debouncedQuery) || coincide(e.marca, debouncedQuery)
     ).slice(0, 5);
   }, [debouncedQuery]);
 
   const cobranza = useMemo(() => {
     if (!debouncedQuery.trim()) return [];
     return COBRANZA_MOCK.filter(
-      (f) => coincide(f.folio, debouncedQuery) || coincide(f.cliente, debouncedQuery) || coincide(f.cotizacion, debouncedQuery)
+      (f) => coincide(f.folio, debouncedQuery) || coincide(f.clienteNombre, debouncedQuery) || coincide(f.oc, debouncedQuery)
     ).slice(0, 5);
   }, [debouncedQuery]);
 
@@ -95,10 +95,10 @@ export default function SearchBar() {
     { label: "Clientes", real: true, items: clientes, render: (c) => ({ key: c._id, primary: c.nombre, secondary: c.rfc, onClick: () => ir(`/clientes/${c._id}/editar`) }) },
     { label: "Cotizaciones", real: true, items: cotizaciones, render: (c) => ({ key: c._id, primary: c.folio, secondary: c.clienteInfo?.nombre, extra: c.status, onClick: () => ir(`/cotizaciones?editar=${c._id}`) }) },
     { label: "Usuarios", real: true, items: usuarios, render: (u) => ({ key: u._id, primary: u.nombre, secondary: `@${u.usuario}`, extra: u.rol, onClick: () => ir("/usuarios") }) },
-    { label: "Equipos", real: false, items: equipos, render: (e) => ({ key: e.id, primary: e.descripcion, secondary: e.codigo, extra: e.status, onClick: () => ir(`/equipos/${e.id}/editar`) }) },
+    { label: "Equipos", real: false, items: equipos, render: (e) => ({ key: e.id, primary: e.descripcion, secondary: e.idInterno, extra: e.clienteNombre, onClick: () => ir(`/equipos/${e.id}/editar`) }) },
     { label: "Reportes", real: false, items: reportes, render: (r) => ({ key: r.id, primary: r.folio, secondary: r.cliente, extra: r.status, onClick: () => ir("/reportes") }) },
     { label: "Calidad", real: false, items: calidad, render: (d) => ({ key: d.id, primary: d.titulo, secondary: d.codigo, onClick: () => ir("/calidad") }) },
-    { label: "Cobranza", real: false, items: cobranza, render: (f) => ({ key: f.id, primary: f.folio, secondary: f.cliente, extra: f.status, onClick: () => ir("/cobranza") }) },
+    { label: "Cobranza", real: false, items: cobranza, render: (f) => ({ key: f.id, primary: f.folio, secondary: f.clienteNombre, extra: f.statusPago === 1 ? "Pagado" : "Pendiente", onClick: () => ir("/cobranza") }) },
   ];
 
   const hayResultados = grupos.some((g) => g.items.length > 0);

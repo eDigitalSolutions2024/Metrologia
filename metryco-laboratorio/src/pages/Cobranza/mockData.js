@@ -1,12 +1,34 @@
+// Refleja la tabla real `events` del PHP legacy (php/calendario_generar.php,
+// php/calendario_consultar.php): registro simple de pago por cobrar, sin abonos
+// parciales ni referencia a cotización — solo cliente, OC, folio, monto, fecha de
+// creación/recepción (fechaCr) y días de pago (15/30/60/0), que determinan la
+// fecha de vencimiento (fechaPago = fechaCr + diasPago).
 export const MOCK = [
-  { id:  1, folio: "FAC-2025-034", cotizacion: "COT-2025-031", cliente: "ASSA ABLOY MEXICO SA DE CV",           monto: 11136, abono: 11136, saldo: 0,     fechaEmision: "2025-06-18", fechaVencimiento: "2025-07-18", status: "pagado" },
-  { id:  2, folio: "FAC-2025-033", cotizacion: "COT-2025-032", cliente: "HONEYWELL AEROSPACE TECHNOLOGIES",     monto: 83520, abono: 0,     saldo: 83520, fechaEmision: "2025-06-20", fechaVencimiento: "2025-07-20", status: "pendiente" },
-  { id:  3, folio: "FAC-2025-032", cotizacion: "COT-2025-028", cliente: "DELPHI TECHNOLOGIES MFG",              monto: 17168, abono: 17168, saldo: 0,     fechaEmision: "2025-06-10", fechaVencimiento: "2025-07-10", status: "pagado" },
-  { id:  4, folio: "FAC-2025-031", cotizacion: "COT-2025-027", cliente: "GRUPO BIMBO SAB DE CV",                monto: 36540, abono: 18270, saldo: 18270, fechaEmision: "2025-06-08", fechaVencimiento: "2025-07-08", status: "parcial" },
-  { id:  5, folio: "FAC-2025-030", cotizacion: "COT-2025-025", cliente: "LEXMARK INTERNATIONAL SA DE CV",       monto:  9744, abono:  9744, saldo: 0,     fechaEmision: "2025-06-02", fechaVencimiento: "2025-07-02", status: "pagado" },
-  { id:  6, folio: "FAC-2025-029", cotizacion: "COT-2025-020", cliente: "CONTINENTAL AUTOMOTIVE MFG",           monto: 54200, abono: 0,     saldo: 54200, fechaEmision: "2025-05-20", fechaVencimiento: "2025-06-20", status: "vencido" },
-  { id:  7, folio: "FAC-2025-028", cotizacion: "COT-2025-019", cliente: "AUDI MEXICO SA DE CV",                 monto: 48000, abono: 48000, saldo: 0,     fechaEmision: "2025-05-15", fechaVencimiento: "2025-06-15", status: "pagado" },
-  { id:  8, folio: "FAC-2025-027", cotizacion: "COT-2025-018", cliente: "BOMBARDIER AEROSPACE CHIHUAHUA",       monto: 22400, abono:  8000, saldo: 14400, fechaEmision: "2025-05-10", fechaVencimiento: "2025-06-10", status: "vencido" },
-  { id:  9, folio: "FAC-2025-026", cotizacion: "COT-2025-017", cliente: "FOXCONN INDUSTRIAL INTERNET SA DE CV", monto: 15900, abono: 15900, saldo: 0,     fechaEmision: "2025-05-05", fechaVencimiento: "2025-06-05", status: "pagado" },
-  { id: 10, folio: "FAC-2025-025", cotizacion: "COT-2025-016", cliente: "BAXTER SA DE CV",                      monto: 61200, abono: 30000, saldo: 31200, fechaEmision: "2025-05-01", fechaVencimiento: "2025-06-01", status: "vencido" },
+  {
+    id: 1, oc: "OC-4471", clienteId: 3, clienteNombre: "ASSA ABLOY MEXICO SA DE CV",
+    folio: "FAC-2025-034", monto: 11136, fechaCr: "2025-06-18", diasPago: 30,
+    fechaPago: "2025-07-18", statusPago: 1, fechaPagada: "2025-07-15", comentarios: "",
+  },
+  {
+    id: 2, oc: "OC-4488", clienteId: 4, clienteNombre: "HONEYWELL AEROSPACE TECHNOLOGIES",
+    folio: "FAC-2025-033", monto: 83520, fechaCr: "2025-06-20", diasPago: 30,
+    fechaPago: "2025-07-20", statusPago: 0, fechaPagada: "", comentarios: "Pago en 2 exhibiciones acordado por cliente.",
+  },
+  {
+    id: 3, oc: "OC-4392", clienteId: 2, clienteNombre: "FOXCONN INDUSTRIAL INTERNET SA DE CV",
+    folio: "FAC-2025-029", monto: 54200, fechaCr: "2025-05-20", diasPago: 30,
+    fechaPago: "2025-06-20", statusPago: 0, fechaPagada: "", comentarios: "Cliente reporta atraso administrativo.",
+  },
+  {
+    id: 4, oc: "OC-4401", clienteId: 1, clienteNombre: "AUDI MEXICO SA DE CV",
+    folio: "FAC-2025-028", monto: 48000, fechaCr: "2025-05-15", diasPago: 15,
+    fechaPago: "2025-05-30", statusPago: 1, fechaPagada: "2025-05-28", comentarios: "",
+  },
+  {
+    id: 5, oc: "OC-4512", clienteId: 3, clienteNombre: "ASSA ABLOY MEXICO SA DE CV",
+    folio: "FAC-2025-027", monto: 22400, fechaCr: "2025-05-10", diasPago: 60,
+    fechaPago: "2025-07-09", statusPago: 0, fechaPagada: "", comentarios: "",
+  },
 ];
+
+export const DIAS_PAGO_OPCIONES = [15, 30, 60, 0];

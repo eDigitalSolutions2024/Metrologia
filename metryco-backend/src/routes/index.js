@@ -3,6 +3,7 @@ const authRoutes = require("./auth.routes");
 const usuarioRoutes = require("./usuario.routes");
 const clienteRoutes = require("./cliente.routes");
 const cotizacionRoutes = require("./cotizacion.routes");
+const actividadRoutes = require("./actividad.routes");
 
 const router = Router();
 
@@ -12,5 +13,6 @@ router.use("/auth", authRoutes);
 router.use("/usuarios", usuarioRoutes);
 router.use("/clientes", clienteRoutes);
 router.use("/cotizaciones", cotizacionRoutes);
+router.use("/actividades", actividadRoutes);
 
 module.exports = router;

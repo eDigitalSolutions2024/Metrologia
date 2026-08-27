@@ -1,15 +1,17 @@
 const bcrypt = require("bcryptjs");
 const Usuario = require("../models/Usuario");
 const AppError = require("../utils/AppError");
+const escapeRegex = require("../utils/escapeRegex");
 
 async function listar({ search = "", status = "", rol = "", page = 0, pageSize = 10 }) {
   const filtro = {};
 
   if (search) {
+    const regex = new RegExp(escapeRegex(search), "i");
     filtro.$or = [
-      { nombre: { $regex: search, $options: "i" } },
-      { usuario: { $regex: search, $options: "i" } },
-      { email: { $regex: search, $options: "i" } },
+      { nombre: regex },
+      { usuario: regex },
+      { email: regex },
     ];
   }
 
