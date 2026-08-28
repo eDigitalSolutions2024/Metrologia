@@ -1,6 +1,8 @@
 const mongoose = require("mongoose");
 const CalculoIncertidumbre = require("../models/CalculoIncertidumbre");
 const ModeloIncertidumbre = require("../models/ModeloIncertidumbre");
+const Patron = require("../models/Patron");
+const Asignacion = require("../models/Asignacion");
 const AppError = require("../utils/AppError");
 const { siguienteFolio } = require("../utils/folio");
 const { crearEvento } = require("../utils/historial");
@@ -21,6 +23,7 @@ function contribucionesDesdeModelo(modelo) {
   return (modelo.contribuciones || []).map((c) => ({
     fuente: c.fuente,
     simbolo: c.simbolo,
+    origen: "plantilla",
     tipo: c.tipo,
     modo: c.modo,
     distribucion: c.distribucion,
@@ -35,6 +38,81 @@ function contribucionesDesdeModelo(modelo) {
   }));
 }
 
+const esPlaceholderPatron = (c) =>
+  (c.modo === "certificado" || /certificad/i.test(c.modo || "")) &&
+  // tolerante a codificación: patrón / patron / patr�n
+  /patr.?n de referencia|bloques patr|reference standard/i.test(c.fuente || "") &&
+  (c.origen === "plantilla" || c.origen == null);
+
+/**
+ * Sustituye la contribución genérica "Incertidumbre del patrón de referencia" de
+ * la plantilla por una contribución REAL por cada patrón usado, tomada de su
+ * certificado (`Patron.uEn(nominal)`), más su deriva si está registrada.
+ * Devuelve además avisos si algún patrón está fuera de vigencia.
+ */
+function aplicarPatrones(contribuciones, patronesDocs = [], puntoNominal, unidad, refFecha = new Date()) {
+  const advertencias = [];
+  if (!patronesDocs.length) return { contribuciones, advertencias };
+
+  // quita el placeholder genérico de la plantilla y cualquier fila de patrón previa
+  // (así re-inyectar es idempotente al recalcular / cambiar el punto nominal)
+  let out = contribuciones.filter((c) => !esPlaceholderPatron(c) && c.origen !== "patron");
+
+  for (const p of patronesDocs) {
+    const { U, k, unidad: uUnidad } = p.uEn(puntoNominal);
+    if (Number.isFinite(U)) {
+      out.push({
+        fuente: `Patrón ${p.codigo}`,
+        simbolo: "U_patrón",
+        origen: "patron",
+        tipo: "B",
+        modo: "certificado",
+        distribucion: "normal",
+        valor: U,
+        k: k || 2,
+        coefSensibilidad: 1,
+        unidad: uUnidad || unidad,
+        notas: `Certificado ${p.calibracion?.numeroCertificado || "s/n"} (${p.calibracion?.laboratorio || p.trazabilidad || "—"}); u = U/k`,
+      });
+    }
+    if (p.deriva?.valor) {
+      out.push({
+        fuente: `Deriva de ${p.codigo}`,
+        simbolo: "δ_der",
+        origen: "patron",
+        tipo: "B",
+        modo: "semiamplitud",
+        distribucion: "rectangular",
+        valor: Math.abs(p.deriva.valor),
+        coefSensibilidad: 1,
+        unidad: p.deriva.unidad || unidad,
+        notas: `Deriva máx. registrada ${p.deriva.valor} por ${p.deriva.periodoMeses || "?"} meses`,
+      });
+    }
+    const estadoV = p.estadoVigencia(refFecha);
+    if (estadoV === "vencido") {
+      advertencias.push(`El patrón ${p.codigo} estaba VENCIDO en la fecha de calibración.`);
+    } else if (estadoV === "por_vencer") {
+      advertencias.push(`El patrón ${p.codigo} vence pronto (${p.calibracion?.vencimiento?.toISOString?.().slice(0, 10)}).`);
+    }
+    if (p.estado !== "activo") {
+      advertencias.push(`El patrón ${p.codigo} no está activo (estado: ${p.estado}).`);
+    }
+  }
+  return { contribuciones: out, advertencias };
+}
+
+/** Carga los docs de patrón desde ids sueltos o desde la asignación. */
+async function resolverPatrones({ patronesUsados, asignacion }) {
+  let ids = (patronesUsados || []).map(oid).filter(Boolean);
+  if (!ids.length && oid(asignacion)) {
+    const a = await Asignacion.findById(asignacion).select("patrones");
+    ids = (a?.patrones || []).map((x) => x);
+  }
+  if (!ids.length) return [];
+  return Patron.find({ _id: { $in: ids } });
+}
+
 /**
  * Inserta / actualiza una contribución de Repetibilidad tipo A a partir de las
  * lecturas repetidas capturadas por el técnico. Determinístico: u = s/√n.
@@ -45,6 +123,7 @@ function aplicarRepetibilidad(contribuciones, lecturas, unidad) {
   const nueva = {
     fuente: "Repetibilidad (tipo A)",
     simbolo: "s(q̄)",
+    origen: "repetibilidad",
     tipo: "A",
     modo: "desviacion_std",
     distribucion: "normal",
@@ -97,8 +176,21 @@ function camposInforme({ datos, modeloDoc, y }) {
 }
 
 /** Cálculo sin persistir — para la vista previa "en vivo" del formulario. */
-function preview(datos) {
-  const contribuciones = [...(datos.contribuciones || [])];
+async function preview(datos) {
+  let contribuciones = [...(datos.contribuciones || [])];
+  let advertencias = [];
+
+  // Inyecta las contribuciones reales de los patrones usados (si se indicaron).
+  if (datos.patronesUsados?.length || datos.asignacion) {
+    const patronesDocs = await resolverPatrones(datos);
+    const r = aplicarPatrones(
+      contribuciones, patronesDocs, datos.puntoNominal, datos.unidad,
+      datos.fechaCalibracion ? new Date(datos.fechaCalibracion) : new Date()
+    );
+    contribuciones = r.contribuciones;
+    advertencias = r.advertencias;
+  }
+
   if (Array.isArray(datos.lecturas) && datos.lecturas.length >= 2) {
     aplicarRepetibilidad(contribuciones, datos.lecturas, datos.unidad);
   }
@@ -107,7 +199,9 @@ function preview(datos) {
     (Array.isArray(datos.lecturas) && datos.lecturas.length
       ? desviacionEstandarMuestral(datos.lecturas.map(Number))?.media
       : undefined);
-  return ejecutarMotor({ contribuciones, valorMedido: y, nivelConfianza: datos.nivelConfianza });
+
+  const salida = ejecutarMotor({ contribuciones, valorMedido: y, nivelConfianza: datos.nivelConfianza });
+  return { ...salida, advertencias };
 }
 
 async function listar({ equipo = "", asignacion = "", estado = "", magnitud = "", page = 0, pageSize = 20 }) {
@@ -155,6 +249,19 @@ async function crear(datos, reqUser) {
   }
 
   const unidad = datos.unidad || modeloDoc?.unidad;
+
+  // Contribuciones reales de los patrones usados (reemplazan el placeholder).
+  let advertencias = [];
+  const patronesDocs = await resolverPatrones(datos);
+  if (patronesDocs.length) {
+    const r = aplicarPatrones(
+      contribuciones, patronesDocs, datos.puntoNominal, unidad,
+      datos.fechaCalibracion ? new Date(datos.fechaCalibracion) : new Date()
+    );
+    contribuciones = r.contribuciones;
+    advertencias = r.advertencias;
+  }
+
   if (Array.isArray(datos.lecturas) && datos.lecturas.length >= 2) {
     aplicarRepetibilidad(contribuciones, datos.lecturas, unidad);
   }
@@ -198,6 +305,7 @@ async function crear(datos, reqUser) {
     lecturas: Array.isArray(datos.lecturas) ? datos.lecturas.map(Number) : [],
     valorMedido: y,
     ...informe,
+    advertencias,
     contribuciones: salida.contribuciones,
     resultado: salida.resultado,
     motor: salida.motor,
@@ -240,16 +348,32 @@ async function recalcular(id, datos, reqUser) {
   });
 
   let contribuciones = datos.contribuciones ? [...datos.contribuciones] : c.contribuciones.map((x) => x.toObject());
+
+  if (datos.condicion) c.condicion = datos.condicion;
+  if (datos.emp != null) c.emp = Number(datos.emp);
+  if (datos.puntoNominal !== undefined) c.puntoNominal = datos.puntoNominal;
+
+  // Re-inyecta las contribuciones de los patrones usados (re-interpola la U si el
+  // patrón tiene tabla y cambió el punto nominal). Idempotente.
+  let advertencias = c.advertencias || [];
+  if ((c.patronesUsados || []).length || datos.asignacion) {
+    const patronesDocs = await resolverPatrones({
+      patronesUsados: c.patronesUsados, asignacion: datos.asignacion || c.asignacion,
+    });
+    if (patronesDocs.length) {
+      const r = aplicarPatrones(contribuciones, patronesDocs, c.puntoNominal, c.unidad, new Date());
+      contribuciones = r.contribuciones;
+      advertencias = r.advertencias;
+    }
+  }
+
   if (Array.isArray(datos.lecturas)) {
     c.lecturas = datos.lecturas.map(Number);
     if (c.lecturas.length >= 2) aplicarRepetibilidad(contribuciones, c.lecturas, c.unidad);
   }
   if (datos.valorMedido !== undefined) c.valorMedido = datos.valorMedido;
   if (datos.nivelConfianza) c.modeloSnapshot = { ...c.modeloSnapshot, nivelConfianza: datos.nivelConfianza };
-
-  if (datos.condicion) c.condicion = datos.condicion;
-  if (datos.emp != null) c.emp = Number(datos.emp);
-  if (datos.puntoNominal !== undefined) c.puntoNominal = datos.puntoNominal;
+  c.advertencias = advertencias;
 
   const nivel = datos.nivelConfianza || c.modeloSnapshot?.nivelConfianza || "95.45%";
   const salida = ejecutarMotor({ contribuciones, valorMedido: c.valorMedido, nivelConfianza: nivel });

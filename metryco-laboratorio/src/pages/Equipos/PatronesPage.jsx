@@ -1,88 +1,89 @@
-import { useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
-  Box, Typography, TextField, InputAdornment, IconButton, Chip, Tooltip,
+  Box, Typography, TextField, InputAdornment, IconButton, Tooltip, Chip,
+  MenuItem, Select, FormControl, InputLabel,
 } from "@mui/material";
 import SearchIcon from "@mui/icons-material/Search";
 import AddIcon from "@mui/icons-material/Add";
 import EditOutlinedIcon from "@mui/icons-material/EditOutlined";
-import WarningAmberOutlinedIcon from "@mui/icons-material/WarningAmberOutlined";
 import FileDownloadOutlinedIcon from "@mui/icons-material/FileDownloadOutlined";
 
 import AppButton from "../../shared/components/AppButton";
 import AppTable from "../../shared/components/AppTable";
 import PageHeader from "../../shared/components/PageHeader";
+import StatCard from "../../shared/components/StatCard";
 import StraightenOutlinedIcon from "@mui/icons-material/StraightenOutlined";
+import VerifiedOutlinedIcon from "@mui/icons-material/VerifiedOutlined";
+import ScheduleOutlinedIcon from "@mui/icons-material/ScheduleOutlined";
+import ReportGmailerrorredOutlinedIcon from "@mui/icons-material/ReportGmailerrorredOutlined";
 import { formatDate } from "../../shared/utils/formatDate";
 import { exportCsv } from "../../shared/utils/exportCsv";
-import { PATRONES_MOCK } from "./mockData";
+import { CATEGORIAS } from "./categorias";
+import { listarPatrones } from "../../services/patrones";
 
-function diasParaVencer(fecha) {
-  if (!fecha) return null;
-  return Math.ceil((new Date(fecha) - new Date()) / 86400000);
-}
+const VIG = {
+  vigente: { label: "Vigente", color: "success" },
+  por_vencer: { label: "Por vencer", color: "warning" },
+  vencido: { label: "Vencido", color: "error" },
+  sin_fecha: { label: "Sin fecha", color: "default" },
+};
 
-function estadoVigencia(fecha) {
-  const dias = diasParaVencer(fecha);
-  if (dias === null) return { label: "Sin fecha", color: "default" };
-  if (dias < 0) return { label: "Vencido", color: "error" };
-  if (dias < 45) return { label: "Por Vencer", color: "warning" };
-  return { label: "Vigente", color: "success" };
-}
-
-// Consultar Patrones = php/patrones_buscar.php.
 export default function PatronesPage() {
   const navigate = useNavigate();
+  const [rows, setRows] = useState([]);
+  const [total, setTotal] = useState(0);
+  const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
+  const [categoria, setCategoria] = useState("");
+  const [vigencia, setVigencia] = useState("");
   const [page, setPage] = useState(0);
 
-  const filtered = PATRONES_MOCK.filter((p) => {
-    const term = search.toLowerCase();
-    return (
-      !term ||
-      p.idInterno.toLowerCase().includes(term) ||
-      p.descripcion.toLowerCase().includes(term) ||
-      p.certificado.toLowerCase().includes(term)
-    );
-  });
+  const cargar = useCallback(() => {
+    setLoading(true);
+    listarPatrones({ search, categoria, vigencia, page, pageSize: 10 })
+      .then(({ items, total }) => { setRows(items); setTotal(total); })
+      .catch(() => { setRows([]); setTotal(0); })
+      .finally(() => setLoading(false));
+  }, [search, categoria, vigencia, page]);
+  useEffect(() => { cargar(); }, [cargar]);
+
+  const cuenta = (v) => rows.filter((r) => r.vigencia === v).length;
 
   const columns = [
-    { field: "idInterno", headerName: "Id Interno" },
-    { field: "categoria", headerName: "Categoría" },
-    { field: "marca", headerName: "Marca" },
-    { field: "modelo", headerName: "Modelo" },
-    { field: "serie", headerName: "Serie" },
-    { field: "descripcion", headerName: "Descripción" },
     {
-      field: "fechaVencimiento",
-      headerName: "Vigencia",
-      renderCell: (row) => {
-        const estado = estadoVigencia(row.fechaVencimiento);
-        return (
-          <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
-            {estado.color !== "success" && estado.color !== "default" && (
-              <WarningAmberOutlinedIcon sx={{ fontSize: 14, color: `${estado.color}.main` }} />
-            )}
-            <Typography variant="body2">{formatDate(row.fechaVencimiento)}</Typography>
-          </Box>
-        );
+      field: "codigo", headerName: "Patrón",
+      renderCell: (r) => (
+        <Box>
+          <Typography variant="body2" fontWeight={700}>{r.codigo}</Typography>
+          <Typography variant="caption" color="text.secondary">{r.nombre}</Typography>
+        </Box>
+      ),
+    },
+    { field: "categoria", headerName: "Categoría", renderCell: (r) => r.categoria || "—" },
+    { field: "trazabilidad", headerName: "Trazabilidad", renderCell: (r) => r.trazabilidad || "—" },
+    {
+      field: "incertidumbre", headerName: "U (cert.)",
+      renderCell: (r) =>
+        r.incertidumbre?.modo === "tabla"
+          ? <Chip size="small" variant="outlined" label={`tabla · ${r.incertidumbre.puntos?.length || 0} pts`} />
+          : r.incertidumbre?.valor != null
+          ? <span>{r.incertidumbre.valor} {r.incertidumbre.unidad || r.unidad} <Typography component="span" variant="caption" color="text.secondary">k={r.incertidumbre.k}</Typography></span>
+          : "—",
+    },
+    { field: "venc", headerName: "Vence", renderCell: (r) => formatDate(r.calibracion?.vencimiento) },
+    {
+      field: "vigencia", headerName: "Estado",
+      renderCell: (r) => {
+        const v = VIG[r.vigencia] || VIG.sin_fecha;
+        return <Chip size="small" label={v.label} color={v.color} />;
       },
     },
     {
-      field: "estado",
-      headerName: "Estado",
-      renderCell: (row) => {
-        const estado = estadoVigencia(row.fechaVencimiento);
-        return <Chip label={estado.label} color={estado.color} size="small" />;
-      },
-    },
-    {
-      field: "acciones",
-      headerName: "Acciones",
-      align: "center",
-      renderCell: (row) => (
+      field: "acciones", headerName: "Acciones", align: "center",
+      renderCell: (r) => (
         <Tooltip title="Editar patrón">
-          <IconButton size="small" onClick={() => navigate(`/equipos/patrones/${row.id}/editar`)}>
+          <IconButton size="small" onClick={() => navigate(`/equipos/patrones/${r._id}/editar`)}>
             <EditOutlinedIcon fontSize="small" sx={{ color: "secondary.main" }} />
           </IconButton>
         </Tooltip>
@@ -90,34 +91,22 @@ export default function PatronesPage() {
     },
   ];
 
-  const vencidos = PATRONES_MOCK.filter((p) => diasParaVencer(p.fechaVencimiento) < 0).length;
-  const porVencer = PATRONES_MOCK.filter((p) => {
-    const d = diasParaVencer(p.fechaVencimiento);
-    return d >= 0 && d < 45;
-  }).length;
-
-  const exportar = () => {
+  const exportar = () =>
     exportCsv(
-      PATRONES_MOCK.map((p) => ({
-        IdInterno: p.idInterno, Categoria: p.categoria, Marca: p.marca, Modelo: p.modelo,
-        Serie: p.serie, Descripcion: p.descripcion, FechaVencimiento: p.fechaVencimiento,
+      rows.map((r) => ({
+        Codigo: r.codigo, Nombre: r.nombre, Categoria: r.categoria, Trazabilidad: r.trazabilidad,
+        U: r.incertidumbre?.valor ?? "", k: r.incertidumbre?.k ?? "",
+        Vence: r.calibracion?.vencimiento?.slice?.(0, 10) || "", Estado: r.vigencia,
       })),
       "patrones.csv"
     );
-  };
 
   return (
     <Box>
       <PageHeader
         icon={<StraightenOutlinedIcon />}
         title="Consultar Patrones"
-        subtitle={
-          <>
-            {PATRONES_MOCK.length} patrones registrados
-            {porVencer > 0 && <Box component="span" sx={{ color: "warning.main", fontWeight: 700 }}> · {porVencer} por vencer</Box>}
-            {vencidos > 0 && <Box component="span" sx={{ color: "error.main", fontWeight: 700 }}> · {vencidos} vencidos</Box>}
-          </>
-        }
+        subtitle={`${total} patrones registrados`}
         actions={
           <>
             <AppButton variant="outlined" startIcon={<FileDownloadOutlinedIcon />} onClick={exportar} sx={{ borderRadius: 2 }}>
@@ -130,32 +119,48 @@ export default function PatronesPage() {
         }
       />
 
-      <Box sx={{ mb: 2 }}>
+      <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", sm: "repeat(3,1fr)" }, gap: 2.5, mb: 3.5 }}>
+        <StatCard label="Vigentes (página)" value={cuenta("vigente")} icon={<VerifiedOutlinedIcon />} color="#16A34A" />
+        <StatCard label="Por vencer" value={cuenta("por_vencer")} icon={<ScheduleOutlinedIcon />} color="#D97706" />
+        <StatCard label="Vencidos" value={cuenta("vencido")} icon={<ReportGmailerrorredOutlinedIcon />} color="#DC2626" />
+      </Box>
+
+      <Box sx={{ display: "flex", gap: 2, mb: 2, flexWrap: "wrap" }}>
         <TextField
-          placeholder="Buscar por ID interno, descripción o certificado..."
+          placeholder="Buscar por código, nombre o N° de certificado…"
           size="small"
           value={search}
           onChange={(e) => { setSearch(e.target.value); setPage(0); }}
-          sx={{ width: 400, "& .MuiOutlinedInput-root": { borderRadius: 2 } }}
-          slotProps={{
-            input: {
-              startAdornment: (
-                <InputAdornment position="start">
-                  <SearchIcon fontSize="small" sx={{ color: "text.secondary" }} />
-                </InputAdornment>
-              ),
-            },
-          }}
+          sx={{ width: 360, "& .MuiOutlinedInput-root": { borderRadius: 2 } }}
+          slotProps={{ input: { startAdornment: <InputAdornment position="start"><SearchIcon fontSize="small" sx={{ color: "text.secondary" }} /></InputAdornment> } }}
         />
+        <FormControl size="small" sx={{ minWidth: 180 }}>
+          <InputLabel>Categoría</InputLabel>
+          <Select label="Categoría" value={categoria} onChange={(e) => { setCategoria(e.target.value); setPage(0); }} sx={{ borderRadius: 2 }}>
+            <MenuItem value="">Todas</MenuItem>
+            {CATEGORIAS.map((c) => <MenuItem key={c} value={c}>{c}</MenuItem>)}
+          </Select>
+        </FormControl>
+        <FormControl size="small" sx={{ minWidth: 160 }}>
+          <InputLabel>Vigencia</InputLabel>
+          <Select label="Vigencia" value={vigencia} onChange={(e) => { setVigencia(e.target.value); setPage(0); }} sx={{ borderRadius: 2 }}>
+            <MenuItem value="">Todas</MenuItem>
+            <MenuItem value="vigente">Vigente</MenuItem>
+            <MenuItem value="por_vencer">Por vencer</MenuItem>
+            <MenuItem value="vencido">Vencido</MenuItem>
+          </Select>
+        </FormControl>
       </Box>
 
       <AppTable
         columns={columns}
-        rows={filtered.slice(page * 10, page * 10 + 10)}
-        totalCount={filtered.length}
+        rows={rows}
+        loading={loading}
+        totalCount={total}
         page={page}
         rowsPerPage={10}
         onPageChange={setPage}
+        emptyText="Sin patrones registrados"
       />
     </Box>
   );

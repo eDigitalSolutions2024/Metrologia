@@ -23,10 +23,12 @@ const eliminarModelo = asyncHandler(async (req, res) => {
 /* ---------- Cálculos ejecutados ---------- */
 const listarCalculos = asyncHandler(async (req, res) => {
   const { page = 0, pageSize = 20 } = req.query;
-  res.json({
-    success: true,
-    ...(await calculos.listar({ ...req.query, page: Number(page), pageSize: Number(pageSize) })),
+  const { items, total } = await calculos.listar({
+    ...req.query,
+    page: Number(page),
+    pageSize: Number(pageSize),
   });
+  res.json({ success: true, data: items, total });
 });
 const obtenerCalculo = asyncHandler(async (req, res) => {
   res.json({ success: true, data: await calculos.obtener(req.params.id) });
@@ -46,7 +48,7 @@ const aprobar = asyncHandler(async (req, res) => {
 
 // Cálculo determinístico SIN persistir — para la vista previa "en vivo".
 const preview = asyncHandler(async (req, res) => {
-  res.json({ success: true, data: calculos.preview(req.body) });
+  res.json({ success: true, data: await calculos.preview(req.body) });
 });
 
 /* ---------- Asistente virtual (IA de apoyo, no calcula) ---------- */

@@ -25,6 +25,7 @@ const reporteSvc = require("../src/services/reporte.service");
 const asignacionSvc = require("../src/services/asignacion.service");
 const certificadoSvc = require("../src/services/certificado.service");
 const calculoSvc = require("../src/services/calculoIncertidumbre.service");
+const patronSvc = require("../src/services/patron.service");
 
 const RFC_DEMO = "DEM020202DEM";
 
@@ -50,22 +51,43 @@ async function run() {
   });
   console.log("· Cliente demo:", cliente.nombre);
 
-  const patron = await Patron.create({
-    codigo: "PAT-DEMO-01",
-    nombre: "Juego de bloques patrón grado 1",
-    categoria: "Dimensional",
-    marca: "Mitutoyo", modelo: "516-950", serie: "DEMO-BP-01",
-    trazabilidad: "CENAM",
-    unidades: "mm", capacidad: "1–100 mm",
-    incertidumbre: { valor: 0.00022, unidad: "mm", k: 2 },
-    ultimaCalibracion: {
-      fecha: new Date("2026-02-10"),
-      vencimiento: new Date("2027-02-10"),
-      certificadoNo: "CENAM-DEMO-2026-001",
-      laboratorio: "CENAM",
+  const patron = await patronSvc.crear(
+    {
+      codigo: "PAT-DEMO-01",
+      nombre: "Juego de bloques patrón grado 1",
+      descripcion: "Bloques patrón de acero, grado 1",
+      categoria: "Dimensional",
+      magnitud: "dimensional",
+      marca: "Mitutoyo", modelo: "516-950", serie: "DEMO-BP-01",
+      unidad: "mm",
+      intervaloMedicion: "1–100 mm",
+      resolucion: "—",
+      incertidumbre: {
+        modo: "tabla",
+        k: 2,
+        unidad: "mm",
+        // U(L) ≈ 0.00010 + 0.0000006·L (mm)  — típico bloques grado 1
+        puntos: [
+          { nominal: 1, U: 0.00010 },
+          { nominal: 10, U: 0.00011 },
+          { nominal: 25, U: 0.00012 },
+          { nominal: 50, U: 0.00013 },
+        ],
+      },
+      deriva: { valor: 0.00005, unidad: "mm", periodoMeses: 12 },
+      trazabilidad: "CENAM",
+      calibracion: {
+        laboratorio: "CENAM",
+        numeroCertificado: "CENAM-DEMO-2026-001",
+        fecha: new Date("2026-02-10"),
+        periodicidadMeses: 24,
+      },
+      condicionesReferencia: "20 ± 1 °C, 45–55 % HR",
+      manejo: "Manipular con guantes; limpiar antes de usar.",
     },
-  });
-  console.log("· Patrón demo:", patron.codigo);
+    reqUser
+  );
+  console.log("· Patrón demo:", patron.codigo, "vence", patron.calibracion.vencimiento.toISOString().slice(0, 10), "· vigencia:", patron.vigencia);
 
   const equipo = await Equipo.create({
     cliente: cliente._id,
@@ -114,14 +136,13 @@ async function run() {
   });
   let calculo = null;
   if (modelo) {
-    const valoresBase = (c) => {
+    // Sólo se fija la resolución del display; el patrón (U + deriva) lo inyecta
+    // el motor desde PAT-DEMO-01, y la repetibilidad desde las lecturas.
+    const contribuciones = modelo.contribuciones.map((c) => {
       const o = c.toObject();
       if (/resoluci/i.test(o.fuente)) return { ...o, valor: 0.0005 }; // a = 0.001/2
-      if (/patr[oó]n de referencia/i.test(o.fuente)) return { ...o, valor: 0.00012, k: 2 };
-      if (/deriva/i.test(o.fuente)) return { ...o, valor: 0.00005 };
       return { ...o, valor: o.valorSugerido || 0 };
-    };
-    const contribuciones = modelo.contribuciones.map(valoresBase);
+    });
     const NOMINALES = [1, 3, 8, 10, 15, 20];
 
     for (const condicion of ["encontrado", "dejado"]) {

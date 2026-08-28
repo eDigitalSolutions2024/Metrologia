@@ -159,6 +159,31 @@ export default function InformeCalibracion() {
           ))
         )}
 
+        {cert.patronesSnapshot?.length > 0 && (
+          <>
+            <div className="rep-band">Patrones de referencia utilizados</div>
+            <div className="tbl-wrap">
+              <table className="rep-table">
+                <thead>
+                  <tr><th>Código</th><th>Descripción</th><th>Trazabilidad</th><th>N° certificado</th><th>Laboratorio</th><th>Vence</th></tr>
+                </thead>
+                <tbody>
+                  {cert.patronesSnapshot.map((p, i) => (
+                    <tr key={i}>
+                      <td className="nom">{p.codigo}</td>
+                      <td>{p.nombre}</td>
+                      <td>{p.trazabilidad || "—"}</td>
+                      <td>{p.numeroCertificado || "—"}</td>
+                      <td>{p.laboratorio || "—"}</td>
+                      <td>{p.vencimiento ? formatDate(p.vencimiento) : "—"}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </>
+        )}
+
         <Box className="rep-band" sx={{ mt: 2 }}>
           Factor de conversión 1 in = 25.4 mm
         </Box>

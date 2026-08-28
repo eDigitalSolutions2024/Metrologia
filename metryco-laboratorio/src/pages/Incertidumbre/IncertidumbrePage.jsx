@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
-  Box, Typography, MenuItem, TextField, IconButton, Chip, Divider,
+  Box, Typography, MenuItem, TextField, IconButton, Chip, Divider, Alert,
   Table, TableHead, TableBody, TableRow, TableCell, Button, Snackbar,
 } from "@mui/material";
 import AddIcon from "@mui/icons-material/Add";
@@ -104,6 +104,10 @@ export default function IncertidumbrePage() {
     }
   }, [asignacionId]); // eslint-disable-line
 
+  // ¿esta contribución es el placeholder genérico del patrón (lo pone el motor real)?
+  const esPlaceholderPatron = (c) =>
+    /certificad/i.test(c.modo || "") && /patr[oó]n de referencia|patr[oó]n\b/i.test(c.fuente || "");
+
   const cargarPlantilla = (id) => {
     setModeloId(id);
     const m = modelos.find((x) => x._id === id);
@@ -112,13 +116,16 @@ export default function IncertidumbrePage() {
     setUnidad(m.unidad || "");
     setNivelConfianza(m.nivelConfianza?.includes("95.4") ? "95.45%" : m.nivelConfianza || "95.45%");
     setContribuciones(
-      m.contribuciones.map((c) => ({
-        fuente: c.fuente, simbolo: c.simbolo || "", tipo: c.tipo || "B",
-        modo: c.modo || "semiamplitud", distribucion: c.distribucion || "rectangular",
-        valor: c.valorSugerido || "", k: c.k ?? 2, n: c.n ?? "",
-        coefSensibilidad: c.coefSensibilidad ?? 1, gradosLibertad: c.gradosLibertad ?? "",
-        unidad: c.unidad || m.unidad || "", notas: c.ayuda || "",
-      }))
+      m.contribuciones
+        // si hay patrones en la asignación, el motor inyecta su U real; se quita el genérico
+        .filter((c) => !(patronIds?.length && esPlaceholderPatron(c)))
+        .map((c) => ({
+          fuente: c.fuente, simbolo: c.simbolo || "", tipo: c.tipo || "B",
+          modo: c.modo || "semiamplitud", distribucion: c.distribucion || "rectangular",
+          valor: c.valorSugerido || "", k: c.k ?? 2, n: c.n ?? "",
+          coefSensibilidad: c.coefSensibilidad ?? 1, gradosLibertad: c.gradosLibertad ?? "",
+          unidad: c.unidad || m.unidad || "", notas: c.ayuda || "",
+        }))
     );
     setCalc(null);
   };
@@ -149,19 +156,26 @@ export default function IncertidumbrePage() {
     [contribuciones, unidad]
   );
 
+  const patronIds = useMemo(
+    () => (asignacionSel?.patrones || []).map((p) => p._id || p).filter(Boolean),
+    [asignacionSel]
+  );
+
   /* ---------- preview en vivo ---------- */
   useEffect(() => {
     clearTimeout(debRef.current);
     const contribs = payloadContribs();
-    if (!contribs.length && !statsLecturas) { setPreview(null); return; }
+    if (!contribs.length && !statsLecturas && !patronIds.length) { setPreview(null); return; }
     debRef.current = setTimeout(() => {
       previewIncertidumbre({
         contribuciones: contribs, lecturas,
-        valorMedido: numOrU(puntoNominal), nivelConfianza, unidad,
+        valorMedido: numOrU(puntoNominal), puntoNominal: numOrU(puntoNominal),
+        nivelConfianza, unidad,
+        patronesUsados: patronIds.length ? patronIds : undefined,
       }).then(setPreview).catch(() => setPreview(null));
     }, 350);
     return () => clearTimeout(debRef.current);
-  }, [payloadContribs, lecturas, puntoNominal, nivelConfianza, unidad, statsLecturas]);
+  }, [payloadContribs, lecturas, puntoNominal, nivelConfianza, unidad, statsLecturas, patronIds]);
 
   const setFila = (i, campo, val) =>
     setContribuciones((cs) => cs.map((c, idx) => (idx === i ? { ...c, [campo]: val } : c)));
@@ -367,10 +381,37 @@ export default function IncertidumbrePage() {
                       </TableRow>
                     );
                   })}
+
+                  {/* Contribuciones inyectadas por el motor desde los patrones */}
+                  {pc.slice(repOffset + contribuciones.length).map((comp, j) => (
+                    <TableRow key={`auto-${j}`} sx={{ bgcolor: "background.default" }}>
+                      <TableCell>
+                        <Typography variant="caption" fontWeight={700}>{comp.fuente}</Typography>
+                        <Chip size="small" label="del patrón" sx={{ ml: 1, height: 16, fontSize: 10 }} color="secondary" variant="outlined" />
+                      </TableCell>
+                      <TableCell><Chip size="small" label={comp.tipo || "B"} /></TableCell>
+                      <TableCell colSpan={2}><Typography variant="caption" color="text.secondary">{comp.modo} · {comp.distribucion || "—"}</Typography></TableCell>
+                      <TableCell><Typography variant="caption">{fmt(comp.valor)}</Typography></TableCell>
+                      <TableCell><Typography variant="caption">{comp.modo === "certificado" ? `k=${comp.k}` : "—"}</Typography></TableCell>
+                      <TableCell>{comp.coefSensibilidad ?? 1}</TableCell>
+                      <TableCell><b>{fmt(comp.u)}</b></TableCell>
+                      <TableCell>{fmt(comp.contribucion)}</TableCell>
+                      <TableCell><PctBar v={comp.porcentajeVarianza} /></TableCell>
+                      <TableCell />
+                    </TableRow>
+                  ))}
                 </TableBody>
               </Table>
             </Box>
           </AppCard>
+
+          {(preview?.advertencias?.length || calc?.advertencias?.length) > 0 && (
+            <Alert severity="warning" sx={{ borderRadius: 3 }}>
+              {[...(preview?.advertencias || []), ...(calc?.advertencias || [])]
+                .filter((v, i, a) => a.indexOf(v) === i)
+                .map((w, i) => <div key={i}>{w}</div>)}
+            </Alert>
+          )}
 
           {/* ---- Resultado (hero) ---- */}
           <ResultadoHero R={R} motor={preview?.motor} calc={calc} onGuardar={guardar} onAccion={accion} />

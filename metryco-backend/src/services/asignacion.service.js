@@ -2,10 +2,26 @@ const mongoose = require("mongoose");
 const Asignacion = require("../models/Asignacion");
 const Reporte = require("../models/Reporte");
 const Equipo = require("../models/Equipo");
+const Patron = require("../models/Patron");
 const AppError = require("../utils/AppError");
 const { crearEvento } = require("../utils/historial");
 
 const oid = (v) => (mongoose.isValidObjectId(v) ? new mongoose.Types.ObjectId(v) : null);
+
+/** Avisos sobre los patrones elegidos (vencidos / no activos). No bloquea. */
+async function avisosPatrones(ids = []) {
+  const _ids = ids.map(oid).filter(Boolean);
+  if (!_ids.length) return [];
+  const patrones = await Patron.find({ _id: { $in: _ids } });
+  const avisos = [];
+  for (const p of patrones) {
+    const v = p.estadoVigencia();
+    if (v === "vencido") avisos.push(`El patrón ${p.codigo} está VENCIDO — no podrás emitir el certificado con él.`);
+    else if (v === "por_vencer") avisos.push(`El patrón ${p.codigo} vence pronto.`);
+    if (p.estado !== "activo") avisos.push(`El patrón ${p.codigo} no está activo (${p.estado}).`);
+  }
+  return avisos;
+}
 
 async function listar({ reporteId = "", estadoCertificado = "", estadoCalibracion = "", page = 0, pageSize = 20 }) {
   const match = {};
@@ -61,7 +77,10 @@ async function crear(datos, reqUser) {
     { _id: datos.reporte, status: "recepcion" },
     { $set: { status: "en_proceso" } }
   );
-  return a;
+
+  const out = a.toObject();
+  out.advertencias = await avisosPatrones(datos.patrones);
+  return out;
 }
 
 async function actualizar(id, datos, reqUser) {
@@ -75,7 +94,9 @@ async function actualizar(id, datos, reqUser) {
 
   a.historial.push(await crearEvento(reqUser, "asignacion_editada", {}));
   await a.save();
-  return a;
+  const out = a.toObject();
+  out.advertencias = await avisosPatrones(a.patrones);
+  return out;
 }
 
 /**

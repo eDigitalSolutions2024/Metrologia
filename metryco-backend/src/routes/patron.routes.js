@@ -1,6 +1,7 @@
 const { Router } = require("express");
 const auth = require("../middleware/auth");
 const requireRole = require("../middleware/requireRole");
+const { pdfPatron } = require("../middleware/upload");
 const c = require("../controllers/patron.controller");
 
 const router = Router();
@@ -11,6 +12,7 @@ router.get("/por-vencer", c.porVencer);
 router.get("/:id", c.obtener);
 router.post("/", c.crear);
 router.put("/:id", c.actualizar);
+router.post("/:id/certificado", pdfPatron, c.adjuntarPdf);
 router.delete("/:id", requireRole("admin", "coordinador"), c.eliminar);
 
 module.exports = router;
