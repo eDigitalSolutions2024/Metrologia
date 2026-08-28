@@ -10,6 +10,8 @@ import EditOutlinedIcon from "@mui/icons-material/EditOutlined";
 
 import AppButton from "../../shared/components/AppButton";
 import AppTable from "../../shared/components/AppTable";
+import PageHeader from "../../shared/components/PageHeader";
+import PrecisionManufacturingOutlinedIcon from "@mui/icons-material/PrecisionManufacturingOutlined";
 import { listarClientes } from "../../services/clientes";
 import { EQUIPOS_MOCK } from "./mockData";
 
@@ -68,17 +70,16 @@ export default function EquiposPage() {
 
   return (
     <Box>
-      <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 3 }}>
-        <Box>
-          <Typography variant="h5" fontWeight={700}>Consultar Equipos</Typography>
-          <Typography variant="body2" color="text.secondary">
-            {filtered.length} de {EQUIPOS_MOCK.length} equipos de clientes
-          </Typography>
-        </Box>
-        <AppButton startIcon={<AddIcon />} onClick={() => navigate("/equipos/nuevo")} sx={{ borderRadius: 2 }}>
-          Alta de Equipo
-        </AppButton>
-      </Box>
+      <PageHeader
+        icon={<PrecisionManufacturingOutlinedIcon />}
+        title="Consultar Equipos"
+        subtitle={`${filtered.length} de ${EQUIPOS_MOCK.length} equipos de clientes`}
+        actions={
+          <AppButton startIcon={<AddIcon />} onClick={() => navigate("/equipos/nuevo")} sx={{ borderRadius: 2 }}>
+            Alta de Equipo
+          </AppButton>
+        }
+      />
 
       <Box sx={{ display: "flex", gap: 2, mb: 2, flexWrap: "wrap", alignItems: "center" }}>
         <TextField
@@ -87,12 +88,14 @@ export default function EquiposPage() {
           value={search}
           onChange={(e) => { setSearch(e.target.value); setPage(0); }}
           sx={{ width: 360, "& .MuiOutlinedInput-root": { borderRadius: 2 } }}
-          InputProps={{
-            startAdornment: (
-              <InputAdornment position="start">
-                <SearchIcon fontSize="small" sx={{ color: "text.secondary" }} />
-              </InputAdornment>
-            ),
+          slotProps={{
+            input: {
+              startAdornment: (
+                <InputAdornment position="start">
+                  <SearchIcon fontSize="small" sx={{ color: "text.secondary" }} />
+                </InputAdornment>
+              ),
+            },
           }}
         />
         <FormControl size="small" sx={{ minWidth: 260 }}>

@@ -13,6 +13,8 @@ import { DeleteOutlined as DeleteOutlineIcon } from "@mui/icons-material";
 
 import AppButton from "../../shared/components/AppButton";
 import AppTable from "../../shared/components/AppTable";
+import PageHeader from "../../shared/components/PageHeader";
+import RequestQuoteOutlinedIcon from "@mui/icons-material/RequestQuoteOutlined";
 import ConfirmDialog from "../../shared/components/ConfirmDialog";
 import CotizacionDialog from "./CotizacionDialog";
 import { formatDate } from "../../shared/utils/formatDate";
@@ -200,18 +202,21 @@ export default function CotizacionesPage() {
 
   return (
     <Box>
-      <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 3 }}>
-        <Box>
-          <Typography variant="h5" fontWeight={700}>Cotizaciones</Typography>
-          <Typography variant="body2" color="text.secondary">
+      <PageHeader
+        icon={<RequestQuoteOutlinedIcon />}
+        title="Cotizaciones"
+        subtitle={
+          <>
             {totalCount} registros · Aprobadas + Facturadas (esta página):{" "}
             <Box component="span" sx={{ fontWeight: 700, color: "secondary.main" }}>{formatCurrency(totalAprobado)}</Box>
-          </Typography>
-        </Box>
-        <AppButton startIcon={<AddIcon />} onClick={abrirNueva} sx={{ borderRadius: 2 }}>
-          Nueva Cotización
-        </AppButton>
-      </Box>
+          </>
+        }
+        actions={
+          <AppButton startIcon={<AddIcon />} onClick={abrirNueva} sx={{ borderRadius: 2 }}>
+            Nueva Cotización
+          </AppButton>
+        }
+      />
 
       {error && <Alert severity="error" sx={{ mb: 2, borderRadius: 2 }}>{error}</Alert>}
 
@@ -243,12 +248,14 @@ export default function CotizacionesPage() {
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           sx={{ width: 240, "& .MuiOutlinedInput-root": { borderRadius: 2 } }}
-          InputProps={{
-            startAdornment: (
-              <InputAdornment position="start">
-                <SearchIcon fontSize="small" sx={{ color: "text.secondary" }} />
-              </InputAdornment>
-            ),
+          slotProps={{
+            input: {
+              startAdornment: (
+                <InputAdornment position="start">
+                  <SearchIcon fontSize="small" sx={{ color: "text.secondary" }} />
+                </InputAdornment>
+              ),
+            },
           }}
         />
         <FormControl size="small" sx={{ minWidth: 160 }}>

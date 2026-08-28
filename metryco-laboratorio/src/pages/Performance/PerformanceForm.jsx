@@ -140,16 +140,16 @@ export default function PerformanceForm() {
                   </Tooltip>
                 </Grid>
                 <Grid size={{ xs: 6, sm: 3, md: 1.5 }}>
-                  <AppInput label="Mínimo" size="small" InputProps={{ readOnly: true }} {...register(`puntos.${index}.minimo`)} />
+                  <AppInput label="Mínimo" size="small" slotProps={{ input: { readOnly: true } }} {...register(`puntos.${index}.minimo`)} />
                 </Grid>
                 <Grid size={{ xs: 6, sm: 3, md: 1.5 }}>
-                  <AppInput label="Mín. real" size="small" InputProps={{ readOnly: true }} {...register(`puntos.${index}.minimoReal`)} />
+                  <AppInput label="Mín. real" size="small" slotProps={{ input: { readOnly: true } }} {...register(`puntos.${index}.minimoReal`)} />
                 </Grid>
                 <Grid size={{ xs: 6, sm: 3, md: 1.5 }}>
-                  <AppInput label="Máximo" size="small" InputProps={{ readOnly: true }} {...register(`puntos.${index}.maximo`)} />
+                  <AppInput label="Máximo" size="small" slotProps={{ input: { readOnly: true } }} {...register(`puntos.${index}.maximo`)} />
                 </Grid>
                 <Grid size={{ xs: 6, sm: 3, md: 1.5 }}>
-                  <AppInput label="Máx. real" size="small" InputProps={{ readOnly: true }} {...register(`puntos.${index}.maximoReal`)} />
+                  <AppInput label="Máx. real" size="small" slotProps={{ input: { readOnly: true } }} {...register(`puntos.${index}.maximoReal`)} />
                 </Grid>
               </Grid>
             </Box>

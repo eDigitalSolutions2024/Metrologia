@@ -1,263 +1,113 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
-  Grid,
-  Paper,
-  Typography,
-  Box,
-  Divider,
-  Chip,
-  Avatar,
-  LinearProgress,
-  Skeleton,
+  Grid, Box, Typography, Divider, Chip, Avatar, LinearProgress, Skeleton,
 } from "@mui/material";
 import {
-  People,
-  Description,
-  Engineering,
-  AttachMoney,
-  TrendingUp,
-  CheckCircle,
-  Cancel,
-  ReceiptLong,
+  PeopleAltOutlined, DescriptionOutlined, PrecisionManufacturingOutlined,
+  WorkspacePremiumOutlined, CheckCircleOutlineOutlined, BlockOutlined, ReceiptLongOutlined,
 } from "@mui/icons-material";
 import { useTheme } from "@mui/material/styles";
 import { formatCurrency } from "../../shared/utils/currency";
 import { formatDate } from "../../shared/utils/formatDate";
+import PageHeader from "../../shared/components/PageHeader";
+import StatCard from "../../shared/components/StatCard";
+import AppCard from "../../shared/components/AppCard";
 import { listarClientes } from "../../services/clientes";
 import { listarCotizaciones } from "../../services/cotizaciones";
+import { listarCertificados } from "../../services/certificados";
+import { listarReportes } from "../../services/reportes";
 
-const COTIZACION_STATUS_MAP = {
+const STATUS_MAP = {
   pendiente: { label: "Pendiente", color: "warning" },
   aprobada:  { label: "Aprobada",  color: "success" },
   rechazada: { label: "Rechazada", color: "error" },
   facturada: { label: "Facturada", color: "info" },
   vencida:   { label: "Vencida",   color: "default" },
 };
-
-const ESTADOS_COTIZACION = ["pendiente", "aprobada", "rechazada", "facturada", "vencida"];
-
+const ESTADOS = ["pendiente", "aprobada", "rechazada", "facturada", "vencida"];
 const ESTADO_COLOR = {
-  pendiente: "#F59E0B",
-  aprobada: "#22C55E",
-  rechazada: "#EF4444",
-  facturada: "#2563EB",
-  vencida: "#6B7280",
+  pendiente: "#D97706", aprobada: "#16A34A", rechazada: "#DC2626", facturada: "#2563EB", vencida: "#64748B",
 };
 
-function getFechaHoy() {
-  const hoy = new Date();
-
-  const fechaFormateada = hoy.toLocaleDateString("es-MX", {
-    month: "long",
-    year: "numeric",
-  });
-  return (
-    fechaFormateada.charAt(0).toLocaleUpperCase() + fechaFormateada.slice(1)
-  );
+function mesActual() {
+  const s = new Date().toLocaleDateString("es-MX", { month: "long", year: "numeric" });
+  return s.charAt(0).toUpperCase() + s.slice(1);
 }
 
 export default function Dashboard() {
   const theme = useTheme();
   const navigate = useNavigate();
-  const fechaFormateada = getFechaHoy();
 
-  const [cargandoStats, setCargandoStats] = useState(true);
-  const [cargandoDetalle, setCargandoDetalle] = useState(true);
-  const [datos, setDatos] = useState({ totalClientes: 0, totalCotizaciones: 0, cotizacionesPendientes: 0 });
+  const [cargando, setCargando] = useState(true);
+  const [datos, setDatos] = useState({ clientes: 0, cotizaciones: 0, pendientes: 0, certificados: 0, reportes: 0 });
   const [recientes, setRecientes] = useState([]);
   const [porEstado, setPorEstado] = useState({});
 
   useEffect(() => {
     let cancelado = false;
-
     (async () => {
-      setCargandoStats(true);
-      setCargandoDetalle(true);
+      setCargando(true);
       try {
-        const [clientesRes, cotizacionesRes, pendientesRes, recientesRes, ...estadoRes] = await Promise.all([
+        const [cli, cot, pend, cert, rep, recientesRes, ...est] = await Promise.all([
           listarClientes({ pageSize: 1 }),
           listarCotizaciones({ pageSize: 1 }),
           listarCotizaciones({ pageSize: 1, status: "pendiente" }),
+          listarCertificados({ pageSize: 1 }).catch(() => ({ total: 0 })),
+          listarReportes({ pageSize: 1 }).catch(() => ({ total: 0 })),
           listarCotizaciones({ pageSize: 5 }),
-          ...ESTADOS_COTIZACION.map((status) => listarCotizaciones({ pageSize: 1, status })),
+          ...ESTADOS.map((status) => listarCotizaciones({ pageSize: 1, status })),
         ]);
         if (cancelado) return;
-
         setDatos({
-          totalClientes: clientesRes.total,
-          totalCotizaciones: cotizacionesRes.total,
-          cotizacionesPendientes: pendientesRes.total,
+          clientes: cli.total, cotizaciones: cot.total, pendientes: pend.total,
+          certificados: cert.total, reportes: rep.total,
         });
         setRecientes(recientesRes.items);
-        setPorEstado(
-          ESTADOS_COTIZACION.reduce((acc, status, i) => {
-            acc[status] = estadoRes[i].total;
-            return acc;
-          }, {})
-        );
-      } catch {
-        // Silencioso: si falla, las secciones simplemente muestran vacío
-      } finally {
-        if (!cancelado) {
-          setCargandoStats(false);
-          setCargandoDetalle(false);
-        }
-      }
+        setPorEstado(ESTADOS.reduce((a, s, i) => ((a[s] = est[i].total), a), {}));
+      } catch { /* vacío */ }
+      finally { if (!cancelado) setCargando(false); }
     })();
-
-    return () => {
-      cancelado = true;
-    };
+    return () => { cancelado = true; };
   }, []);
 
   const stats = [
-    {
-      titulo: "Clientes Registrados",
-      valor: datos.totalClientes,
-      formato: "numero",
-      real: true,
-      icono: <People sx={{ fontSize: 32 }} />,
-      color: theme.palette.secondary.main,
-      sub: "Total en el sistema",
-      onClick: () => navigate("/clientes"),
-    },
-    {
-      titulo: "Cotizaciones",
-      valor: datos.totalCotizaciones,
-      formato: "numero",
-      real: true,
-      icono: <Description sx={{ fontSize: 32 }} />,
-      color: theme.palette.success.main,
-      sub: `${datos.cotizacionesPendientes} pendientes`,
-      onClick: () => navigate("/cotizaciones"),
-    },
-    {
-      titulo: "Equipos",
-      valor: 412,
-      formato: "numero",
-      real: false,
-      icono: <Engineering sx={{ fontSize: 32 }} />,
-      color: theme.palette.warning.main,
-      sub: "28 por calibrar",
-      onClick: () => navigate("/equipos"),
-    },
-    {
-      titulo: "Facturación",
-      valor: 284600,
-      formato: "moneda",
-      real: false,
-      icono: <AttachMoney sx={{ fontSize: 32 }} />,
-      color: theme.palette.error.main,
-      sub: "Junio 2025",
-    },
+    { label: "Clientes", value: datos.clientes, icon: <PeopleAltOutlined />, color: theme.palette.secondary.main, hint: "Registrados", onClick: () => navigate("/clientes") },
+    { label: "Cotizaciones", value: datos.cotizaciones, icon: <DescriptionOutlined />, color: theme.palette.success.main, hint: `${datos.pendientes} pendientes`, onClick: () => navigate("/cotizaciones") },
+    { label: "Reportes de servicio", value: datos.reportes, icon: <PrecisionManufacturingOutlined />, color: theme.palette.warning.main, hint: "En el sistema", onClick: () => navigate("/reportes") },
+    { label: "Certificados", value: datos.certificados, icon: <WorkspacePremiumOutlined />, color: theme.palette.info.main, hint: "Emitidos", onClick: () => navigate("/reportes/certificados") },
   ];
 
-  const totalPorEstado = ESTADOS_COTIZACION.reduce((s, e) => s + (porEstado[e] || 0), 0) || 1;
+  const totalEstados = ESTADOS.reduce((s, e) => s + (porEstado[e] || 0), 0) || 1;
 
   return (
-    <Box sx={{ display: "flex", flexDirection: "column", width: "100%" }}>
-      <Box sx={{ mb: "15px" }}>
-        <Typography variant="h4" fontWeight={700}>
-          Dashboard
-        </Typography>
-        <Typography /*color="text.secondary"*/>
-          Resumen general — {fechaFormateada}
-        </Typography>
-      </Box>
+    <Box>
+      <PageHeader title="Panel general" subtitle={`Resumen del laboratorio — ${mesActual()}`} />
 
-      {/* Tarjetas de stats */}
-      <Grid container spacing={4} sx={{ mb: 3.5 }}>
-        {stats.map((card) => (
-          <Grid key={card.titulo} size={{ xs: 12, sm: 6, md: 3 }}>
-            <Paper
-              elevation={0}
-              onClick={card.onClick}
-              sx={{
-                p: 3.5,
-                borderRadius: 3,
-                border: 1,
-                borderColor: "divider",
-                cursor: card.onClick ? "pointer" : "default",
-                transition: ".3s",
-                "&:hover": {
-                  transform: "translateY(-4px)",
-                  boxShadow: "0 12px 30px rgba(0,0,0,.08)",
-                },
-              }}
-            >
-              <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
-                <Box sx={{ minWidth: 0 }}>
-                  <Box sx={{ display: "flex", alignItems: "center", gap: 0.75, mb: 1 }}>
-                    <Typography color="text.secondary" variant="body2">
-                      {card.titulo}
-                    </Typography>
-                    {!card.real && (
-                      <Chip label="datos de prueba" size="small" variant="outlined" sx={{ height: 16, fontSize: 10 }} />
-                    )}
-                  </Box>
-                  {cargandoStats && card.real ? (
-                    <Skeleton variant="text" width={80} height={44} />
-                  ) : (
-                    <Typography variant="h4" fontWeight={800}>
-                      {card.formato === "moneda"
-                        ? formatCurrency(card.valor)
-                        : card.valor}
-                    </Typography>
-                  )}
-                  <Typography
-                    variant="caption"
-                    color="text.secondary"
-                    mt={1}
-                    display="flex"
-                    alignItems="center"
-                    gap={0.4}
-                  >
-                    {card.tendencia && (
-                      <TrendingUp
-                        sx={{ fontSize: 14, color: "success.main" }}
-                      />
-                    )}
-                    {card.sub}
-                  </Typography>
-                </Box>
-                <Box sx={{ width: 60, height: 60, flexShrink: 0, borderRadius: 3, background: card.color + "18", color: card.color, display: "flex", alignItems: "center", justifyContent: "center" }}>
-                  {card.icono}
-                </Box>
-              </Box>
-            </Paper>
+      <Grid container spacing={2.5} sx={{ mb: 3.5 }}>
+        {stats.map((s) => (
+          <Grid key={s.label} size={{ xs: 12, sm: 6, md: 3 }}>
+            <Box onClick={s.onClick} sx={{ cursor: "pointer", height: "100%" }}>
+              {cargando ? (
+                <Skeleton variant="rounded" height={128} sx={{ borderRadius: 3.5 }} />
+              ) : (
+                <StatCard label={s.label} value={s.value} icon={s.icon} color={s.color} hint={s.hint} />
+              )}
+            </Box>
           </Grid>
         ))}
       </Grid>
 
-      <Grid container spacing={4} sx={{ alignItems: "stretch" }}>
-        {/* Cotizaciones recientes */}
+      <Grid container spacing={2.5} sx={{ alignItems: "stretch" }}>
         <Grid size={{ xs: 12, md: 8 }}>
-          <Paper
-            elevation={0}
-            sx={{
-              borderRadius: 2,
-              border: 1,
-              borderColor: "divider",
-              overflow: "hidden",
-              width: "100%",
-              padding: "25px",
-            }}
+          <AppCard
+            title="Cotizaciones recientes"
+            action={<Chip label="Ver todas" size="small" clickable onClick={() => navigate("/cotizaciones")} />}
+            sx={{ height: "100%" }}
           >
-            <Box sx={{ borderBottom: 1, px: 3.5, py: 3, display: "flex", justifyContent: "space-between", alignItems: "center", borderColor: "divider" }}>
-              <Typography fontWeight={700}>Cotizaciones Recientes</Typography>
-              <Chip
-                label="Ver todas"
-                size="small"
-                clickable
-                onClick={() => navigate("/cotizaciones")}
-                sx={{ borderRadius: 2, padding: "5px", mb: "10px", mt: "10px" }}
-              />
-            </Box>
-
-            {cargandoDetalle ? (
+            {cargando ? (
               Array.from({ length: 5 }).map((_, i) => (
-                <Box key={i} sx={{ display: "flex", alignItems: "center", gap: 2, p: 2 }}>
+                <Box key={i} sx={{ display: "flex", alignItems: "center", gap: 2, py: 1.25 }}>
                   <Skeleton variant="circular" width={34} height={34} />
                   <Skeleton variant="text" width="100%" />
                 </Box>
@@ -268,105 +118,62 @@ export default function Dashboard() {
               </Box>
             ) : (
               recientes.map((c, i) => {
-                const s = COTIZACION_STATUS_MAP[c.status] ?? { label: c.status, color: "default" };
-                const clienteNombre = c.clienteInfo?.nombre || c.cliente?.nombre || "—";
+                const s = STATUS_MAP[c.status] ?? { label: c.status, color: "default" };
+                const cliente = c.clienteInfo?.nombre || c.cliente?.nombre || "—";
                 return (
                   <Box key={c._id}>
                     <Box
                       onClick={() => navigate(`/cotizaciones?editar=${c._id}`)}
                       sx={{
-                        display: "grid", gridTemplateColumns: "minmax(0, 1fr) 120px 120px 120px",
-                        alignItems: "center", padding: 2, gap: 3, cursor: "pointer",
-                        transition: ".3s",
-                        "&:hover": { transform: "translateY(-2px)", bgcolor: "action.hover", borderRadius: "10px" },
-                        borderRadius: "10px",
+                        display: "grid", gridTemplateColumns: "minmax(0,1fr) 110px 120px 110px",
+                        alignItems: "center", gap: 2, py: 1.5, px: 1, cursor: "pointer",
+                        borderRadius: 2, transition: "background-color .15s ease",
+                        "&:hover": { bgcolor: "action.hover" },
                       }}
                     >
                       <Box sx={{ display: "flex", alignItems: "center", gap: 1.5, minWidth: 0 }}>
-                        <Avatar
-                          sx={{
-                            width: 34, height: 34, flexShrink: 0,
-                            bgcolor: theme.palette.secondary.main + "1F", color: "secondary.main",
-                            fontSize: 14, fontWeight: 700,
-                          }}
-                        >
-                          {clienteNombre.charAt(0)}
+                        <Avatar sx={{ width: 34, height: 34, flexShrink: 0, fontSize: 14, fontWeight: 700, bgcolor: theme.palette.secondary.main + "1F", color: "secondary.main" }}>
+                          {cliente.charAt(0)}
                         </Avatar>
                         <Box sx={{ minWidth: 0 }}>
                           <Typography variant="body2" fontWeight={600} noWrap>{c.folio}</Typography>
-                          <Typography variant="caption" color="text.secondary" noWrap sx={{ display: "block" }}>
-                            {clienteNombre}
-                          </Typography>
+                          <Typography variant="caption" color="text.secondary" noWrap sx={{ display: "block" }}>{cliente}</Typography>
                         </Box>
                       </Box>
-
-                      <Typography variant="caption" color="text.secondary" sx={{ whiteSpace: "nowrap" }}>
-                        {formatDate(c.fecha)}
-                      </Typography>
-
-                      <Typography variant="body2" fontWeight={700} sx={{ whiteSpace: "nowrap" }}>
-                        {formatCurrency(c.total)}
-                      </Typography>
-
-                      <Chip label={s.label} color={s.color} size="small" sx={{ whiteSpace: "nowrap" }} />
+                      <Typography variant="caption" color="text.secondary" noWrap>{formatDate(c.fecha)}</Typography>
+                      <Typography variant="body2" fontWeight={700} noWrap>{formatCurrency(c.total)}</Typography>
+                      <Chip label={s.label} color={s.color} size="small" />
                     </Box>
-
                     {i < recientes.length - 1 && <Divider />}
                   </Box>
                 );
               })
             )}
-          </Paper>
+          </AppCard>
         </Grid>
 
-        {/* Cotizaciones por estado */}
         <Grid size={{ xs: 12, md: 4 }}>
-          <Paper
-            elevation={0}
-            sx={{ borderRadius: 2, border: 1, borderColor: "divider", p: 3.5 }}
-          >
-            <Typography variant="h6" fontWeight={700} sx={{ mb: 2 }}>
-              Cotizaciones por Estado
-            </Typography>
-
-            {cargandoDetalle ? (
+          <AppCard title="Cotizaciones por estado" sx={{ height: "100%" }}>
+            {cargando ? (
               Array.from({ length: 4 }).map((_, i) => (
-                <Box key={i} sx={{ mb: 3 }}>
+                <Box key={i} sx={{ mb: 2.5 }}>
                   <Skeleton variant="text" width="60%" />
-                  <Skeleton variant="rounded" height={8} sx={{ borderRadius: 4 }} />
+                  <Skeleton variant="rounded" height={6} sx={{ borderRadius: 4 }} />
                 </Box>
               ))
             ) : (
-              ESTADOS_COTIZACION.map((estado) => {
-                const cantidad = porEstado[estado] || 0;
-                const porcentaje = Math.round((cantidad / totalPorEstado) * 100);
-                const s = COTIZACION_STATUS_MAP[estado];
+              ESTADOS.map((estado) => {
+                const cant = porEstado[estado] || 0;
+                const pct = Math.round((cant / totalEstados) * 100);
                 return (
-                  <Box key={estado} sx={{ mb: 3, padding: "8px", transition: ".3s", "&:hover": {
-                        transform: "translateY(-2px)",
-                        bgcolor: "action.hover",
-                        borderRadius: "10px",
-                      } }}>
+                  <Box key={estado} sx={{ mb: 2.25 }}>
                     <Box sx={{ display: "flex", justifyContent: "space-between", mb: 0.75 }}>
-                      <Typography variant="body1" fontWeight={600}>
-                        {s.label}
-                      </Typography>
-                      <Typography variant="body1" color="text.secondary">
-                        {cantidad} {cantidad === 1 ? "cotización" : "cotizaciones"}
-                      </Typography>
+                      <Typography variant="body2" fontWeight={600}>{STATUS_MAP[estado].label}</Typography>
+                      <Typography variant="body2" color="text.secondary">{cant}</Typography>
                     </Box>
                     <LinearProgress
-                      variant="determinate"
-                      value={porcentaje}
-                      sx={{
-                        height: 8,
-                        borderRadius: 4,
-                        bgcolor: "action.hover",
-                        "& .MuiLinearProgress-bar": {
-                          bgcolor: ESTADO_COLOR[estado],
-                          borderRadius: 4,
-                        },
-                      }}
+                      variant="determinate" value={pct}
+                      sx={{ height: 6, borderRadius: 999, bgcolor: "action.hover", "& .MuiLinearProgress-bar": { bgcolor: ESTADO_COLOR[estado], borderRadius: 999 } }}
                     />
                   </Box>
                 );
@@ -375,33 +182,24 @@ export default function Dashboard() {
 
             <Divider sx={{ my: 2 }} />
 
-            <Box sx={{ textAlign: "center", margin: "10px", display: "grid", gridTemplateColumns: "1fr 1fr 1fr" }}>
+            <Box sx={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 1 }}>
               {[
-                { icono: <CheckCircle sx={{ fontSize: 16 }} />, valor: porEstado.aprobada || 0, label: "Aprobadas", color: theme.palette.success.main },
-                { icono: <Cancel sx={{ fontSize: 16 }} />, valor: porEstado.rechazada || 0, label: "Rechazadas", color: theme.palette.error.main },
-                { icono: <ReceiptLong sx={{ fontSize: 16 }} />, valor: porEstado.facturada || 0, label: "Facturadas", color: theme.palette.secondary.main },
-              ].map((resumen) => (
-                <Box key={resumen.label} sx={{ width: "100%", textAlign: "center", display: "flex", flexDirection: "column", alignItems: "center", gap: 0.5 }}>
-                  <Box sx={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "10px" }}>
-                    <Box sx={{ width: 32, height: 32, borderRadius: "50%", background: resumen.color + "18", color: resumen.color, display: "flex", alignItems: "center", justifyContent: "center" }}>
-                      {resumen.icono}
+                { icon: <CheckCircleOutlineOutlined sx={{ fontSize: 16 }} />, valor: porEstado.aprobada || 0, label: "Aprobadas", color: theme.palette.success.main },
+                { icon: <BlockOutlined sx={{ fontSize: 16 }} />, valor: porEstado.rechazada || 0, label: "Rechazadas", color: theme.palette.error.main },
+                { icon: <ReceiptLongOutlined sx={{ fontSize: 16 }} />, valor: porEstado.facturada || 0, label: "Facturadas", color: theme.palette.secondary.main },
+              ].map((r) => (
+                <Box key={r.label} sx={{ textAlign: "center" }}>
+                  <Box sx={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 0.75 }}>
+                    <Box sx={{ width: 28, height: 28, borderRadius: 2, display: "grid", placeItems: "center", background: r.color + "18", color: r.color }}>
+                      {r.icon}
                     </Box>
-                    <Typography
-                      variant="h5"
-                      fontWeight={800}
-                      sx={{ color: resumen.color }}
-                    >
-                      {resumen.valor}
-                    </Typography>
+                    <Typography variant="h6" fontWeight={800} sx={{ color: r.color }}>{r.valor}</Typography>
                   </Box>
-
-                  <Typography variant="h7" color="text.secondary">
-                    {resumen.label}
-                  </Typography>
+                  <Typography variant="caption" color="text.secondary">{r.label}</Typography>
                 </Box>
               ))}
             </Box>
-          </Paper>
+          </AppCard>
         </Grid>
       </Grid>
     </Box>

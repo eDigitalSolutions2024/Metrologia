@@ -4,6 +4,9 @@ import Login from "../pages/Login/Login";
 import MainLayout from "../layouts/MainLayout";
 import ProtectedRoute from "../core/auth/ProtectedRoute";
 import GuestRoute from "../core/auth/GuestRoute";
+import VerCertificado from "../pages/Publico/VerCertificado";
+import CertificadosPage from "../pages/Certificados/CertificadosPage";
+import IncertidumbrePage from "../pages/Incertidumbre/IncertidumbrePage";
 
 import Dashboard from "../pages/Dashboard/Dashboard";
 import Usuarios from "../pages/Usuarios/Usuarios";
@@ -30,6 +33,9 @@ import ROUTES from "../shared/constants/routes";
 export default function AppRouter() {
   return (
     <Routes>
+      {/* Verificación pública del certificado por token (sin sesión, sin layout) */}
+      <Route path="/certificado/ver/:token" element={<VerCertificado />} />
+
       <Route
         path={ROUTES.LOGIN}
         element={
@@ -48,6 +54,8 @@ export default function AppRouter() {
         }
       >
         <Route index element={<Dashboard />} />
+        <Route path="reportes/certificados" element={<CertificadosPage />} />
+        <Route path="incertidumbre" element={<IncertidumbrePage />} />
         <Route path="usuarios" element={<Usuarios />} />
         <Route path="general" element={<General />} />
         <Route path="clientes" element={<ClientesPage />} />

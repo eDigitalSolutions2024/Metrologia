@@ -1,4 +1,5 @@
 require("dotenv/config");
+const path = require("path");
 
 const REQUIRED = ["MONGODB_URI", "JWT_SECRET", "JWT_REFRESH_SECRET"];
 
@@ -33,6 +34,7 @@ if (isProd) {
 module.exports = {
   port: Number(process.env.PORT) || 4000,
   nodeEnv,
+  isProd,
   mongoUri: process.env.MONGODB_URI,
   corsOrigin: process.env.CORS_ORIGIN || "http://localhost:5173",
   jwt: {
@@ -40,5 +42,19 @@ module.exports = {
     expiresIn: process.env.JWT_EXPIRES_IN || "1h",
     refreshSecret: process.env.JWT_REFRESH_SECRET,
     refreshExpiresIn: process.env.JWT_REFRESH_EXPIRES_IN || "7d",
+  },
+
+  // URL pública del frontend — se usa para armar el enlace que va dentro del QR
+  // del certificado (…/certificado/ver/<token>).
+  publicWebUrl:
+    process.env.PUBLIC_WEB_URL || process.env.CORS_ORIGIN || "http://localhost:5174",
+
+  // Carpeta local donde se guardan archivos subidos (PDFs de certificados, etc.).
+  uploadsDir: process.env.UPLOADS_DIR || path.join(__dirname, "..", "..", "uploads"),
+
+  // Datos del laboratorio que aparecen en la verificación pública del certificado.
+  laboratorio: {
+    nombre: process.env.LAB_NOMBRE || "Laboratorio de Metrología",
+    acreditacion: process.env.LAB_ACREDITACION || "",
   },
 };

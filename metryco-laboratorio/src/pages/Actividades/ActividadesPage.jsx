@@ -6,6 +6,8 @@ import ChevronLeftIcon from "@mui/icons-material/ChevronLeft";
 import ChevronRightIcon from "@mui/icons-material/ChevronRight";
 import AddIcon from "@mui/icons-material/Add";
 import AppButton from "../../shared/components/AppButton";
+import PageHeader from "../../shared/components/PageHeader";
+import CalendarMonthOutlinedIcon from "@mui/icons-material/CalendarMonthOutlined";
 import NuevaActividad from "../../shared/components/NuevaActividad/NuevaActividad";
 import { listarActividades } from "../../services/actividades";
 
@@ -78,12 +80,15 @@ export default function ActividadesPage() {
 
   return (
     <Box>
-      <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 3 }}>
-        <Typography variant="h5" fontWeight={700}>Calendario de Actividades</Typography>
-        <AppButton startIcon={<AddIcon />} sx={{ borderRadius: 2 }} onClick={() => abrirNueva()}>
-          Nueva Actividad
-        </AppButton>
-      </Box>
+      <PageHeader
+        icon={<CalendarMonthOutlinedIcon />}
+        title="Calendario de Actividades"
+        actions={
+          <AppButton startIcon={<AddIcon />} sx={{ borderRadius: 2 }} onClick={() => abrirNueva()}>
+            Nueva Actividad
+          </AppButton>
+        }
+      />
 
       <Paper elevation={0} sx={{ border: 1, borderColor: "divider", borderRadius: 4, overflow: "hidden" }}>
         <Box sx={{ borderBottom: 1, display: "flex", alignItems: "center", justifyContent: "space-between", px: 3, py: 2, borderColor: "divider" }}>

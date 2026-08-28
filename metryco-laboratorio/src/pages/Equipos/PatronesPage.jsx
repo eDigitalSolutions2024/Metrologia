@@ -11,6 +11,8 @@ import FileDownloadOutlinedIcon from "@mui/icons-material/FileDownloadOutlined";
 
 import AppButton from "../../shared/components/AppButton";
 import AppTable from "../../shared/components/AppTable";
+import PageHeader from "../../shared/components/PageHeader";
+import StraightenOutlinedIcon from "@mui/icons-material/StraightenOutlined";
 import { formatDate } from "../../shared/utils/formatDate";
 import { exportCsv } from "../../shared/utils/exportCsv";
 import { PATRONES_MOCK } from "./mockData";
@@ -106,24 +108,27 @@ export default function PatronesPage() {
 
   return (
     <Box>
-      <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 3 }}>
-        <Box>
-          <Typography variant="h5" fontWeight={700}>Consultar Patrones</Typography>
-          <Typography variant="body2" color="text.secondary">
+      <PageHeader
+        icon={<StraightenOutlinedIcon />}
+        title="Consultar Patrones"
+        subtitle={
+          <>
             {PATRONES_MOCK.length} patrones registrados
             {porVencer > 0 && <Box component="span" sx={{ color: "warning.main", fontWeight: 700 }}> · {porVencer} por vencer</Box>}
             {vencidos > 0 && <Box component="span" sx={{ color: "error.main", fontWeight: 700 }}> · {vencidos} vencidos</Box>}
-          </Typography>
-        </Box>
-        <Box sx={{ display: "flex", gap: 1.5 }}>
-          <AppButton variant="outlined" startIcon={<FileDownloadOutlinedIcon />} onClick={exportar} sx={{ borderRadius: 2 }}>
-            Exportar Patrones
-          </AppButton>
-          <AppButton startIcon={<AddIcon />} onClick={() => navigate("/equipos/patrones/nuevo")} sx={{ borderRadius: 2 }}>
-            Alta de Patrón
-          </AppButton>
-        </Box>
-      </Box>
+          </>
+        }
+        actions={
+          <>
+            <AppButton variant="outlined" startIcon={<FileDownloadOutlinedIcon />} onClick={exportar} sx={{ borderRadius: 2 }}>
+              Exportar Patrones
+            </AppButton>
+            <AppButton startIcon={<AddIcon />} onClick={() => navigate("/equipos/patrones/nuevo")} sx={{ borderRadius: 2 }}>
+              Alta de Patrón
+            </AppButton>
+          </>
+        }
+      />
 
       <Box sx={{ mb: 2 }}>
         <TextField
@@ -132,12 +137,14 @@ export default function PatronesPage() {
           value={search}
           onChange={(e) => { setSearch(e.target.value); setPage(0); }}
           sx={{ width: 400, "& .MuiOutlinedInput-root": { borderRadius: 2 } }}
-          InputProps={{
-            startAdornment: (
-              <InputAdornment position="start">
-                <SearchIcon fontSize="small" sx={{ color: "text.secondary" }} />
-              </InputAdornment>
-            ),
+          slotProps={{
+            input: {
+              startAdornment: (
+                <InputAdornment position="start">
+                  <SearchIcon fontSize="small" sx={{ color: "text.secondary" }} />
+                </InputAdornment>
+              ),
+            },
           }}
         />
       </Box>

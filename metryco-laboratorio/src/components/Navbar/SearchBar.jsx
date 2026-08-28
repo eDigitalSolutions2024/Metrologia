@@ -30,6 +30,20 @@ export default function SearchBar() {
   const containerRef = useRef(null);
 
   const debouncedQuery = useDebounce(query, 350);
+  const inputRef = useRef(null);
+
+  // Atajo ⌘K / Ctrl+K para enfocar la búsqueda global.
+  useEffect(() => {
+    const onKey = (e) => {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
+        e.preventDefault();
+        inputRef.current?.focus();
+        setOpen(true);
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
 
   useEffect(() => {
     if (!debouncedQuery.trim()) return;
@@ -106,10 +120,11 @@ export default function SearchBar() {
 
   return (
     <ClickAwayListener onClickAway={cerrar}>
-      <Box ref={containerRef} sx={{ position: "relative", width: 320 }}>
+      <Box ref={containerRef} sx={{ position: "relative", width: { xs: 200, sm: 320, md: 380 } }}>
         <TextField
           size="small"
-          placeholder="Buscar en todo el sistema..."
+          inputRef={inputRef}
+          placeholder="Buscar en todo el sistema…"
           value={query}
           onChange={(e) => {
             setQuery(e.target.value);
@@ -117,32 +132,58 @@ export default function SearchBar() {
           }}
           onFocus={() => setOpen(true)}
           fullWidth
-          sx={{ borderRadius: 2 }}
-          InputProps={{
-            startAdornment: (
-              <InputAdornment position="start">
-                <SearchIcon fontSize="small" />
-              </InputAdornment>
-            ),
-            endAdornment: loading ? (
-              <InputAdornment position="end">
-                <CircularProgress size={16} />
-              </InputAdornment>
-            ) : null,
+          sx={{
+            "& .MuiOutlinedInput-root": {
+              borderRadius: 999,
+              bgcolor: "background.default",
+              transition: "box-shadow .15s, background-color .15s",
+              "&.Mui-focused": { bgcolor: "background.paper" },
+            },
+          }}
+          slotProps={{
+            input: {
+              startAdornment: (
+                <InputAdornment position="start">
+                  <SearchIcon fontSize="small" sx={{ color: "text.secondary" }} />
+                </InputAdornment>
+              ),
+              endAdornment: loading ? (
+                <InputAdornment position="end">
+                  <CircularProgress size={16} />
+                </InputAdornment>
+              ) : !query ? (
+                <InputAdornment position="end">
+                  <Box
+                    component="kbd"
+                    sx={{
+                      fontFamily: "inherit", fontSize: 11, fontWeight: 600,
+                      color: "text.secondary", border: 1, borderColor: "divider",
+                      borderRadius: 1, px: 0.75, py: 0.15, lineHeight: 1.4,
+                      bgcolor: "background.paper",
+                    }}
+                  >
+                    ⌘K
+                  </Box>
+                </InputAdornment>
+              ) : null,
+            },
           }}
         />
 
         {mostrarPanel && (
           <Paper
-            elevation={4}
+            elevation={0}
             sx={{
               position: "absolute",
-              top: "calc(100% + 6px)",
+              top: "calc(100% + 8px)",
               left: 0,
               right: 0,
               zIndex: 1300,
-              borderRadius: 2,
-              maxHeight: 440,
+              borderRadius: 3,
+              border: 1,
+              borderColor: "divider",
+              boxShadow: "0 24px 60px -12px rgba(15,23,42,.22)",
+              maxHeight: 460,
               overflowY: "auto",
             }}
           >

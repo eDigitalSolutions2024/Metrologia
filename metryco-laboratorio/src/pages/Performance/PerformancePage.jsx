@@ -7,6 +7,8 @@ import EditOutlinedIcon from "@mui/icons-material/EditOutlined";
 
 import AppButton from "../../shared/components/AppButton";
 import AppTable from "../../shared/components/AppTable";
+import PageHeader from "../../shared/components/PageHeader";
+import SpeedOutlinedIcon from "@mui/icons-material/SpeedOutlined";
 import { MOCK } from "./mockData";
 
 // Consultar Performance = php/performance_buscar.php.
@@ -45,17 +47,16 @@ export default function PerformancePage() {
 
   return (
     <Box>
-      <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 3 }}>
-        <Box>
-          <Typography variant="h5" fontWeight={700}>Performance</Typography>
-          <Typography variant="body2" color="text.secondary">
-            {MOCK.length} plantillas de puntos de prueba para calibración
-          </Typography>
-        </Box>
-        <AppButton startIcon={<AddIcon />} onClick={() => navigate("/performance/nuevo")} sx={{ borderRadius: 2 }}>
-          Nuevo Performance
-        </AppButton>
-      </Box>
+      <PageHeader
+        icon={<SpeedOutlinedIcon />}
+        title="Performance"
+        subtitle={`${MOCK.length} plantillas de puntos de prueba para calibración`}
+        actions={
+          <AppButton startIcon={<AddIcon />} onClick={() => navigate("/performance/nuevo")} sx={{ borderRadius: 2 }}>
+            Nuevo Performance
+          </AppButton>
+        }
+      />
 
       <Box sx={{ mb: 2 }}>
         <TextField
@@ -64,12 +65,14 @@ export default function PerformancePage() {
           value={search}
           onChange={(e) => { setSearch(e.target.value); setPage(0); }}
           sx={{ width: 380, "& .MuiOutlinedInput-root": { borderRadius: 2 } }}
-          InputProps={{
-            startAdornment: (
-              <InputAdornment position="start">
-                <SearchIcon fontSize="small" sx={{ color: "text.secondary" }} />
-              </InputAdornment>
-            ),
+          slotProps={{
+            input: {
+              startAdornment: (
+                <InputAdornment position="start">
+                  <SearchIcon fontSize="small" sx={{ color: "text.secondary" }} />
+                </InputAdornment>
+              ),
+            },
           }}
         />
       </Box>

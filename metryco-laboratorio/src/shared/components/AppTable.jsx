@@ -1,15 +1,6 @@
 import {
-  Table,
-  TableBody,
-  TableCell,
-  TableContainer,
-  TableHead,
-  TableRow,
-  TablePagination,
-  Paper,
-  Box,
-  Typography,
-  CircularProgress,
+  Table, TableBody, TableCell, TableContainer, TableHead, TableRow,
+  TablePagination, Paper, Box, Typography, CircularProgress,
 } from "@mui/material";
 
 export default function AppTable({
@@ -22,19 +13,19 @@ export default function AppTable({
   onPageChange,
   onRowsPerPageChange,
   emptyText = "Sin registros",
+  maxHeight,
 }) {
   return (
-    <Paper elevation={0} sx={{ border: 1, borderColor: "divider", borderRadius: 3, overflow: "hidden" }}>
-      <TableContainer>
-        <Table size="small">
+    <Paper
+      elevation={0}
+      sx={{ border: 1, borderColor: "divider", borderRadius: 3.5, overflow: "hidden" }}
+    >
+      <TableContainer sx={{ maxHeight }}>
+        <Table size="small" stickyHeader={!!maxHeight}>
           <TableHead>
-            <TableRow sx={{ backgroundColor: "background.default" }}>
+            <TableRow>
               {columns.map((col) => (
-                <TableCell
-                  key={col.field}
-                  align={col.align || "left"}
-                  sx={{ fontWeight: 700, fontSize: 13, color: "text.secondary", py: 1.5 }}
-                >
+                <TableCell key={col.field} align={col.align || "left"} sx={{ py: 1.5 }}>
                   {col.headerName}
                 </TableCell>
               ))}
@@ -44,25 +35,29 @@ export default function AppTable({
           <TableBody>
             {loading ? (
               <TableRow>
-                <TableCell colSpan={columns.length} align="center" sx={{ py: 6 }}>
-                  <CircularProgress size={28} />
+                <TableCell colSpan={columns.length} align="center" sx={{ py: 7 }}>
+                  <CircularProgress size={26} />
                 </TableCell>
               </TableRow>
             ) : rows.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={columns.length} align="center" sx={{ py: 6 }}>
+                <TableCell colSpan={columns.length} align="center" sx={{ py: 7 }}>
                   <Typography color="text.secondary">{emptyText}</Typography>
                 </TableCell>
               </TableRow>
             ) : (
               rows.map((row, idx) => (
                 <TableRow
-                  key={row.id ?? idx}
+                  key={row.id ?? row._id ?? idx}
                   hover
-                  sx={{ "&:last-child td": { border: 0 } }}
+                  sx={{
+                    "&:last-child td": { border: 0 },
+                    "& td": { transition: "background-color .12s ease" },
+                    "&:hover td": { backgroundColor: "action.hover" },
+                  }}
                 >
                   {columns.map((col) => (
-                    <TableCell key={col.field} align={col.align || "left"} sx={{ fontSize: 13, py: 1.25 }}>
+                    <TableCell key={col.field} align={col.align || "left"} sx={{ fontSize: 13, py: 1.35 }}>
                       {col.renderCell ? col.renderCell(row) : row[col.field] ?? "—"}
                     </TableCell>
                   ))}

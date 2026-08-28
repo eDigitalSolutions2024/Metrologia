@@ -13,6 +13,8 @@ import FileDownloadOutlinedIcon from "@mui/icons-material/FileDownloadOutlined";
 
 import AppButton from "../../shared/components/AppButton";
 import AppTable from "../../shared/components/AppTable";
+import PageHeader from "../../shared/components/PageHeader";
+import ScienceOutlinedIcon from "@mui/icons-material/ScienceOutlined";
 import { formatDate } from "../../shared/utils/formatDate";
 import { listarClientes } from "../../services/clientes";
 import { obtenerDirectorio } from "../../services/usuarios";
@@ -330,22 +332,21 @@ export default function CalidadPage() {
 
   return (
     <Box>
-      <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", mb: 3 }}>
-        <Box>
-          <Typography variant="h5" fontWeight={700} sx={{ mb: 0.5 }}>Calidad</Typography>
-          <Typography variant="body2" color="text.secondary">
-            Certificados pendientes de aprobar por Calidad
-          </Typography>
-        </Box>
-        <AppButton
-          variant="outlined"
-          startIcon={<FileDownloadOutlinedIcon />}
-          onClick={() => setExportarOpen(true)}
-          sx={{ borderRadius: 2 }}
-        >
-          Exportar Excel
-        </AppButton>
-      </Box>
+      <PageHeader
+        icon={<ScienceOutlinedIcon />}
+        title="Calidad"
+        subtitle="Certificados pendientes de aprobar por Calidad"
+        actions={
+          <AppButton
+            variant="outlined"
+            startIcon={<FileDownloadOutlinedIcon />}
+            onClick={() => setExportarOpen(true)}
+            sx={{ borderRadius: 2 }}
+          >
+            Exportar Excel
+          </AppButton>
+        }
+      />
 
       <ConsultarTab />
       <ExportarDialog open={exportarOpen} onClose={() => setExportarOpen(false)} />

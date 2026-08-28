@@ -31,6 +31,9 @@ import AdminPanelSettingsOutlinedIcon from "@mui/icons-material/AdminPanelSettin
 
 import AppButton from "../../shared/components/AppButton";
 import AppTable from "../../shared/components/AppTable";
+import PageHeader from "../../shared/components/PageHeader";
+import StatCard from "../../shared/components/StatCard";
+import ManageAccountsOutlinedIcon from "@mui/icons-material/ManageAccountsOutlined";
 import ConfirmDialog from "../../shared/components/ConfirmDialog";
 
 import PasswordConfirmDialog from "../../shared/components/PasswordConfirmDialog";
@@ -241,66 +244,23 @@ export default function Usuarios() {
 
   return (
     <Box sx={{ "& > * + *": { mt: 3 } }}>
-      <Box sx={{ display: "flex", justifyContent: "space-between", pb: 3, borderBottom: "1px solid", borderColor: "divider" }}>
-        <Box>
-          <Box>
-            <Typography variant="h5" fontWeight={700}>
-              Usuarios del Sistema
-            </Typography>
-          </Box>
-          <Box sx={{ mt: 1 }}>
-            <Typography variant="body2" color="text.secondary">
-              {totalCount} usuarios
-            </Typography>
-          </Box>
-        </Box>
-        <Box sx={{ mt: 2 }}>
-          <AppButton
-            startIcon={<AddIcon />}
-            sx={{ borderRadius: 2 }}
-            onClick={() => setOpenNuevoUsuario(true)}
-          >
+      <PageHeader
+        icon={<ManageAccountsOutlinedIcon />}
+        title="Usuarios del Sistema"
+        subtitle={`${totalCount} usuarios`}
+        actions={
+          <AppButton startIcon={<AddIcon />} sx={{ borderRadius: 2 }} onClick={() => setOpenNuevoUsuario(true)}>
             Nuevo Usuario
           </AppButton>
-        </Box>
-      </Box>
+        }
+      />
 
       {error && <Alert severity="error" sx={{ borderRadius: 2 }}>{error}</Alert>}
 
-      <Grid container spacing={3}>
+      <Grid container spacing={2.5}>
         {statCards.map((card) => (
           <Grid key={card.titulo} size={{ xs: 12, sm: 6, md: 3 }}>
-            <Paper
-              elevation={0}
-              sx={{
-                p: 3,
-                borderRadius: 3,
-                border: 1,
-                borderColor: "divider",
-                transition: ".3s",
-                "&:hover": {
-                  transform: "translateY(-4px)",
-                  boxShadow: "0 12px 30px rgba(0,0,0,.08)",
-                },
-              }}
-            >
-              <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
-                <Box>
-                  <Typography color="text.secondary" variant="body2" mb={1}>
-                    {card.titulo}
-                  </Typography>
-                  <Typography variant="h4" fontWeight={800}>
-                    {card.valor}
-                  </Typography>
-                  <Typography variant="caption" color="text.secondary" mt={1} display="block">
-                    {card.sub}
-                  </Typography>
-                </Box>
-                <Box sx={{ width: 52, height: 52, flexShrink: 0, borderRadius: 3, background: card.color + "18", color: card.color, display: "flex", alignItems: "center", justifyContent: "center" }}>
-                  {card.icono}
-                </Box>
-              </Box>
-            </Paper>
+            <StatCard label={card.titulo} value={card.valor} icon={card.icono} color={card.color} hint={card.sub} />
           </Grid>
         ))}
       </Grid>
@@ -311,16 +271,15 @@ export default function Usuarios() {
           size="small"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          sx={{
-            width: 340,
-            "& .MuiOutlinedInput-root": { borderRadius: 2 },
-          }}
-          InputProps={{
-            startAdornment: (
-              <InputAdornment position="start">
-                <SearchIcon fontSize="small" sx={{ color: "text.secondary" }} />
-              </InputAdornment>
-            ),
+          sx={{ width: 340, "& .MuiOutlinedInput-root": { borderRadius: 2 } }}
+          slotProps={{
+            input: {
+              startAdornment: (
+                <InputAdornment position="start">
+                  <SearchIcon fontSize="small" sx={{ color: "text.secondary" }} />
+                </InputAdornment>
+              ),
+            },
           }}
         />
       </Box>

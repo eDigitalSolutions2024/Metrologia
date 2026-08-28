@@ -1,8 +1,10 @@
 const rateLimit = require("express-rate-limit");
 
+const isProd = process.env.NODE_ENV === "production";
+
 const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  limit: 10,
+  limit: isProd ? 10 : 100,
   standardHeaders: true,
   legacyHeaders: false,
   message: { success: false, message: "Demasiados intentos, inténtalo de nuevo más tarde" },

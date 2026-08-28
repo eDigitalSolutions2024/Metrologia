@@ -12,6 +12,9 @@ import FileDownloadOutlinedIcon from "@mui/icons-material/FileDownloadOutlined";
 
 import AppButton from "../../shared/components/AppButton";
 import AppTable from "../../shared/components/AppTable";
+import PageHeader from "../../shared/components/PageHeader";
+import StatCard from "../../shared/components/StatCard";
+import PaymentsOutlinedIcon from "@mui/icons-material/PaymentsOutlined";
 import AppInput from "../../shared/components/AppInput";
 import AppDatePicker from "../../shared/components/AppDatePicker";
 import { formatDate } from "../../shared/utils/formatDate";
@@ -213,29 +216,29 @@ export default function CobranzaPage() {
 
   return (
     <Box>
-      <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 3, flexWrap: "wrap", gap: 2 }}>
-        <Typography variant="h5" fontWeight={700}>Cuentas por Cobrar</Typography>
-        <Box sx={{ display: "flex", gap: 1.5 }}>
-          <AppButton variant="outlined" startIcon={<FileDownloadOutlinedIcon />} onClick={exportar} sx={{ borderRadius: 2 }}>
-            Exportar Reporte Excel
-          </AppButton>
-          <AppButton startIcon={<AddIcon />} onClick={() => setNuevoOpen(true)} sx={{ borderRadius: 2 }}>
-            Nuevo Registro
-          </AppButton>
-        </Box>
-      </Box>
+      <PageHeader
+        icon={<PaymentsOutlinedIcon />}
+        title="Cuentas por Cobrar"
+        actions={
+          <>
+            <AppButton variant="outlined" startIcon={<FileDownloadOutlinedIcon />} onClick={exportar} sx={{ borderRadius: 2 }}>
+              Exportar Reporte Excel
+            </AppButton>
+            <AppButton startIcon={<AddIcon />} onClick={() => setNuevoOpen(true)} sx={{ borderRadius: 2 }}>
+              Nuevo Registro
+            </AppButton>
+          </>
+        }
+      />
 
-      <Grid container spacing={2} mb={3}>
+      <Grid container spacing={2.5} mb={3}>
         {[
           { label: "Total Atrasado", valor: atrasadas.reduce((s, r) => s + r.monto, 0), color: theme.palette.error.main },
           { label: "Total por Pagar", valor: porPagar.reduce((s, r) => s + r.monto, 0), color: theme.palette.warning.main },
           { label: "Total Cobrado", valor: pagadas.reduce((s, r) => s + r.monto, 0), color: theme.palette.success.main },
         ].map((s) => (
           <Grid key={s.label} size={{ xs: 12, sm: 4 }}>
-            <Paper elevation={0} sx={{ p: 2.5, borderRadius: 3, border: 1, borderColor: "divider", bgcolor: s.color + "1A" }}>
-              <Typography variant="caption" color="text.secondary">{s.label}</Typography>
-              <Typography variant="h5" fontWeight={800} sx={{ color: s.color, mt: 0.5 }}>{formatCurrency(s.valor)}</Typography>
-            </Paper>
+            <StatCard label={s.label} value={formatCurrency(s.valor)} color={s.color} />
           </Grid>
         ))}
       </Grid>

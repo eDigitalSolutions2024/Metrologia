@@ -5,7 +5,7 @@ const { port } = require("./config/env");
 async function start() {
   await connectDB();
   app.listen(port, () => {
-    console.log(`API de Metryco corriendo en http://localhost:${port}`);
+    console.log(`API de Metrología corriendo en http://localhost:${port}`);
   });
 }
 

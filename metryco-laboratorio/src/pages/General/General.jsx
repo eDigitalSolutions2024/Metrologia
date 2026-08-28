@@ -3,8 +3,10 @@ import {
   Box, Typography, TextField, InputAdornment, Chip, Avatar, Alert,
 } from "@mui/material";
 import SearchIcon from "@mui/icons-material/Search";
+import ContactsOutlinedIcon from "@mui/icons-material/ContactsOutlined";
 
 import AppTable from "../../shared/components/AppTable";
+import PageHeader from "../../shared/components/PageHeader";
 import { obtenerDirectorio } from "../../services/usuarios";
 import { useDebounce } from "../../shared/hooks/useDebounce";
 
@@ -104,14 +106,11 @@ export default function General() {
 
   return (
     <Box sx={{ "& > * + *": { mt: 3 } }}>
-      <Box>
-        <Typography variant="h5" fontWeight={700}>
-          Directorio General
-        </Typography>
-        <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
-          Consulta de todo el personal de la empresa
-        </Typography>
-      </Box>
+      <PageHeader
+        icon={<ContactsOutlinedIcon />}
+        title="Directorio General"
+        subtitle="Consulta de todo el personal de la empresa"
+      />
 
       {error && <Alert severity="error" sx={{ borderRadius: 2 }}>{error}</Alert>}
 
@@ -125,12 +124,14 @@ export default function General() {
             setPage(0);
           }}
           sx={{ width: 340, "& .MuiOutlinedInput-root": { borderRadius: 2 } }}
-          InputProps={{
-            startAdornment: (
-              <InputAdornment position="start">
-                <SearchIcon fontSize="small" sx={{ color: "text.secondary" }} />
-              </InputAdornment>
-            ),
+          slotProps={{
+            input: {
+              startAdornment: (
+                <InputAdornment position="start">
+                  <SearchIcon fontSize="small" sx={{ color: "text.secondary" }} />
+                </InputAdornment>
+              ),
+            },
           }}
         />
       </Box>

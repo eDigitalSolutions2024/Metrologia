@@ -13,6 +13,8 @@ import { DeleteOutlined as DeleteOutlineIcon } from "@mui/icons-material";
 
 import AppButton from "../../shared/components/AppButton";
 import AppTable from "../../shared/components/AppTable";
+import PageHeader from "../../shared/components/PageHeader";
+import GroupsOutlinedIcon from "@mui/icons-material/GroupsOutlined";
 import ConfirmDialog from "../../shared/components/ConfirmDialog";
 import PasswordConfirmDialog from "../../shared/components/PasswordConfirmDialog";
 import { listarClientes, actualizarCliente, eliminarCliente } from "../../services/clientes";
@@ -154,15 +156,16 @@ export default function ClientesPage() {
 
   return (
     <Box>
-      <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 3 }}>
-        <Box>
-          <Typography variant="h5" fontWeight={700}>Clientes</Typography>
-          <Typography variant="body2" color="text.secondary">{totalCount} registros</Typography>
-        </Box>
-        <AppButton startIcon={<AddIcon />} onClick={() => navigate("/clientes/nuevo")} sx={{ borderRadius: 2 }}>
-          Nuevo Cliente
-        </AppButton>
-      </Box>
+      <PageHeader
+        icon={<GroupsOutlinedIcon />}
+        title="Clientes"
+        subtitle={`${totalCount} registros`}
+        actions={
+          <AppButton startIcon={<AddIcon />} onClick={() => navigate("/clientes/nuevo")} sx={{ borderRadius: 2 }}>
+            Nuevo Cliente
+          </AppButton>
+        }
+      />
 
       {error && <Alert severity="error" sx={{ mb: 2, borderRadius: 2 }}>{error}</Alert>}
 
@@ -173,12 +176,14 @@ export default function ClientesPage() {
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           sx={{ width: 360, "& .MuiOutlinedInput-root": { borderRadius: 2 } }}
-          InputProps={{
-            startAdornment: (
-              <InputAdornment position="start">
-                <SearchIcon fontSize="small" sx={{ color: "text.secondary" }} />
-              </InputAdornment>
-            ),
+          slotProps={{
+            input: {
+              startAdornment: (
+                <InputAdornment position="start">
+                  <SearchIcon fontSize="small" sx={{ color: "text.secondary" }} />
+                </InputAdornment>
+              ),
+            },
           }}
         />
         <FormControl size="small" sx={{ minWidth: 160 }}>

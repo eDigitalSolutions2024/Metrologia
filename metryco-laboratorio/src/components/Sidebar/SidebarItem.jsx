@@ -1,20 +1,21 @@
-import {
-  ListItemButton,
-  ListItemIcon,
-  ListItemText,
-  Collapse,
-} from "@mui/material";
+import { ListItemButton, ListItemIcon, ListItemText, Collapse, Box } from "@mui/material";
 import { ExpandLess, ExpandMore } from "@mui/icons-material";
 import { useState } from "react";
 import { NavLink, useLocation } from "react-router-dom";
 
+const activePill = {
+  color: "#fff",
+  background: "linear-gradient(135deg, rgba(37,99,235,.92), rgba(29,78,216,.92))",
+  boxShadow: "0 10px 24px -6px rgba(37,99,235,.55)",
+};
+const idle = { color: "rgba(230,237,246,.72)", background: "transparent" };
+const hover = { background: "rgba(255,255,255,.055)", color: "#fff" };
+
 export default function SidebarItem({ item }) {
   const location = useLocation();
   const hasChildren = item.children && item.children.length > 0;
-
   const isParentActive = hasChildren && item.children.some((c) => location.pathname === c.path);
   const [open, setOpen] = useState(isParentActive);
-
   const Icon = item.icon;
 
   if (!hasChildren) {
@@ -22,26 +23,21 @@ export default function SidebarItem({ item }) {
       <NavLink to={item.path} style={{ textDecoration: "none" }}>
         {({ isActive }) => (
           <ListItemButton
+            disableRipple
             sx={{
-              color: isActive ? "#fff" : "#E2E8F0",
-              backgroundColor: isActive ? "#2563EB" : "transparent",
-              borderRadius: 2,
-              mx: 1,
-              my: 0.5,
-              transition: ".2s",
-              "&:hover": {
-                backgroundColor: isActive ? "#1D4ED8" : "#1E293B",
-                color: "#fff",
-              },
+              position: "relative", borderRadius: 2.5, mx: 0.5, my: 0.3, py: 0.85, pl: 1.75,
+              transition: "background .18s, color .18s, box-shadow .18s",
+              ...(isActive ? activePill : idle),
+              "&:hover": isActive ? {} : hover,
+              "&::before": isActive
+                ? { content: '""', position: "absolute", left: -0.5, top: "26%", bottom: "26%", width: 3, borderRadius: 3, background: "#93C5FD" }
+                : {},
             }}
           >
-            <ListItemIcon sx={{ color: "inherit", minWidth: 42 }}>
-              <Icon />
+            <ListItemIcon sx={{ color: "inherit", minWidth: 36 }}>
+              <Icon fontSize="small" />
             </ListItemIcon>
-            <ListItemText
-              primary={item.title}
-              primaryTypographyProps={{ fontWeight: 600, fontSize: 15 }}
-            />
+            <ListItemText primary={item.title} slotProps={{ primary: { fontWeight: 600, fontSize: 14 } }} />
           </ListItemButton>
         )}
       </NavLink>
@@ -52,51 +48,45 @@ export default function SidebarItem({ item }) {
     <>
       <ListItemButton
         onClick={() => setOpen((o) => !o)}
+        disableRipple
         sx={{
-          color: isParentActive ? "#fff" : "#E2E8F0",
-          backgroundColor: isParentActive ? "#1E293B" : "transparent",
-          borderRadius: 2,
-          mx: 1,
-          my: 0.5,
-          transition: ".2s",
-          "&:hover": { backgroundColor: "#1E293B", color: "#fff" },
+          borderRadius: 2.5, mx: 0.5, my: 0.3, py: 0.85, pl: 1.75,
+          transition: "background .18s, color .18s",
+          ...(isParentActive ? { color: "#fff", background: "rgba(255,255,255,.06)" } : idle),
+          "&:hover": hover,
         }}
       >
-        <ListItemIcon sx={{ color: "inherit", minWidth: 42 }}>
-          <Icon />
+        <ListItemIcon sx={{ color: "inherit", minWidth: 36 }}>
+          <Icon fontSize="small" />
         </ListItemIcon>
-        <ListItemText
-          primary={item.title}
-          primaryTypographyProps={{ fontWeight: 600, fontSize: 15 }}
-        />
-        {open ? <ExpandLess /> : <ExpandMore />}
+        <ListItemText primary={item.title} slotProps={{ primary: { fontWeight: 600, fontSize: 14 } }} />
+        <Box sx={{ color: "rgba(230,237,246,.5)", display: "flex", transition: "transform .2s", transform: open ? "none" : "rotate(-90deg)" }}>
+          <ExpandMore fontSize="small" />
+        </Box>
       </ListItemButton>
 
-      <Collapse in={open} timeout="auto" unmountOnExit>
-        {item.children.map((sub) => (
-          <NavLink key={sub.title} to={sub.path} style={{ textDecoration: "none" }}>
-            {({ isActive }) => (
-              <ListItemButton
-                sx={{
-                  pl: 7,
-                  py: 1,
-                  color: isActive ? "#fff" : "#CBD5E1",
-                  backgroundColor: isActive ? "#2563EB" : "transparent",
-                  borderRadius: 2,
-                  mx: 1,
-                  my: 0.25,
-                  transition: ".2s",
-                  "&:hover": { color: "#fff", backgroundColor: "#334155" },
-                }}
-              >
-                <ListItemText
-                  primary={sub.title}
-                  primaryTypographyProps={{ fontSize: 14 }}
-                />
-              </ListItemButton>
-            )}
-          </NavLink>
-        ))}
+      <Collapse in={open} timeout={220} unmountOnExit>
+        <Box sx={{ ml: 2.75, my: 0.25, borderLeft: "1px solid rgba(255,255,255,.09)" }}>
+          {item.children.map((sub) => (
+            <NavLink key={sub.title} to={sub.path} style={{ textDecoration: "none" }}>
+              {({ isActive }) => (
+                <ListItemButton
+                  disableRipple
+                  sx={{
+                    pl: 2, py: 0.6, borderRadius: 2, mx: 0.75, my: 0.2,
+                    transition: "background .18s, color .18s",
+                    ...(isActive
+                      ? { color: "#fff", background: "linear-gradient(135deg, rgba(37,99,235,.9), rgba(29,78,216,.9))" }
+                      : { color: "rgba(203,213,225,.68)", background: "transparent" }),
+                    "&:hover": isActive ? {} : { color: "#fff", background: "rgba(255,255,255,.055)" },
+                  }}
+                >
+                  <ListItemText primary={sub.title} slotProps={{ primary: { fontSize: 13 } }} />
+                </ListItemButton>
+              )}
+            </NavLink>
+          ))}
+        </Box>
       </Collapse>
     </>
   );
