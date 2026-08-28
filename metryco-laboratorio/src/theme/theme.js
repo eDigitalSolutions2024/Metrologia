@@ -42,6 +42,7 @@ const softShadows = [
 const theme = createTheme({
   cssVariables: true,
   colorSchemes: { light: { palette: light }, dark: { palette: dark } },
+  colorSchemeSelector: "class", // permite que el toggle claro/oscuro tenga efecto
   shape: { borderRadius: 14 },
   shadows: softShadows,
 

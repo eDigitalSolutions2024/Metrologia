@@ -92,7 +92,7 @@ export default function NuevaActividad({ open, onClose, onCreated, fechaSugerida
             <EventAvailableOutlinedIcon />
           </Box>
           <Box>
-            <Typography variant="h6" fontWeight={700} lineHeight={1.2}>Nueva Actividad</Typography>
+            <Typography variant="h6" fontWeight={700} sx={{ lineHeight: 1.2 }}>Nueva Actividad</Typography>
             <Typography variant="body2" color="text.secondary">Programa una actividad en el calendario</Typography>
           </Box>
         </Box>
