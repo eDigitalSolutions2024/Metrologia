@@ -177,6 +177,71 @@ const MODELOS = [
     ],
   },
   {
+    // Reconstruido del informe legacy MET-000023433 (micrómetro DIGITAL MD-17,
+    // 0–20 mm, div. mínima 0,001 mm, accuracy 0,003 mm). En ese informe la
+    // U expandida es CONSTANTE = 5,8E-04 mm en todos los puntos (1..20 mm) y la
+    // desv. estándar salió 0 (las 3 lecturas idénticas). Ese valor equivale a
+    //   U = 2 · (0,001 / √12) = 2 · (0,0005 / √3) ≈ 5,77E-04 mm
+    // es decir, dominado por la RESOLUCIÓN del display (a = resolución/2,
+    // rectangular, k=2). Aquí se deja el presupuesto completo: los demás
+    // componentes en 0 / valores típicos pequeños, para que el técnico los
+    // capture. El EMP (accuracy) se guarda como criterio de aceptación.
+    magnitud: "dimensional", tipoInstrumento: "micrometro",
+    nombre: "Micrómetro digital 0–25 mm — error de indicación (informe MET)",
+    mensurando: "Error de indicación del micrómetro digital en cada punto de calibración",
+    unidad: "mm",
+    rangoTipico: "0–25 mm",
+    normaReferencia: "JCGM 100:2008 (GUM); EA-4/02; EURAMET cg-2; procedimiento MetryCo (informe MET)",
+    nivelConfianza: "95.45%",
+    criterioAceptacion: { emp: 0.003, regla: "simple" },
+    contribuciones: [
+      {
+        fuente: "Resolución del micrómetro (display digital)", simbolo: "δx_res",
+        tipo: "B", modo: "semiamplitud", distribucion: "rectangular",
+        valorSugerido: 0.0005, unidad: "mm", obligatoria: true,
+        ayuda: "Digital: a = resolución/2. Con div. mínima 0,001 mm → a = 0,0005 mm (rectangular, √3). Es el término dominante del informe MET (U ≈ 5,8E-4 mm).",
+      },
+      {
+        fuente: "Repetibilidad (tipo A)", simbolo: "s(q̄)",
+        tipo: "A", modo: "desviacion_std", distribucion: "normal",
+        valorSugerido: 0, n: 3, unidad: "mm", obligatoria: true,
+        ayuda: "Desv. estándar de las 3 lecturas del punto; u = s/√n, ν = n−1. En el informe MET fue 0 (lecturas idénticas al resolver el display).",
+      },
+      {
+        fuente: "Incertidumbre del patrón de referencia (bloques patrón)", simbolo: "U_patron",
+        tipo: "B", modo: "certificado", distribucion: "normal", k: 2,
+        valorSugerido: 0.00012, unidad: "mm", obligatoria: true,
+        ayuda: "Del certificado del juego de bloques patrón usado; u = U/k. Bloques grado 0/1 en 0–25 mm: U ≈ 0,1 µm típico.",
+      },
+      {
+        fuente: "Deriva del patrón entre calibraciones", simbolo: "δx_der",
+        tipo: "B", modo: "semiamplitud", distribucion: "rectangular",
+        valorSugerido: 0.00005, unidad: "mm",
+        ayuda: "Cambio máximo del patrón entre dos calibraciones (semiamplitud).",
+      },
+      {
+        fuente: "Efecto de temperatura (dilatación diferencial)", simbolo: "δx_T",
+        tipo: "B", modo: "semiamplitud", distribucion: "rectangular",
+        valorSugerido: 0, unidad: "mm",
+        ayuda: "α_acero·ΔT·L. Para L ≤ 25 mm y ΔT ≤ 1 °C es ≤ 0,3 µm; despreciable con laboratorio a 20 ± 1 °C. Captura el valor si tus condiciones difieren.",
+      },
+      {
+        fuente: "Planitud y paralelismo de topes", simbolo: "δx_plan",
+        tipo: "B", modo: "semiamplitud", distribucion: "rectangular",
+        valorSugerido: 0, unidad: "mm",
+        ayuda: "De la verificación geométrica (vidrios ópticos planos). Si no se cuantifica, dejar 0 y anotarlo en el certificado.",
+      },
+      {
+        fuente: "Fuerza de medición (trinquete)", simbolo: "δx_F",
+        tipo: "B", modo: "semiamplitud", distribucion: "rectangular",
+        valorSugerido: 0, unidad: "mm",
+        ayuda: "Deformación por diferencia de fuerza patrón↔medición. Con trinquete/fricción calibrado suele ser despreciable.",
+      },
+    ],
+    notas:
+      "Plantilla derivada del informe MET-000023433. El informe legacy sólo muestra la U final (constante, 5,8E-4 mm), no el desglose: los valores de los componentes B distintos de la resolución son estimaciones típicas — sustitúyelos por los datos reales del laboratorio (certificado del patrón, verificación geométrica, condiciones ambientales). Criterio del informe: PASA si |error| ≤ accuracy (0,003 mm).",
+  },
+  {
     magnitud: "masa", tipoInstrumento: "balanza_analitica",
     nombre: "Balanza analítica — error de indicación",
     mensurando: "Error de indicación de la balanza en cada carga de calibración",

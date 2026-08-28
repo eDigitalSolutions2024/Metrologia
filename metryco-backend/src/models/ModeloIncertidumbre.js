@@ -48,6 +48,20 @@ const modeloIncertidumbreSchema = new Schema(
 
     contribuciones: [contribucionPlantillaSchema],
 
+    // Criterio de aceptación del instrumento (no es incertidumbre; documenta el
+    // "ACCURACY / CRITERIO PASO" del informe legacy para la decisión PASA/NO PASA).
+    criterioAceptacion: {
+      emp: Number, // error máximo permisible (MPE) en `unidad`
+      regla: {
+        type: String,
+        enum: ["simple", "guard_band_U", "guard_band_2U"],
+        default: "simple",
+      },
+      // simple: |error| ≤ EMP
+      // guard_band_U: |error| + U ≤ EMP  (regla de decisión conservadora)
+    },
+    rangoTipico: String, // p. ej. "0–25 mm"
+
     notas: String,
     activo: { type: Boolean, default: true },
     creadoPor: { type: Schema.Types.ObjectId, ref: "Usuario" },
