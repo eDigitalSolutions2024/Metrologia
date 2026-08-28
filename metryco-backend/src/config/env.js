@@ -33,10 +33,11 @@ if (isProd) {
 
 module.exports = {
   port: Number(process.env.PORT) || 4000,
-  nodeEnv,
-  isProd,
   mongoUri: process.env.MONGODB_URI,
-  corsOrigin: process.env.CORS_ORIGIN || "http://localhost:5173",
+  corsOrigin:
+    process.env.NODE_ENV === "production"
+      ? process.env.CORS_ORIGIN
+      : [process.env.CORS_ORIGIN || "http://localhost:5173", "http://localhost:5174"],
   jwt: {
     secret: process.env.JWT_SECRET,
     expiresIn: process.env.JWT_EXPIRES_IN || "1h",
