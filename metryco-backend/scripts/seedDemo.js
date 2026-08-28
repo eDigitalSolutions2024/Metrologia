@@ -69,12 +69,14 @@ async function run() {
 
   const equipo = await Equipo.create({
     cliente: cliente._id,
-    idInterno: "DEMO-EQ-001",
-    marca: "Mitutoyo", modelo: "530-312", serie: "DEMO-VC-77",
-    descripcion: "Calibrador Vernier 0–150 mm",
+    idInterno: "MD-17",
+    marca: "Mitutoyo", modelo: "293-DIG", serie: "DEMO-MD-17",
+    descripcion: "Micrometro",
     categoria: "Dimensional",
-    unidades: "mm", divisionMinima: "0.02", resolucion: "0.02",
-    rango: "0–150 mm", rangoCalibracion: "0–150 mm",
+    subtipo: "DIGITAL",
+    accuracy: 0.003,
+    unidades: "mm", divisionMinima: "0.001", resolucion: "0.001",
+    rango: "0-20.000", rangoCalibracion: "0-20.000",
     patronesSugeridos: [patron._id],
     registradoPor: admin._id,
   });
@@ -102,52 +104,57 @@ async function run() {
   );
   console.log("· Asignación calibrada (técnico ejecutor registrado en historial)");
 
-  // Cálculo de incertidumbre GUM a partir del modelo de vernier.
+  // Presupuestos de incertidumbre por punto, replicando el informe MET-000023433:
+  // micrometro digital, 6 nominales, "como se encontro" + "como se dejo",
+  // 3 lecturas iguales al nominal -> s = 0, U dominada por la resolucion.
   const modelo = await ModeloIncertidumbre.findOne({
     magnitud: "dimensional",
-    tipoInstrumento: "vernier",
+    tipoInstrumento: "micrometro",
+    nombre: /informe MET/i,
   });
   let calculo = null;
   if (modelo) {
-    // Valores realistas de demostración (mm) en el punto de 50 mm.
-    const contribuciones = modelo.contribuciones.map((c) => {
+    const valoresBase = (c) => {
       const o = c.toObject();
-      if (/resoluci/i.test(o.fuente)) return { ...o, valor: 0.01 }; // a = 0.02/2
-      if (/patr[oó]n de referencia/i.test(o.fuente)) return { ...o, valor: 0.00044, k: 2 }; // U del certificado
-      if (/deriva/i.test(o.fuente)) return { ...o, valor: 0.0003 };
-      if (/temperatura/i.test(o.fuente)) return { ...o, valor: 0.0025 };
-      if (/planitud|geo/i.test(o.fuente)) return { ...o, valor: 0.004 };
+      if (/resoluci/i.test(o.fuente)) return { ...o, valor: 0.0005 }; // a = 0.001/2
+      if (/patr[oó]n de referencia/i.test(o.fuente)) return { ...o, valor: 0.00012, k: 2 };
+      if (/deriva/i.test(o.fuente)) return { ...o, valor: 0.00005 };
       return { ...o, valor: o.valorSugerido || 0 };
-    });
-    calculo = await calculoSvc.crear(
-      {
-        modelo: modelo._id.toString(),
-        equipo: equipo._id.toString(),
-        asignacion: asignacion._id.toString(),
-        patronesUsados: [patron._id.toString()],
-        puntoNominal: 50,
-        unidad: "mm",
-        lecturas: [50.01, 50.0, 50.02, 49.99, 50.01, 50.0],
-        nivelConfianza: "95.45%",
-      },
-      reqUser
-    );
-    console.log("· Cálculo incertidumbre:", calculo.folio, "→", calculo.resultado.expresion);
+    };
+    const contribuciones = modelo.contribuciones.map(valoresBase);
+    const NOMINALES = [1, 3, 8, 10, 15, 20];
+
+    for (const condicion of ["encontrado", "dejado"]) {
+      for (const n of NOMINALES) {
+        const c = await calculoSvc.crear(
+          {
+            modelo: modelo._id.toString(),
+            equipo: equipo._id.toString(),
+            asignacion: asignacion._id.toString(),
+            patronesUsados: [patron._id.toString()],
+            puntoNominal: n,
+            unidad: "mm",
+            emp: 0.003,
+            condicion,
+            lecturas: [n, n, n],
+            contribuciones,
+            nivelConfianza: "95.45%",
+          },
+          reqUser
+        );
+        await calculoSvc.revisar(c._id.toString(), reqUser);
+        await calculoSvc.aprobar(c._id.toString(), reqUser);
+        calculo = c;
+      }
+    }
+    console.log(`· ${NOMINALES.length * 2} cálculos de incertidumbre (encontrado+dejado) → U ≈ ${calculo.resultado.incertidumbreExpandida.toExponential(1)} mm`);
   }
 
+  // Sin `resultado` explícito: el certificado lo arma con los puntos aprobados.
   const cert = await certificadoSvc.emitir(
     {
       asignacion: asignacion._id.toString(),
       vigencia: new Date(Date.now() + 365 * 86400000),
-      resultado: calculo
-        ? {
-            valorMedido: calculo.resultado.y,
-            unidad: "mm",
-            incertidumbreExpandida: calculo.resultado.incertidumbreExpandida,
-            k: calculo.resultado.k,
-            nivelConfianza: calculo.resultado.nivelConfianza,
-          }
-        : undefined,
     },
     reqUser
   );

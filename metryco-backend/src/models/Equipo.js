@@ -16,6 +16,8 @@ const equipoSchema = new Schema(
     serie: String,
     descripcion: { type: String, trim: true },
     categoria: { type: String, enum: CATEGORIAS_EQUIPO },
+    subtipo: String, // "DIGITAL", "ANALÓGICO", "CARÁTULA"... (campo TIPO del informe)
+    accuracy: Number, // exactitud / EMP del instrumento, en `unidades`
 
     unidades: String,
     divisionMinima: String,

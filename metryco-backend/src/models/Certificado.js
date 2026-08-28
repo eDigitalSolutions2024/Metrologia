@@ -43,6 +43,11 @@ const certificadoSchema = new Schema(
       serie: String,
       descripcion: String,
       categoria: String,
+      subtipo: String,
+      accuracy: Number,
+      unidades: String,
+      divisionMinima: String,
+      rango: String,
     },
     clienteSnapshot: { nombre: String },
     patronesSnapshot: [
@@ -73,8 +78,14 @@ const certificadoSchema = new Schema(
         calculo: { type: Schema.Types.ObjectId, ref: "CalculoIncertidumbre" },
         folioCalculo: String,
         mensurando: String,
+        condicion: String, // "encontrado" | "dejado" | "unico"
         puntoNominal: Number,
-        valorMedido: Number,
+        lecturas: [Number],
+        valorMedido: Number, // promedio
+        desviacionStd: Number,
+        errorIndicacion: Number,
+        emp: Number,
+        criterio: String, // "pasa" | "no_pasa" | "sin_evaluar"
         unidad: String,
         uCombinada: Number,
         incertidumbreExpandida: Number,

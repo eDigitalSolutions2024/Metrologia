@@ -65,6 +65,37 @@ function ejecutarMotor({ contribuciones, valorMedido, nivelConfianza }) {
   return engine.calcular({ contribuciones, y: valorMedido, nivelConfianza });
 }
 
+/**
+ * Campos para el informe de calibración: desviación estándar de las lecturas,
+ * error de indicación (y − nominal) y criterio PASA/NO PASA contra el EMP.
+ */
+function camposInforme({ datos, modeloDoc, y }) {
+  const lecturas = (datos.lecturas || []).map(Number).filter(Number.isFinite);
+  const desviacionStd = lecturas.length >= 2 ? desviacionEstandarMuestral(lecturas).s : 0;
+
+  const emp =
+    datos.emp != null && Number.isFinite(Number(datos.emp))
+      ? Number(datos.emp)
+      : modeloDoc?.criterioAceptacion?.emp;
+
+  const nominal = Number(datos.puntoNominal);
+  const errorIndicacion =
+    Number.isFinite(nominal) && Number.isFinite(y) ? y - nominal : undefined;
+
+  let criterio = "sin_evaluar";
+  if (emp != null && Number.isFinite(errorIndicacion)) {
+    criterio = Math.abs(errorIndicacion) <= Math.abs(emp) ? "pasa" : "no_pasa";
+  }
+
+  return {
+    condicion: ["encontrado", "dejado", "unico"].includes(datos.condicion) ? datos.condicion : "unico",
+    emp,
+    desviacionStd,
+    errorIndicacion,
+    criterio,
+  };
+}
+
 /** Cálculo sin persistir — para la vista previa "en vivo" del formulario. */
 function preview(datos) {
   const contribuciones = [...(datos.contribuciones || [])];
@@ -136,6 +167,7 @@ async function crear(datos, reqUser) {
 
   const nivel = datos.nivelConfianza || modeloDoc?.nivelConfianza || "95.45%";
   const salida = ejecutarMotor({ contribuciones, valorMedido: y, nivelConfianza: nivel });
+  const informe = camposInforme({ datos, modeloDoc, y });
 
   const folio = await siguienteFolio("UNC");
   const evento = await crearEvento(reqUser, "calculo_creado", {
@@ -165,6 +197,7 @@ async function crear(datos, reqUser) {
     puntoNominal: datos.puntoNominal,
     lecturas: Array.isArray(datos.lecturas) ? datos.lecturas.map(Number) : [],
     valorMedido: y,
+    ...informe,
     contribuciones: salida.contribuciones,
     resultado: salida.resultado,
     motor: salida.motor,
@@ -214,8 +247,22 @@ async function recalcular(id, datos, reqUser) {
   if (datos.valorMedido !== undefined) c.valorMedido = datos.valorMedido;
   if (datos.nivelConfianza) c.modeloSnapshot = { ...c.modeloSnapshot, nivelConfianza: datos.nivelConfianza };
 
+  if (datos.condicion) c.condicion = datos.condicion;
+  if (datos.emp != null) c.emp = Number(datos.emp);
+  if (datos.puntoNominal !== undefined) c.puntoNominal = datos.puntoNominal;
+
   const nivel = datos.nivelConfianza || c.modeloSnapshot?.nivelConfianza || "95.45%";
   const salida = ejecutarMotor({ contribuciones, valorMedido: c.valorMedido, nivelConfianza: nivel });
+
+  const inf = camposInforme({
+    datos: { lecturas: c.lecturas, emp: c.emp, puntoNominal: c.puntoNominal, condicion: c.condicion },
+    modeloDoc: null,
+    y: c.valorMedido,
+  });
+  c.condicion = inf.condicion;
+  c.desviacionStd = inf.desviacionStd;
+  c.errorIndicacion = inf.errorIndicacion;
+  c.criterio = inf.criterio;
 
   c.contribuciones = salida.contribuciones;
   c.resultado = salida.resultado;

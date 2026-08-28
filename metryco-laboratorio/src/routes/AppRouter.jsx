@@ -6,6 +6,7 @@ import ProtectedRoute from "../core/auth/ProtectedRoute";
 import GuestRoute from "../core/auth/GuestRoute";
 import VerCertificado from "../pages/Publico/VerCertificado";
 import CertificadosPage from "../pages/Certificados/CertificadosPage";
+import InformeCalibracion from "../pages/Certificados/InformeCalibracion";
 import IncertidumbrePage from "../pages/Incertidumbre/IncertidumbrePage";
 
 import Dashboard from "../pages/Dashboard/Dashboard";
@@ -35,6 +36,16 @@ export default function AppRouter() {
     <Routes>
       {/* Verificación pública del certificado por token (sin sesión, sin layout) */}
       <Route path="/certificado/ver/:token" element={<VerCertificado />} />
+
+      {/* Informe de calibración para imprimir / PDF (con sesión, sin layout) */}
+      <Route
+        path="/informe/certificado/:id"
+        element={
+          <ProtectedRoute>
+            <InformeCalibracion />
+          </ProtectedRoute>
+        }
+      />
 
       <Route
         path={ROUTES.LOGIN}

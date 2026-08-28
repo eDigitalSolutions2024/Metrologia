@@ -10,6 +10,7 @@ import AddIcon from "@mui/icons-material/Add";
 import QrCode2OutlinedIcon from "@mui/icons-material/QrCode2Outlined";
 import LabelOutlinedIcon from "@mui/icons-material/LabelOutlined";
 import PictureAsPdfOutlinedIcon from "@mui/icons-material/PictureAsPdfOutlined";
+import ArticleOutlinedIcon from "@mui/icons-material/ArticleOutlined";
 import BlockOutlinedIcon from "@mui/icons-material/BlockOutlined";
 import VerifiedOutlinedIcon from "@mui/icons-material/VerifiedOutlined";
 import ScheduleOutlinedIcon from "@mui/icons-material/ScheduleOutlined";
@@ -132,6 +133,11 @@ export default function CertificadosPage() {
                 <PictureAsPdfOutlinedIcon fontSize="small" sx={{ color: r.archivo?.nombreArchivo ? "error.main" : "text.disabled" }} />
               </IconButton>
             </span>
+          </Tooltip>
+          <Tooltip title="Informe de calibración (PDF)">
+            <IconButton size="small" onClick={() => window.open(`/informe/certificado/${r._id}`, "_blank")}>
+              <ArticleOutlinedIcon fontSize="small" sx={{ color: "secondary.main" }} />
+            </IconButton>
           </Tooltip>
           <Tooltip title="Código QR">
             <IconButton size="small" onClick={() => setQrCert(r)}>

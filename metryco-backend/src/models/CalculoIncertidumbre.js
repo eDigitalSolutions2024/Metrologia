@@ -77,6 +77,13 @@ const calculoIncertidumbreSchema = new Schema(
     lecturas: [Number], // observaciones repetidas (opcional -> repetibilidad tipo A)
     valorMedido: Number, // y capturado (si no se deriva de lecturas)
 
+    // Contexto de informe de calibración
+    condicion: { type: String, enum: ["encontrado", "dejado", "unico"], default: "unico" },
+    emp: Number, // error máximo permisible aplicado (del modelo o capturado)
+    desviacionStd: Number, // s de las lecturas (columna "DESVIACION STD" del informe)
+    errorIndicacion: Number, // y − puntoNominal
+    criterio: { type: String, enum: ["pasa", "no_pasa", "sin_evaluar"], default: "sin_evaluar" },
+
     contribuciones: [contribucionSchema],
     resultado: resultadoSchema,
 
