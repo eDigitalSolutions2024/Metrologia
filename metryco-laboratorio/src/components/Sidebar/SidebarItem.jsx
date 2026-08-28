@@ -20,7 +20,7 @@ export default function SidebarItem({ item }) {
 
   if (!hasChildren) {
     return (
-      <NavLink to={item.path} style={{ textDecoration: "none" }}>
+      <NavLink to={item.path} end style={{ textDecoration: "none" }}>
         {({ isActive }) => (
           <ListItemButton
             disableRipple
@@ -68,7 +68,7 @@ export default function SidebarItem({ item }) {
       <Collapse in={open} timeout={220} unmountOnExit>
         <Box sx={{ ml: 2.75, my: 0.25, borderLeft: "1px solid rgba(255,255,255,.09)" }}>
           {item.children.map((sub) => (
-            <NavLink key={sub.title} to={sub.path} style={{ textDecoration: "none" }}>
+            <NavLink key={sub.title} to={sub.path} end style={{ textDecoration: "none" }}>
               {({ isActive }) => (
                 <ListItemButton
                   disableRipple
