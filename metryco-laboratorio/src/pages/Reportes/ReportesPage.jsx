@@ -2,14 +2,15 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   Box, Typography, TextField, InputAdornment, Chip, Tooltip, IconButton,
-  MenuItem, Select, FormControl, InputLabel, Grid, Paper,
-  Dialog, DialogTitle, DialogContent, DialogActions, Button, Alert, Divider,
+  MenuItem, Select, FormControl, InputLabel, Grid,
+  Dialog, DialogTitle, DialogContent, DialogActions, Button, Alert,
 } from "@mui/material";
 import { useTheme } from "@mui/material/styles";
 import SearchIcon from "@mui/icons-material/Search";
 import AddIcon from "@mui/icons-material/Add";
 import VisibilityOutlinedIcon from "@mui/icons-material/VisibilityOutlined";
 import FileDownloadOutlinedIcon from "@mui/icons-material/FileDownloadOutlined";
+import PictureAsPdfOutlinedIcon from "@mui/icons-material/PictureAsPdfOutlined";
 import DescriptionOutlinedIcon from "@mui/icons-material/DescriptionOutlined";
 import HourglassTopOutlinedIcon from "@mui/icons-material/HourglassTopOutlined";
 import TaskAltOutlinedIcon from "@mui/icons-material/TaskAltOutlined";
@@ -22,7 +23,8 @@ import StatCard from "../../shared/components/StatCard";
 import FactCheckOutlinedIcon from "@mui/icons-material/FactCheckOutlined";
 import { formatDate } from "../../shared/utils/formatDate";
 import { listarClientes } from "../../services/clientes";
-import { listarReportes, crearReporte, obtenerReporte } from "../../services/reportes";
+import { listarReportes, crearReporte } from "../../services/reportes";
+import { useAuth } from "../../core/auth/useAuth";
 
 const STATUS = {
   recepcion:  { label: "Recepción",  color: "default" },
@@ -32,26 +34,35 @@ const STATUS = {
   cancelado:  { label: "Cancelado",  color: "error" },
 };
 
+const MESES = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
+  "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"];
+const ANIO_ACTUAL = new Date().getFullYear();
+const ANIOS = [ANIO_ACTUAL, ANIO_ACTUAL - 1, ANIO_ACTUAL - 2, ANIO_ACTUAL - 3];
+
 export default function ReportesPage() {
   const navigate = useNavigate();
   const theme = useTheme();
+  const { user } = useAuth();
+  const puedeCrearReporte = ["admin", "coordinador", "ventas"].includes(user?.rol);
 
   const [rows, setRows] = useState([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState("todos");
+  const [mes, setMes] = useState("");
+  const [anio, setAnio] = useState("");
   const [page, setPage] = useState(0);
+  const [rowsPerPage, setRowsPerPage] = useState(10);
   const [nuevoOpen, setNuevoOpen] = useState(false);
-  const [verId, setVerId] = useState(null);
 
   const cargar = useCallback(() => {
     setLoading(true);
-    listarReportes({ search, status, page, pageSize: 10 })
+    listarReportes({ search, status, mes, anio, page, pageSize: rowsPerPage })
       .then(({ items, total }) => { setRows(items); setTotal(total); })
       .catch(() => { setRows([]); setTotal(0); })
       .finally(() => setLoading(false));
-  }, [search, status, page]);
+  }, [search, status, mes, anio, page, rowsPerPage]);
   useEffect(() => { cargar(); }, [cargar]);
 
   const stats = useMemo(() => {
@@ -65,31 +76,36 @@ export default function ReportesPage() {
   }, [rows, theme]);
 
   const columns = [
+    { field: "folio", headerName: "Reporte de Servicio", renderCell: (r) => <Typography variant="body2" fontWeight={700}>{r.folio}</Typography> },
+    { field: "cliente", headerName: "Cliente", renderCell: (r) => r.cliente?.nombre || "—" },
+    { field: "fechaRecepcion", headerName: "Fecha", renderCell: (r) => formatDate(r.fechaRecepcion) },
     {
-      field: "folio", headerName: "Reporte",
-      renderCell: (r) => (
-        <Box>
-          <Typography variant="body2" fontWeight={700}>{r.folio}</Typography>
-          <Typography variant="caption" color="text.secondary">{r.cliente?.nombre}</Typography>
-        </Box>
-      ),
-    },
-    { field: "numEquipos", headerName: "Equipos", align: "center", renderCell: (r) => r.numEquipos ?? 0 },
-    { field: "ordenCompra", headerName: "OC", renderCell: (r) => r.ordenCompra || "—" },
-    { field: "fechaRecepcion", headerName: "Recepción", renderCell: (r) => formatDate(r.fechaRecepcion) },
-    { field: "creadoPor", headerName: "Inició", renderCell: (r) => r.creadoPor?.nombre || "—" },
-    {
-      field: "status", headerName: "Estado",
+      field: "status", headerName: "Estatus",
       renderCell: (r) => {
         const s = STATUS[r.status] || { label: r.status, color: "default" };
         return <Chip size="small" label={s.label} color={s.color} />;
       },
     },
     {
+      field: "pdf", headerName: "Descargar", align: "center",
+      renderCell: (r) => (
+        <Tooltip title="Descargar Reporte de Servicio (PDF)">
+          <IconButton size="small" onClick={() => window.open(`/informe/reporte/${r._id}`, "_blank")}>
+            <PictureAsPdfOutlinedIcon fontSize="small" sx={{ color: "error.main" }} />
+          </IconButton>
+        </Tooltip>
+      ),
+    },
+    { field: "cotizacion", headerName: "Cotización", align: "center", renderCell: (r) => r.cotizacion?.folio || "—" },
+    { field: "ordenCompra", headerName: "Orden de Compra", renderCell: (r) => r.ordenCompra || "—" },
+    { field: "factura", headerName: "Factura", renderCell: (r) => r.factura || "—" },
+    { field: "cantidadEnProceso", headerName: "Cantidad en Proceso", align: "center", renderCell: (r) => r.cantidadEnProceso ?? 0 },
+    { field: "numEquipos", headerName: "Cantidad Asignaciones", align: "center", renderCell: (r) => r.numEquipos ?? 0 },
+    {
       field: "acciones", headerName: "Acciones", align: "center",
       renderCell: (r) => (
         <Tooltip title="Ver reporte">
-          <IconButton size="small" onClick={() => setVerId(r._id)}>
+          <IconButton size="small" onClick={() => navigate(`/reportes/${r._id}`)}>
             <VisibilityOutlinedIcon fontSize="small" sx={{ color: "secondary.main" }} />
           </IconButton>
         </Tooltip>
@@ -108,9 +124,11 @@ export default function ReportesPage() {
             <AppButton variant="outlined" startIcon={<FileDownloadOutlinedIcon />} onClick={() => navigate("/reportes/exportar")} sx={{ borderRadius: 2 }}>
               Exportar
             </AppButton>
-            <AppButton startIcon={<AddIcon />} onClick={() => setNuevoOpen(true)} sx={{ borderRadius: 2 }}>
-              Nuevo Reporte
-            </AppButton>
+            {puedeCrearReporte && (
+              <AppButton startIcon={<AddIcon />} onClick={() => setNuevoOpen(true)} sx={{ borderRadius: 2 }}>
+                Nuevo Reporte
+              </AppButton>
+            )}
           </>
         }
       />
@@ -127,9 +145,23 @@ export default function ReportesPage() {
         <TextField
           placeholder="Buscar por folio, OC o factura…" size="small"
           value={search} onChange={(e) => { setSearch(e.target.value); setPage(0); }}
-          sx={{ width: 340, "& .MuiOutlinedInput-root": { borderRadius: 2 } }}
+          sx={{ width: 300, "& .MuiOutlinedInput-root": { borderRadius: 2 } }}
           slotProps={{ input: { startAdornment: <InputAdornment position="start"><SearchIcon fontSize="small" sx={{ color: "text.secondary" }} /></InputAdornment> } }}
         />
+        <FormControl size="small" sx={{ minWidth: 150 }}>
+          <InputLabel>Mes</InputLabel>
+          <Select label="Mes" value={mes} onChange={(e) => { setMes(e.target.value); setPage(0); }} sx={{ borderRadius: 2 }}>
+            <MenuItem value="">Todos</MenuItem>
+            {MESES.map((m, i) => <MenuItem key={m} value={i + 1}>{m}</MenuItem>)}
+          </Select>
+        </FormControl>
+        <FormControl size="small" sx={{ minWidth: 130 }}>
+          <InputLabel>Año</InputLabel>
+          <Select label="Año" value={anio} onChange={(e) => { setAnio(e.target.value); setPage(0); }} sx={{ borderRadius: 2 }}>
+            <MenuItem value="">Todos</MenuItem>
+            {ANIOS.map((a) => <MenuItem key={a} value={a}>{a}</MenuItem>)}
+          </Select>
+        </FormControl>
         <FormControl size="small" sx={{ minWidth: 180 }}>
           <InputLabel>Estado</InputLabel>
           <Select label="Estado" value={status} onChange={(e) => { setStatus(e.target.value); setPage(0); }} sx={{ borderRadius: 2 }}>
@@ -141,12 +173,13 @@ export default function ReportesPage() {
 
       <AppTable
         columns={columns} rows={rows} loading={loading}
-        totalCount={total} page={page} rowsPerPage={10} onPageChange={setPage}
+        totalCount={total} page={page} rowsPerPage={rowsPerPage}
+        onPageChange={setPage}
+        onRowsPerPageChange={(n) => { setRowsPerPage(n); setPage(0); }}
         emptyText="Sin reportes todavía"
       />
 
-      <NuevoReporteDialog open={nuevoOpen} onClose={() => setNuevoOpen(false)} onDone={() => { setNuevoOpen(false); cargar(); }} />
-      <VerReporteDialog id={verId} onClose={() => setVerId(null)} />
+      <NuevoReporteDialog open={nuevoOpen} onClose={() => setNuevoOpen(false)} onDone={(r) => { setNuevoOpen(false); cargar(); if (r?._id) navigate(`/reportes/${r._id}`); }} />
     </Box>
   );
 }
@@ -169,8 +202,8 @@ function NuevoReporteDialog({ open, onClose, onDone }) {
     if (!cliente) { setError("Elige un cliente."); return; }
     setSaving(true); setError("");
     try {
-      await crearReporte({ cliente, ordenCompra: oc || undefined, observaciones: obs || undefined });
-      onDone();
+      const r = await crearReporte({ cliente, ordenCompra: oc || undefined, observaciones: obs || undefined });
+      onDone(r);
     } catch (e) {
       setError(e?.response?.data?.message || "No se pudo crear el reporte.");
     } finally { setSaving(false); }
@@ -192,57 +225,6 @@ function NuevoReporteDialog({ open, onClose, onDone }) {
       <DialogActions sx={{ px: 3, pb: 2 }}>
         <Button onClick={onClose}>Cancelar</Button>
         <Button variant="contained" onClick={crear} disabled={saving} sx={{ borderRadius: 2 }}>Crear</Button>
-      </DialogActions>
-    </Dialog>
-  );
-}
-
-function VerReporteDialog({ id, onClose }) {
-  const [data, setData] = useState(null);
-  useEffect(() => {
-    if (!id) { setData(null); return; }
-    obtenerReporte(id).then(setData).catch(() => setData(null));
-  }, [id]);
-
-  return (
-    <Dialog open={!!id} onClose={onClose} maxWidth="sm" fullWidth>
-      <DialogTitle sx={{ fontWeight: 700 }}>{data?.reporte?.folio || "Reporte"}</DialogTitle>
-      <DialogContent>
-        {!data ? (
-          <Typography variant="body2" color="text.secondary">Cargando…</Typography>
-        ) : (
-          <>
-            <Typography variant="body2"><b>Cliente:</b> {data.reporte.cliente?.nombre}</Typography>
-            <Typography variant="body2"><b>Estado:</b> {STATUS[data.reporte.status]?.label || data.reporte.status}</Typography>
-            {data.reporte.ordenCompra && <Typography variant="body2"><b>OC:</b> {data.reporte.ordenCompra}</Typography>}
-
-            <Divider sx={{ my: 1.5 }} />
-            <Typography variant="subtitle2" fontWeight={700} gutterBottom>Asignaciones ({data.asignaciones.length})</Typography>
-            {data.asignaciones.length === 0 && <Typography variant="caption" color="text.secondary">Aún sin equipos asignados.</Typography>}
-            {data.asignaciones.map((a) => (
-              <Box key={a._id} sx={{ py: 0.75, borderBottom: 1, borderColor: "divider" }}>
-                <Typography variant="body2" fontWeight={600}>{a.equipo?.idInterno} — {a.equipo?.descripcion}</Typography>
-                <Box sx={{ display: "flex", gap: 0.5, mt: 0.5, flexWrap: "wrap" }}>
-                  <Chip size="small" label={`cal: ${a.estados?.calibracion}`} />
-                  <Chip size="small" label={`entrega: ${a.estados?.entrega}`} />
-                  <Chip size="small" label={`cert: ${a.estados?.certificado}`} />
-                  {a.tecnicoEjecutor?.nombre && <Chip size="small" variant="outlined" label={`ejecutó: ${a.tecnicoEjecutor.nombre}`} />}
-                </Box>
-              </Box>
-            ))}
-
-            <Divider sx={{ my: 1.5 }} />
-            <Typography variant="subtitle2" fontWeight={700} gutterBottom>Historial</Typography>
-            {data.reporte.historial?.map((h, i) => (
-              <Typography key={i} variant="caption" sx={{ display: "block", color: "text.secondary" }}>
-                {new Date(h.fecha).toLocaleString("es-MX")} · {h.accion} · {h.usuario?.nombre || h.usuario?.usuario}
-              </Typography>
-            ))}
-          </>
-        )}
-      </DialogContent>
-      <DialogActions sx={{ px: 3, pb: 2 }}>
-        <Button variant="contained" onClick={onClose} sx={{ borderRadius: 2 }}>Cerrar</Button>
       </DialogActions>
     </Dialog>
   );

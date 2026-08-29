@@ -1,0 +1,20 @@
+const { Schema, model } = require("mongoose");
+
+/**
+ * Configuración global del sistema — documento único (`clave: "global"`).
+ * Empieza solo con `menuPermisos` (qué roles ven cada ítem del menú lateral,
+ * antes fijo en el código en components/Sidebar/menuConfig.js). Pensado para
+ * crecer: nombre de la empresa, colores de la interfaz, logotipos, etc.
+ */
+const configuracionSchema = new Schema(
+  {
+    clave: { type: String, required: true, unique: true, default: "global" },
+    // Map de key de ítem de menú -> arreglo de roles que lo pueden ver.
+    // La key es `item.path` para hojas, o el título del grupo para los
+    // encabezados sin ruta propia (ej. "Reportes", "Equipos").
+    menuPermisos: { type: Map, of: [String], default: undefined },
+  },
+  { timestamps: true }
+);
+
+module.exports = model("Configuracion", configuracionSchema);

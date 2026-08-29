@@ -2,15 +2,23 @@ const asyncHandler = require("../utils/asyncHandler");
 const service = require("../services/reporte.service");
 
 const listar = asyncHandler(async (req, res) => {
-  const { search = "", status = "todos", clienteId = "", page = 0, pageSize = 10 } = req.query;
+  const { search = "", status = "todos", clienteId = "", mes = "", anio = "", page = 0, pageSize = 10 } = req.query;
   const { items, total } = await service.listar({
-    search, status, clienteId, page: Number(page), pageSize: Number(pageSize),
+    search, status, clienteId, mes, anio, page: Number(page), pageSize: Number(pageSize),
   });
   res.json({ success: true, data: items, total });
 });
 
 const obtener = asyncHandler(async (req, res) => {
   res.json({ success: true, data: await service.obtener(req.params.id) });
+});
+
+const paraImprimir = asyncHandler(async (req, res) => {
+  res.json({ success: true, data: await service.paraImprimir(req.params.id) });
+});
+
+const agregarComentario = asyncHandler(async (req, res) => {
+  res.json({ success: true, data: await service.agregarComentario(req.params.id, req.body.texto, req.user) });
 });
 
 const crear = asyncHandler(async (req, res) => {
@@ -26,4 +34,4 @@ const eliminar = asyncHandler(async (req, res) => {
   res.json({ success: true, data: await service.eliminar(req.params.id) });
 });
 
-module.exports = { listar, obtener, crear, actualizar, eliminar };
+module.exports = { listar, obtener, crear, actualizar, eliminar, paraImprimir, agregarComentario };

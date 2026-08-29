@@ -6,7 +6,8 @@ const contactoRoutes = require("./contacto.routes");
 
 const router = Router();
 
-router.use(auth);
+// El técnico nunca ve "Clientes" en el sistema original (solo admin/coordinador/ventas).
+router.use(auth, requireRole("admin", "coordinador", "ventas"));
 
 router.get("/", clienteController.listar);
 router.get("/:id", clienteController.obtener);

@@ -61,6 +61,36 @@ async function listar({ search = "", clienteId = "", estado = "", page = 0, page
   return { items: items.map(conEstadoVigente), total };
 }
 
+/**
+ * Exportación (CSV desde el frontend): sin paginación, con filtros de
+ * cliente/mes/año (por `fechaEmision`) y con/sin factura (del Reporte
+ * ligado, el Certificado en sí no tiene campo de factura propio).
+ */
+async function exportar({ clienteId = "", mes = "", anio = "", factura = "todos" }) {
+  const match = {};
+  if (clienteId && oid(clienteId)) match.cliente = oid(clienteId);
+  if (anio) {
+    const y = Number(anio);
+    const m = mes ? Number(mes) : null;
+    const desde = m ? new Date(y, m - 1, 1) : new Date(y, 0, 1);
+    const hasta = m ? new Date(y, m, 1) : new Date(y + 1, 0, 1);
+    match.fechaEmision = { $gte: desde, $lt: hasta };
+  }
+
+  let items = await Certificado.find(match)
+    .populate("cliente", "nombre rfc")
+    .populate("reporte", "folio factura")
+    .sort({ fechaEmision: -1 })
+    .limit(5000);
+
+  items = items.map(conEstadoVigente);
+
+  if (factura === "con") items = items.filter((c) => !!c.reporte?.factura);
+  if (factura === "sin") items = items.filter((c) => !c.reporte?.factura);
+
+  return items;
+}
+
 async function obtener(id) {
   const cert = await Certificado.findById(id)
     .populate("cliente", "nombre rfc")
@@ -322,7 +352,7 @@ async function archivoStream(id) {
 }
 
 module.exports = {
-  listar, obtener, emitir, actualizar, cambiarEstado, adjuntarPdf,
+  listar, obtener, exportar, emitir, actualizar, cambiarEstado, adjuntarPdf,
   anular, regenerarToken, qrPng, qrSvg, archivoStream,
   urlPublica, rutaArchivo,
 };

@@ -23,6 +23,7 @@ export const ENDPOINTS = {
   ACTIVIDADES: "/actividades",
   COBRANZA: "/cobranza",
   USUARIOS: "/usuarios",
+  CONFIGURACION: "/configuracion",
 };
 
 // Solo se persiste el usuario (datos no sensibles) para mostrarlo mientras se

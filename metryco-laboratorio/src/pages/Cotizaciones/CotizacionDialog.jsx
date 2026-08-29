@@ -1,20 +1,31 @@
 import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { useForm, useFieldArray, Controller } from "react-hook-form";
 import {
   Dialog, DialogTitle, DialogContent, DialogActions, Box, Typography, Grid,
-  IconButton, Table, TableHead, TableRow, TableCell, TableBody, Paper,
+  IconButton, Table, TableHead, TableRow, TableCell, TableBody, Paper, Chip,
   MenuItem, Select, FormControl, InputLabel, Alert, CircularProgress,
 } from "@mui/material";
 import { AddCircleOutlined as AddCircleOutlineIcon } from "@mui/icons-material";
 import { DeleteOutlined as DeleteOutlineIcon } from "@mui/icons-material";
 import CloseIcon from "@mui/icons-material/Close";
+import FactCheckOutlinedIcon from "@mui/icons-material/FactCheckOutlined";
 
 import AppButton from "../../shared/components/AppButton";
 import AppInput from "../../shared/components/AppInput";
 import AppDatePicker from "../../shared/components/AppDatePicker";
 import { formatCurrency } from "../../shared/utils/currency";
+import { direccionCliente } from "../../shared/utils/direccionCliente";
 import { listarClientes } from "../../services/clientes";
 import { obtenerCotizacion, crearCotizacion, actualizarCotizacion } from "../../services/cotizaciones";
+
+const STATUS_MAP = {
+  pendiente: { label: "Pendiente", color: "warning" },
+  aprobada: { label: "Aprobada", color: "success" },
+  rechazada: { label: "Rechazada", color: "error" },
+  facturada: { label: "Facturada", color: "info" },
+  vencida: { label: "Vencida", color: "default" },
+};
 
 const DEFAULT_VALUES = {
   cliente: "",
@@ -25,8 +36,10 @@ const DEFAULT_VALUES = {
 
 export default function CotizacionDialog({ open, cotizacionId, onClose, onSaved }) {
   const isEdit = !!cotizacionId;
+  const navigate = useNavigate();
 
   const [clientes, setClientes] = useState([]);
+  const [cotizacionData, setCotizacionData] = useState(null); // folio, status, reporte ligado — solo lectura
   const [loadingData, setLoadingData] = useState(true);
   const [submitError, setSubmitError] = useState("");
   const [pasoClienteConfirmado, setPasoClienteConfirmado] = useState(isEdit);
@@ -64,9 +77,11 @@ export default function CotizacionDialog({ open, cotizacionId, onClose, onSaved 
             observaciones: cotizacion.observaciones || "",
             items: cotizacion.items,
           });
+          setCotizacionData(cotizacion);
           setPasoClienteConfirmado(true);
         } else {
           reset(DEFAULT_VALUES);
+          setCotizacionData(null);
           setPasoClienteConfirmado(false);
         }
       } catch {
@@ -153,15 +168,44 @@ export default function CotizacionDialog({ open, cotizacionId, onClose, onSaved 
               </Box>
             ) : (
               <>
-                <Box sx={{ display: "flex", alignItems: "center", gap: 1.5, mb: 3, p: 1.5, borderRadius: 2, bgcolor: "background.default" }}>
+                <Box sx={{ display: "flex", alignItems: "center", gap: 1.5, mb: isEdit ? 1 : 3, p: 1.5, borderRadius: 2, bgcolor: "background.default", flexWrap: "wrap" }}>
                   <Typography variant="body2" color="text.secondary">Cliente:</Typography>
                   <Typography variant="body2" fontWeight={700}>{clienteNombre}</Typography>
+                  {isEdit && cotizacionData?.status && (
+                    <Chip size="small" label={STATUS_MAP[cotizacionData.status]?.label || cotizacionData.status}
+                      color={STATUS_MAP[cotizacionData.status]?.color || "default"} />
+                  )}
                   {!isEdit && (
                     <AppButton variant="text" size="small" onClick={() => setPasoClienteConfirmado(false)} sx={{ ml: "auto" }}>
                       Cambiar cliente
                     </AppButton>
                   )}
                 </Box>
+
+                {isEdit && cotizacionData && (
+                  <Box sx={{ display: "flex", alignItems: "center", gap: 1.5, mb: 3, p: 1.5, borderRadius: 2, border: 1, borderColor: "divider", flexWrap: "wrap" }}>
+                    <Box sx={{ flex: 1, minWidth: 220 }}>
+                      <Typography variant="caption" color="text.secondary" sx={{ display: "block" }}>
+                        {cotizacionData.cliente?.contacto?.nombre ? `Contacto: ${cotizacionData.cliente.contacto.nombre}` : ""}
+                        {cotizacionData.cliente?.contacto?.telefono ? ` · Tel. ${cotizacionData.cliente.contacto.telefono}` : ""}
+                      </Typography>
+                      {direccionCliente(cotizacionData.cliente) && (
+                        <Typography variant="caption" color="text.secondary" sx={{ display: "block", mt: 0.25 }}>
+                          {direccionCliente(cotizacionData.cliente)}
+                        </Typography>
+                      )}
+                    </Box>
+                    {cotizacionData.reporte ? (
+                      <AppButton size="small" variant="outlined" startIcon={<FactCheckOutlinedIcon />}
+                        onClick={() => { onClose(); navigate(`/reportes/${cotizacionData.reporte._id}`); }}
+                        sx={{ borderRadius: 2 }}>
+                        Reporte de Servicio: {cotizacionData.reporte.folio}
+                      </AppButton>
+                    ) : (
+                      <Typography variant="caption" color="text.secondary">Sin reporte de servicio ligado todavía</Typography>
+                    )}
+                  </Box>
+                )}
 
                 <Grid container spacing={2} sx={{ mb: 3 }}>
                   <Grid size={{ xs: 12, md: 4 }}>

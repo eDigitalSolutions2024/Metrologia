@@ -53,9 +53,13 @@ module.exports = {
   // Carpeta local donde se guardan archivos subidos (PDFs de certificados, etc.).
   uploadsDir: process.env.UPLOADS_DIR || path.join(__dirname, "..", "..", "uploads"),
 
-  // Datos del laboratorio que aparecen en la verificación pública del certificado.
+  // Datos del laboratorio que aparecen en la verificación pública del certificado
+  // y en los documentos imprimibles (Reporte de Servicio, Entrega, etc.).
   laboratorio: {
     nombre: process.env.LAB_NOMBRE || "Laboratorio de Metrología",
     acreditacion: process.env.LAB_ACREDITACION || "",
+    rfc: process.env.LAB_RFC || "",
+    domicilio: process.env.LAB_DOMICILIO || "",
+    telefono: process.env.LAB_TELEFONO || "",
   },
 };

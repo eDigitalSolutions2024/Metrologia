@@ -9,8 +9,10 @@ router.use(auth);
 router.get("/", c.listar);
 router.post("/calcular-punto", c.calcularPunto);
 router.get("/:id", c.obtener);
-router.post("/", c.crear);
-router.put("/:id", c.actualizar);
+// Igual que Patrones: administrar el catálogo es de admin/coordinador/técnico;
+// ventas solo lo consulta al armar una asignación.
+router.post("/", requireRole("admin", "coordinador", "tecnico"), c.crear);
+router.put("/:id", requireRole("admin", "coordinador", "tecnico"), c.actualizar);
 router.delete("/:id", requireRole("admin", "coordinador"), c.eliminar);
 
 module.exports = router;

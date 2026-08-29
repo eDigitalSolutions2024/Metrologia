@@ -13,6 +13,7 @@ const certificadoRoutes = require("./certificado.routes");
 const magnitudRoutes = require("./magnitud.routes");
 const incertidumbreRoutes = require("./incertidumbre.routes");
 const publicoRoutes = require("./publico.routes");
+const configuracionRoutes = require("./configuracion.routes");
 
 const router = Router();
 
@@ -34,5 +35,6 @@ router.use("/asignaciones", asignacionRoutes);
 router.use("/certificados", certificadoRoutes);
 router.use("/magnitudes", magnitudRoutes);
 router.use("/incertidumbre", incertidumbreRoutes);
+router.use("/configuracion", configuracionRoutes);
 
 module.exports = router;

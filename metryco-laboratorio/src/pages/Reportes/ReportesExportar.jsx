@@ -1,7 +1,7 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   Box, Typography, Grid, MenuItem, Select, FormControl, InputLabel,
-  Paper, ToggleButtonGroup, ToggleButton,
+  Paper, ToggleButtonGroup, ToggleButton, Alert,
 } from "@mui/material";
 import { useTheme } from "@mui/material/styles";
 import FileDownloadOutlinedIcon from "@mui/icons-material/FileDownloadOutlined";
@@ -11,31 +11,63 @@ import ReceiptLongOutlinedIcon from "@mui/icons-material/ReceiptLongOutlined";
 import { useNavigate } from "react-router-dom";
 
 import AppButton from "../../shared/components/AppButton";
-
-const CLIENTES = [
-  "", "AUDI MEXICO SA DE CV", "FOXCONN INDUSTRIAL INTERNET", "ASSA ABLOY MEXICO",
-  "BOMBARDIER CHIHUAHUA", "HONEYWELL AEROSPACE",
-];
+import { formatDate } from "../../shared/utils/formatDate";
+import { exportCsv } from "../../shared/utils/exportCsv";
+import { listarClientes } from "../../services/clientes";
+import { exportarCertificados } from "../../services/certificados";
 
 const MESES = [
   "", "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
   "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre",
 ];
 
-const YEARS = ["", "2023", "2024", "2025", "2026"];
+const ANIO_ACTUAL = new Date().getFullYear();
+const YEARS = ["", ANIO_ACTUAL, ANIO_ACTUAL - 1, ANIO_ACTUAL - 2, ANIO_ACTUAL - 3];
 
 export default function ReportesExportar() {
   const navigate = useNavigate();
   const theme = useTheme();
+
+  const [clientes, setClientes] = useState([]);
   const [cliente, setCliente] = useState("");
   const [factura, setFactura] = useState("todos");
   const [mes, setMes] = useState("");
   const [anio, setAnio] = useState("");
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
 
-  const handleExport = () => {
+  useEffect(() => {
+    listarClientes({ pageSize: 500 }).then(({ items }) => setClientes(items)).catch(() => {});
+  }, []);
+
+  const handleExport = async () => {
     setLoading(true);
-    setTimeout(() => setLoading(false), 1500);
+    setError("");
+    try {
+      const mesIdx = mes ? MESES.indexOf(mes) : "";
+      const items = await exportarCertificados({ clienteId: cliente, mes: mesIdx, anio, factura });
+      if (items.length === 0) {
+        setError("No hay certificados que coincidan con esos filtros.");
+        return;
+      }
+      exportCsv(
+        items.map((c) => ({
+          Folio: c.folio,
+          Cliente: c.cliente?.nombre || c.clienteSnapshot?.nombre || "",
+          Equipo: c.equipoSnapshot?.idInterno || "",
+          Descripcion: c.equipoSnapshot?.descripcion || "",
+          FechaEmision: formatDate(c.fechaEmision),
+          Estado: c.estadoEfectivo || c.estado,
+          ReporteServicio: c.reporte?.folio || "",
+          Factura: c.reporte?.factura || "",
+        })),
+        `certificados_${anio || "todos"}${mes ? "_" + mes : ""}.csv`
+      );
+    } catch {
+      setError("No se pudo generar la exportación. Intenta de nuevo.");
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -46,7 +78,7 @@ export default function ReportesExportar() {
         </AppButton>
         <Box>
           <Typography variant="h5" fontWeight={700}>Exportar Certificados</Typography>
-          <Typography variant="body2" color="text.secondary">Filtra y descarga los certificados de calibración</Typography>
+          <Typography variant="body2" color="text.secondary">Filtra y descarga los certificados de calibración (CSV)</Typography>
         </Box>
       </Box>
 
@@ -69,12 +101,15 @@ export default function ReportesExportar() {
               </Box>
             </Box>
 
+            {error && <Alert severity="warning" sx={{ mb: 2, borderRadius: 2 }}>{error}</Alert>}
+
             <Grid container spacing={3}>
               <Grid size={{ xs: 12 }}>
                 <FormControl fullWidth size="small">
                   <InputLabel>Cliente (opcional)</InputLabel>
                   <Select label="Cliente (opcional)" value={cliente} onChange={(e) => setCliente(e.target.value)} sx={{ borderRadius: 2 }}>
-                    {CLIENTES.map((c) => <MenuItem key={c} value={c}>{c || "Todos los clientes"}</MenuItem>)}
+                    <MenuItem value="">Todos los clientes</MenuItem>
+                    {clientes.map((c) => <MenuItem key={c._id} value={c._id}>{c.nombre}</MenuItem>)}
                   </Select>
                 </FormControl>
               </Grid>
@@ -158,7 +193,7 @@ export default function ReportesExportar() {
             <Box>
               <Typography variant="subtitle1" fontWeight={700}>Vista previa de exportación</Typography>
               <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5, maxWidth: 280 }}>
-                Se generará un archivo con los certificados que coincidan con los filtros seleccionados a la izquierda.
+                Se descargará un CSV con los certificados que coincidan con los filtros seleccionados a la izquierda (folio, cliente, equipo, fecha, estado, reporte y factura).
               </Typography>
             </Box>
           </Paper>

@@ -2,6 +2,7 @@ const mongoose = require("mongoose");
 const Cotizacion = require("../models/Cotizacion");
 const Cliente = require("../models/Cliente");
 const Counter = require("../models/Counter");
+const Reporte = require("../models/Reporte");
 const AppError = require("../utils/AppError");
 
 const IVA_RATE = 0.16;
@@ -82,8 +83,14 @@ async function listar({ search = "", status = "todos", mes = "", anio = "", clie
 }
 
 async function obtener(id) {
-  const cotizacion = await Cotizacion.findById(id).populate("cliente", "nombre rfc");
+  const cotizacion = await Cotizacion.findById(id).populate("cliente", "nombre rfc contacto domicilioFiscal").lean();
   if (!cotizacion) throw new AppError("Cotización no encontrada", 404);
+
+  // Liga inversa: qué Reporte de Servicio (si alguno) se abrió a partir de esta
+  // cotización, para poder saltar de una a otro igual que en el PHP legacy.
+  const reporte = await Reporte.findOne({ cotizacion: id }).select("folio status").lean();
+  cotizacion.reporte = reporte || null;
+
   return cotizacion;
 }
 

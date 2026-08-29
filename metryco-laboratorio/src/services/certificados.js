@@ -8,6 +8,13 @@ export async function listarCertificados({ search = "", clienteId = "", estado =
   return { items: data.data, total: data.total };
 }
 
+export async function exportarCertificados({ clienteId = "", mes = "", anio = "", factura = "todos" } = {}) {
+  const { data } = await api.get(`${ENDPOINTS.CERTIFICADOS}/exportar`, {
+    params: { clienteId, mes, anio, factura },
+  });
+  return data.data;
+}
+
 export async function obtenerCertificado(id) {
   const { data } = await api.get(`${ENDPOINTS.CERTIFICADOS}/${id}`);
   return data.data;

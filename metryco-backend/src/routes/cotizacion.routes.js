@@ -5,7 +5,8 @@ const cotizacionController = require("../controllers/cotizacion.controller");
 
 const router = Router();
 
-router.use(auth);
+// El técnico nunca ve "Cotización" en el sistema original (solo admin/coordinador/ventas).
+router.use(auth, requireRole("admin", "coordinador", "ventas"));
 
 router.get("/", cotizacionController.listar);
 router.get("/:id", cotizacionController.obtener);

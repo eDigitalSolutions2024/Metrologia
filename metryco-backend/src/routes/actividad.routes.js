@@ -5,7 +5,9 @@ const actividadController = require("../controllers/actividad.controller");
 
 const router = Router();
 
-router.use(auth);
+// En el sistema original solo nivel 0 (admin) ve "Actividades" en el menú —
+// ni técnico ni ventas lo tienen.
+router.use(auth, requireRole("admin", "coordinador"));
 
 router.get("/", actividadController.listar);
 router.get("/:id", actividadController.obtener);

@@ -7,7 +7,10 @@ const { eventoSchema } = require("./_shared");
  * usados (trazabilidad que el legacy no tenía), y 3 estados independientes:
  * calibración · entrega · certificado.
  *
- * Proceso mejorado: cualquiera crea la asignación. El técnico ejecutor se
+ * Permisos (ver asignacion.routes.js/asignacion.service.js): la crea
+ * admin/coordinador/ventas; datos operativos y estado calibración/entrega los
+ * mueve admin/coordinador/tecnico; el estado certificado (aprobar/rechazar)
+ * es exclusivo de Calidad (admin/coordinador). El técnico ejecutor se
  * registra automáticamente cuando alguien marca la calibración como hecha, y
  * cada transición queda en `historial` con nombre + fecha.
  */
@@ -36,10 +39,34 @@ const asignacionSchema = new Schema(
       entrega: { type: String, enum: EST_ENTREGA, default: "pendiente" },
       certificado: { type: String, enum: EST_CERTIFICADO, default: "sin_generar" },
     },
-    motivoRechazo: String,
+    motivoRechazo: String, // motivo del rechazo MÁS RECIENTE (acceso rápido)
+    // Historial completo de rechazos de Calidad (legacy: tabla `comentarios_calidad`).
+    historialRechazos: [
+      {
+        motivo: { type: String, required: true },
+        fecha: { type: Date, default: Date.now },
+        usuario: {
+          id: { type: Schema.Types.ObjectId, ref: "Usuario" },
+          nombre: String,
+        },
+      },
+    ],
 
     fechaCalibracion: Date,
     fechaEntrega: Date,
+
+    // Logística de recolección del equipo (legacy: tabla "Recolección de equipos").
+    recoleccion: {
+      enSitio: { type: Boolean, default: false }, // se calibra en planta del cliente
+      enLaboratorio: { type: Boolean, default: false }, // se trae al laboratorio
+      ubicacionInfo: String, // dónde/cómo ubicar el equipo para recogerlo
+      recolectado: { type: Boolean, default: false },
+      infoRecoleccion: String, // notas de cuándo/cómo se recolectó
+    },
+
+    // Factura ligada a la entrega de ESTA asignación (independiente de la
+    // factura general del Reporte, que cubre el servicio completo).
+    factura: String,
 
     historial: [eventoSchema],
   },

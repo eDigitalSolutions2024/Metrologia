@@ -8,7 +8,10 @@
       "PowerShell(curl.exe -s -X POST \"https://sistema.metrycolab.com/v2/api/login\" -H \"Content-Type: application/json\" -d \"{\\\\\"usuario\\\\\":\\\\\"admin\\\\\",\\\\\"password\\\\\":\\\\\"admin_it\\\\\"}\" 2>&1)",
       "PowerShell(curl.exe -s -o NUL -w \"%{http_code} %{url_effective}\" \"https://sistema.metrycolab.com/v2/api/\" 2>&1)",
       "PowerShell(curl.exe -s -o NUL -w \"%{http_code} %{url_effective}\" \"https://sistema.metrycolab.com/api/\" 2>&1)",
-      "PowerShell(curl.exe -s -o NUL -w \"%{http_code} %{url_effective}\" \"https://sistema.metrycolab.com/v2/api/clientes\" 2>&1)"
+      "PowerShell(curl.exe -s -o NUL -w \"%{http_code} %{url_effective}\" \"https://sistema.metrycolab.com/v2/api/clientes\" 2>&1)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\\\\n\" http://localhost:4000/api/clientes)",
+      "Bash(npx eslint *)",
+      "Bash(node -e ' *)"
     ]
   }
 }

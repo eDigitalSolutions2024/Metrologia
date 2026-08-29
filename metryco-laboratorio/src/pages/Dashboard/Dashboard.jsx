@@ -17,6 +17,7 @@ import { listarClientes } from "../../services/clientes";
 import { listarCotizaciones } from "../../services/cotizaciones";
 import { listarCertificados } from "../../services/certificados";
 import { listarReportes } from "../../services/reportes";
+import { useAuth } from "../../core/auth/useAuth";
 
 const STATUS_MAP = {
   pendiente: { label: "Pendiente", color: "warning" },
@@ -38,6 +39,10 @@ function mesActual() {
 export default function Dashboard() {
   const theme = useTheme();
   const navigate = useNavigate();
+  const { user } = useAuth();
+  // Clientes/Cotizaciones son datos comerciales — el técnico no tiene permiso
+  // de leerlos (ver cliente.routes.js/cotizacion.routes.js), así que ni se piden.
+  const puedeVerComercial = ["admin", "coordinador", "ventas"].includes(user?.rol);
 
   const [cargando, setCargando] = useState(true);
   const [datos, setDatos] = useState({ clientes: 0, cotizaciones: 0, pendientes: 0, certificados: 0, reportes: 0 });
@@ -50,13 +55,13 @@ export default function Dashboard() {
       setCargando(true);
       try {
         const [cli, cot, pend, cert, rep, recientesRes, ...est] = await Promise.all([
-          listarClientes({ pageSize: 1 }),
-          listarCotizaciones({ pageSize: 1 }),
-          listarCotizaciones({ pageSize: 1, status: "pendiente" }),
+          puedeVerComercial ? listarClientes({ pageSize: 1 }) : Promise.resolve({ total: 0 }),
+          puedeVerComercial ? listarCotizaciones({ pageSize: 1 }) : Promise.resolve({ total: 0 }),
+          puedeVerComercial ? listarCotizaciones({ pageSize: 1, status: "pendiente" }) : Promise.resolve({ total: 0 }),
           listarCertificados({ pageSize: 1 }).catch(() => ({ total: 0 })),
           listarReportes({ pageSize: 1 }).catch(() => ({ total: 0 })),
-          listarCotizaciones({ pageSize: 5 }),
-          ...ESTADOS.map((status) => listarCotizaciones({ pageSize: 1, status })),
+          puedeVerComercial ? listarCotizaciones({ pageSize: 5 }) : Promise.resolve({ items: [] }),
+          ...ESTADOS.map((status) => puedeVerComercial ? listarCotizaciones({ pageSize: 1, status }) : Promise.resolve({ total: 0 })),
         ]);
         if (cancelado) return;
         setDatos({
@@ -69,11 +74,13 @@ export default function Dashboard() {
       finally { if (!cancelado) setCargando(false); }
     })();
     return () => { cancelado = true; };
-  }, []);
+  }, [puedeVerComercial]);
 
   const stats = [
-    { label: "Clientes", value: datos.clientes, icon: <PeopleAltOutlined />, color: theme.palette.secondary.main, hint: "Registrados", onClick: () => navigate("/clientes") },
-    { label: "Cotizaciones", value: datos.cotizaciones, icon: <DescriptionOutlined />, color: theme.palette.success.main, hint: `${datos.pendientes} pendientes`, onClick: () => navigate("/cotizaciones") },
+    ...(puedeVerComercial ? [
+      { label: "Clientes", value: datos.clientes, icon: <PeopleAltOutlined />, color: theme.palette.secondary.main, hint: "Registrados", onClick: () => navigate("/clientes") },
+      { label: "Cotizaciones", value: datos.cotizaciones, icon: <DescriptionOutlined />, color: theme.palette.success.main, hint: `${datos.pendientes} pendientes`, onClick: () => navigate("/cotizaciones") },
+    ] : []),
     { label: "Reportes de servicio", value: datos.reportes, icon: <PrecisionManufacturingOutlined />, color: theme.palette.warning.main, hint: "En el sistema", onClick: () => navigate("/reportes") },
     { label: "Certificados", value: datos.certificados, icon: <WorkspacePremiumOutlined />, color: theme.palette.info.main, hint: "Emitidos", onClick: () => navigate("/reportes/certificados") },
   ];
@@ -98,6 +105,7 @@ export default function Dashboard() {
         ))}
       </Grid>
 
+      {puedeVerComercial && (
       <Grid container spacing={2.5} sx={{ alignItems: "stretch" }}>
         <Grid size={{ xs: 12, md: 8 }}>
           <AppCard
@@ -202,6 +210,7 @@ export default function Dashboard() {
           </AppCard>
         </Grid>
       </Grid>
+      )}
     </Box>
   );
 }

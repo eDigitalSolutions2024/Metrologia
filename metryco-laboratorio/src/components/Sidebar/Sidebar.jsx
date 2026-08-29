@@ -1,8 +1,10 @@
+import { useEffect, useState } from "react";
 import { Box, List, Typography } from "@mui/material";
 
-import menu from "./menuConfig";
+import menu, { menuKey } from "./menuConfig";
 import SidebarItem from "./SidebarItem";
 import { useAuth } from "../../core/auth/useAuth";
+import { obtenerMenuPermisos } from "../../services/configuracion";
 
 const ROL_LABELS = {
   admin: "Administrador",
@@ -36,11 +38,45 @@ function BrandMark({ size = 30 }) {
   );
 }
 
+// Un ítem sin `roles` (tras aplicar overrides) se muestra a cualquier rol.
+// Un grupo (item con `children`) solo aparece si al menos un hijo es visible.
+// La sección "Sistema" (Administración) nunca toma overrides — siempre fija.
+function rolesEfectivos(item, seccion, overrides) {
+  if (seccion === "Sistema") return item.roles;
+  return overrides[menuKey(item)] || item.roles;
+}
+
+function visiblePara(rol, seccion, overrides) {
+  return (item) => {
+    const roles = rolesEfectivos(item, seccion, overrides);
+    return !roles || roles.includes(rol);
+  };
+}
+
+function filtrarMenu(menuBase, rol, overrides) {
+  return menuBase
+    .map((grupo) => ({
+      ...grupo,
+      items: grupo.items
+        .filter(visiblePara(rol, grupo.section, overrides))
+        .map((item) => (item.children ? { ...item, children: item.children.filter(visiblePara(rol, grupo.section, overrides)) } : item))
+        .filter((item) => !item.children || item.children.length > 0),
+    }))
+    .filter((grupo) => grupo.items.length > 0);
+}
+
 export default function Sidebar({ open = true }) {
   const { user } = useAuth();
   const nombre = user?.nombre || user?.usuario || "Usuario";
   const inicial = nombre.charAt(0).toUpperCase();
   const rolLabel = ROL_LABELS[user?.rol] || user?.rol || "";
+
+  const [overrides, setOverrides] = useState({});
+  useEffect(() => {
+    obtenerMenuPermisos().then(setOverrides).catch(() => setOverrides({}));
+  }, []);
+
+  const menuVisible = filtrarMenu(menu, user?.rol, overrides);
 
   return (
     <Box
@@ -89,7 +125,7 @@ export default function Sidebar({ open = true }) {
 
       {/* Navegación por secciones */}
       <Box sx={{ flex: 1, px: 1.25, pb: 1 }}>
-        {menu.map((grupo) => (
+        {menuVisible.map((grupo) => (
           <Box key={grupo.section} sx={{ mb: 1.5 }}>
             <Typography
               sx={{
