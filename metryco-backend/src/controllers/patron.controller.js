@@ -31,4 +31,13 @@ const porVencer = asyncHandler(async (req, res) => {
   res.json({ success: true, data: await service.porVencer(dias) });
 });
 
-module.exports = { listar, obtener, crear, actualizar, eliminar, porVencer };
+const adjuntarCertificado = asyncHandler(async (req, res) => {
+  res.json({ success: true, data: await service.adjuntarCertificado(req.params.id, req.file) });
+});
+
+const descargarCertificado = asyncHandler(async (req, res) => {
+  const { ruta, nombre } = await service.archivoStream(req.params.id);
+  res.download(ruta, nombre);
+});
+
+module.exports = { listar, obtener, crear, actualizar, eliminar, porVencer, adjuntarCertificado, descargarCertificado };

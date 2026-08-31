@@ -1,6 +1,9 @@
+const fs = require("fs");
+const path = require("path");
 const Patron = require("../models/Patron");
 const AppError = require("../utils/AppError");
 const escapeRegex = require("../utils/escapeRegex");
+const { uploadsDir } = require("../config/env");
 
 async function listar({ search = "", categoria = "", soloVigentes = "", page = 0, pageSize = 50 }) {
   const match = {};
@@ -43,6 +46,37 @@ async function eliminar(id) {
   return patron;
 }
 
+function rutaArchivo(patron) {
+  if (!patron?.ultimaCalibracion?.archivoUrl) return null;
+  return path.join(uploadsDir, "certificados", patron.ultimaCalibracion.archivoUrl);
+}
+
+// Certificado PDF del propio patrón (reutiliza la carpeta uploads/certificados
+// y el middleware pdfCertificado que ya existía para Certificados de cliente).
+async function adjuntarCertificado(id, file) {
+  if (!file) throw new AppError("No se recibió el archivo", 400);
+  const patron = await Patron.findById(id);
+  if (!patron) {
+    fs.unlink(file.path, () => {});
+    throw new AppError("Patrón no encontrado", 404);
+  }
+
+  const anterior = rutaArchivo(patron);
+  if (anterior && fs.existsSync(anterior)) fs.unlink(anterior, () => {});
+
+  patron.ultimaCalibracion = { ...(patron.ultimaCalibracion?.toObject?.() ?? patron.ultimaCalibracion ?? {}), archivoUrl: file.filename };
+  await patron.save();
+  return patron;
+}
+
+async function archivoStream(id) {
+  const patron = await Patron.findById(id);
+  if (!patron) throw new AppError("Patrón no encontrado", 404);
+  const ruta = rutaArchivo(patron);
+  if (!ruta || !fs.existsSync(ruta)) throw new AppError("El patrón no tiene certificado adjunto", 404);
+  return { ruta, nombre: `${patron.codigo}.pdf` };
+}
+
 /** Patrones cuyo vencimiento cae dentro de `dias` (default 30). */
 async function porVencer(dias = 30) {
   const limite = new Date(Date.now() + dias * 86400000);
@@ -52,4 +86,4 @@ async function porVencer(dias = 30) {
   }).sort({ "ultimaCalibracion.vencimiento": 1 });
 }
 
-module.exports = { listar, obtener, crear, actualizar, eliminar, porVencer };
+module.exports = { listar, obtener, crear, actualizar, eliminar, porVencer, adjuntarCertificado, archivoStream };

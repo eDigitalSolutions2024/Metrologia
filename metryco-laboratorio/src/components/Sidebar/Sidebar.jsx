@@ -4,7 +4,7 @@ import { Box, List, Typography } from "@mui/material";
 import menu, { menuKey } from "./menuConfig";
 import SidebarItem from "./SidebarItem";
 import { useAuth } from "../../core/auth/useAuth";
-import { obtenerMenuPermisos } from "../../services/configuracion";
+import { obtenerMenuPermisos, obtenerLogo, logoUrl } from "../../services/configuracion";
 
 const ROL_LABELS = {
   admin: "Administrador",
@@ -76,6 +76,11 @@ export default function Sidebar({ open = true }) {
     obtenerMenuPermisos().then(setOverrides).catch(() => setOverrides({}));
   }, []);
 
+  const [logo, setLogo] = useState(null);
+  useEffect(() => {
+    obtenerLogo().then(setLogo).catch(() => setLogo(null));
+  }, []);
+
   const menuVisible = filtrarMenu(menu, user?.rol, overrides);
 
   return (
@@ -106,12 +111,18 @@ export default function Sidebar({ open = true }) {
       <Box sx={{ px: 2.5, pt: 3, pb: 2, display: "flex", alignItems: "center", gap: 1.5 }}>
         <Box
           sx={{
-            width: 40, height: 40, borderRadius: 2.5, display: "grid", placeItems: "center",
+            width: 40, height: 40, borderRadius: 2.5, display: "grid", placeItems: "center", flexShrink: 0,
             background: "linear-gradient(135deg, rgba(37,99,235,.25), rgba(37,99,235,.05))",
             border: "1px solid rgba(96,165,250,.25)",
+            overflow: "hidden",
           }}
         >
-          <BrandMark size={24} />
+          {logo ? (
+            <Box component="img" src={logoUrl(logo.nombreArchivo)} alt="Logo"
+              sx={{ width: "100%", height: "100%", objectFit: "contain" }} />
+          ) : (
+            <BrandMark size={24} />
+          )}
         </Box>
         <Box>
           <Typography sx={{ fontWeight: 800, fontSize: 15, letterSpacing: ".14em", lineHeight: 1 }}>

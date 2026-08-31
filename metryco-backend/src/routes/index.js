@@ -14,6 +14,8 @@ const magnitudRoutes = require("./magnitud.routes");
 const incertidumbreRoutes = require("./incertidumbre.routes");
 const publicoRoutes = require("./publico.routes");
 const configuracionRoutes = require("./configuracion.routes");
+const alertaRoutes = require("./alerta.routes");
+const cobranzaRoutes = require("./cobranza.routes");
 
 const router = Router();
 
@@ -36,5 +38,7 @@ router.use("/certificados", certificadoRoutes);
 router.use("/magnitudes", magnitudRoutes);
 router.use("/incertidumbre", incertidumbreRoutes);
 router.use("/configuracion", configuracionRoutes);
+router.use("/alertas", alertaRoutes);
+router.use("/cobranza", cobranzaRoutes);
 
 module.exports = router;

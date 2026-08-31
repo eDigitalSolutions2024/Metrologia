@@ -24,6 +24,7 @@ export const ENDPOINTS = {
   COBRANZA: "/cobranza",
   USUARIOS: "/usuarios",
   CONFIGURACION: "/configuracion",
+  ALERTAS: "/alertas",
 };
 
 // Solo se persiste el usuario (datos no sensibles) para mostrarlo mientras se

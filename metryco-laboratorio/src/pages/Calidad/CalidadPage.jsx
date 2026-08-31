@@ -18,6 +18,7 @@ import { listarClientes } from "../../services/clientes";
 import { obtenerDirectorio } from "../../services/usuarios";
 import { exportCsv } from "../../shared/utils/exportCsv";
 import { listarCalidad, cambiarEstadoAsignacion } from "../../services/reportes";
+import { pedirRefrescoAlertas } from "../../shared/utils/alertasBus";
 import { useNavigate } from "react-router-dom";
 
 const MESES = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
@@ -117,6 +118,7 @@ function ConsultarTab() {
     try {
       await cambiarEstadoAsignacion(a._id, { dominio: "certificado", valor: "autorizado" });
       cargar();
+      pedirRefrescoAlertas();
     } catch (e) {
       setError(e?.response?.data?.message || "No se pudo autorizar.");
     }
@@ -128,6 +130,7 @@ function ConsultarTab() {
       await cambiarEstadoAsignacion(rechazarTarget._id, { dominio: "certificado", valor: "rechazado", motivo });
       setRechazarTarget(null);
       cargar();
+      pedirRefrescoAlertas();
     } catch (e) {
       setError(e?.response?.data?.message || "No se pudo rechazar.");
     }

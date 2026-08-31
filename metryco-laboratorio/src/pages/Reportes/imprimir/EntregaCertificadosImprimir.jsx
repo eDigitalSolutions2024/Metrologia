@@ -24,13 +24,13 @@ export default function EntregaCertificadosImprimir() {
   if (estado === "cargando") return <Centro><CircularProgress /></Centro>;
   if (estado === "error" || !data) return <Centro><Typography>No se pudo cargar el reporte.</Typography></Centro>;
 
-  const { reporte, asignaciones, laboratorio } = data;
+  const { reporte, asignaciones, laboratorio, logo } = data;
   const cliente = reporte.cliente || {};
   // Certificados ya autorizados por Calidad (proceso independiente de la entrega del equipo).
   const items = asignaciones.filter((a) => a.estados?.certificado === "autorizado");
 
   return (
-    <PrintLayout laboratorio={laboratorio} titulo="COMPROBANTE DE ENTREGA DE CERTIFICADOS" subtitulo="CERTIFICATE DELIVERY" folio={reporte.folio}>
+    <PrintLayout laboratorio={laboratorio} logo={logo} titulo="COMPROBANTE DE ENTREGA DE CERTIFICADOS" subtitulo="CERTIFICATE DELIVERY" folio={reporte.folio}>
       <Box sx={{ display: "grid", gridTemplateColumns: "140px 1fr 90px 1fr", rowGap: 0.4, fontSize: 12.5, mb: 1 }}>
         <b>CLIENTE:</b><span>{cliente.nombre || "—"}</span>
         <b>FECHA:</b><span>{formatDate(new Date())}</span>

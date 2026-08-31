@@ -345,6 +345,17 @@ async function qrSvg(id) {
   return qr.svg(urlPublica(cert.publicToken));
 }
 
+/** Certificados vigentes cuya fecha de vigencia cae dentro de `dias` (default 30). */
+async function porVencer(dias = 30) {
+  const limite = new Date(Date.now() + dias * 86400000);
+  return Certificado.find({
+    estado: { $nin: ["anulado", "borrador"] },
+    vigencia: { $gte: new Date(), $lte: limite },
+  })
+    .populate("cliente", "nombre")
+    .sort({ vigencia: 1 });
+}
+
 async function archivoStream(id) {
   const cert = await Certificado.findById(id);
   if (!cert) throw new AppError("Certificado no encontrado", 404);
@@ -355,6 +366,6 @@ async function archivoStream(id) {
 
 module.exports = {
   listar, obtener, exportar, emitir, actualizar, cambiarEstado, adjuntarPdf,
-  anular, regenerarToken, qrPng, qrSvg, archivoStream,
+  anular, regenerarToken, qrPng, qrSvg, archivoStream, porVencer,
   urlPublica, rutaArchivo,
 };

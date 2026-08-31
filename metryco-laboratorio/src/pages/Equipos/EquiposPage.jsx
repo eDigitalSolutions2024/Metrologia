@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
-  Box, Typography, TextField, InputAdornment, IconButton,
+  Box, TextField, InputAdornment, IconButton,
   Tooltip, MenuItem, Select, FormControl, InputLabel, Button,
 } from "@mui/material";
 import SearchIcon from "@mui/icons-material/Search";
@@ -13,7 +13,7 @@ import AppTable from "../../shared/components/AppTable";
 import PageHeader from "../../shared/components/PageHeader";
 import PrecisionManufacturingOutlinedIcon from "@mui/icons-material/PrecisionManufacturingOutlined";
 import { listarClientes } from "../../services/clientes";
-import { EQUIPOS_MOCK } from "./mockData";
+import { listarEquipos } from "../../services/equipos";
 
 // Consultar Equipos = php/equipo_buscar.php: el equipo pertenece a un cliente
 // (tabla `equipo`, campo empId). Certificado/Portada/Gráfica dependen de las
@@ -24,7 +24,11 @@ export default function EquiposPage() {
   const [clientes, setClientes] = useState([]);
   const [clienteFiltro, setClienteFiltro] = useState("");
   const [search, setSearch] = useState("");
+  const [buscar, setBuscar] = useState("");
   const [page, setPage] = useState(0);
+  const [items, setItems] = useState([]);
+  const [total, setTotal] = useState(0);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     listarClientes({ pageSize: 200 })
@@ -32,22 +36,17 @@ export default function EquiposPage() {
       .catch(() => setClientes([]));
   }, []);
 
-  const filtered = EQUIPOS_MOCK.filter((e) => {
-    const matchCliente = !clienteFiltro || String(e.clienteId) === String(clienteFiltro);
-    const term = search.toLowerCase();
-    const matchSearch =
-      !term ||
-      e.idInterno.toLowerCase().includes(term) ||
-      e.descripcion.toLowerCase().includes(term) ||
-      e.marca.toLowerCase().includes(term) ||
-      e.serie.toLowerCase().includes(term);
-    return matchCliente && matchSearch;
-  });
+  useEffect(() => {
+    setLoading(true);
+    listarEquipos({ search: buscar, clienteId: clienteFiltro, page, pageSize: 10 })
+      .then(({ items, total }) => { setItems(items); setTotal(total); })
+      .catch(() => { setItems([]); setTotal(0); })
+      .finally(() => setLoading(false));
+  }, [buscar, clienteFiltro, page]);
 
   const columns = [
-    { field: "id", headerName: "MET" },
-    { field: "clienteNombre", headerName: "Cliente" },
     { field: "idInterno", headerName: "ID Cliente" },
+    { field: "cliente", headerName: "Cliente", renderCell: (row) => row.cliente?.nombre || "—" },
     { field: "descripcion", headerName: "Descripción" },
     { field: "marca", headerName: "Marca" },
     { field: "modelo", headerName: "Modelo" },
@@ -60,7 +59,7 @@ export default function EquiposPage() {
       align: "center",
       renderCell: (row) => (
         <Tooltip title="Editar equipo">
-          <IconButton size="small" onClick={() => navigate(`/equipos/${row.id}/editar`)}>
+          <IconButton size="small" onClick={() => navigate(`/equipos/${row._id}/editar`)}>
             <EditOutlinedIcon fontSize="small" sx={{ color: "secondary.main" }} />
           </IconButton>
         </Tooltip>
@@ -73,7 +72,7 @@ export default function EquiposPage() {
       <PageHeader
         icon={<PrecisionManufacturingOutlinedIcon />}
         title="Consultar Equipos"
-        subtitle={`${filtered.length} de ${EQUIPOS_MOCK.length} equipos de clientes`}
+        subtitle={`${total} equipos de clientes`}
         actions={
           <AppButton startIcon={<AddIcon />} onClick={() => navigate("/equipos/nuevo")} sx={{ borderRadius: 2 }}>
             Alta de Equipo
@@ -86,7 +85,8 @@ export default function EquiposPage() {
           placeholder="Buscar por ID, descripción, marca o serie..."
           size="small"
           value={search}
-          onChange={(e) => { setSearch(e.target.value); setPage(0); }}
+          onChange={(e) => setSearch(e.target.value)}
+          onKeyDown={(e) => { if (e.key === "Enter") { setPage(0); setBuscar(search); } }}
           sx={{ width: 360, "& .MuiOutlinedInput-root": { borderRadius: 2 } }}
           slotProps={{
             input: {
@@ -110,16 +110,17 @@ export default function EquiposPage() {
             {clientes.map((c) => <MenuItem key={c._id} value={c._id}>{c.nombre}</MenuItem>)}
           </Select>
         </FormControl>
-        <Button variant="contained" onClick={() => setPage(0)} sx={{ borderRadius: 2 }}>Buscar</Button>
+        <Button variant="contained" onClick={() => { setPage(0); setBuscar(search); }} sx={{ borderRadius: 2 }}>Buscar</Button>
       </Box>
 
       <AppTable
         columns={columns}
-        rows={filtered.slice(page * 10, page * 10 + 10)}
-        totalCount={filtered.length}
+        rows={items}
+        totalCount={total}
         page={page}
         rowsPerPage={10}
         onPageChange={setPage}
+        loading={loading}
       />
     </Box>
   );

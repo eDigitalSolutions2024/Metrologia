@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import {
-  Box, Typography, Grid, Paper, Chip, Tooltip, IconButton,
+  Box, Typography, Grid, Paper, Chip, Tooltip, IconButton, Alert,
   Dialog, DialogTitle, DialogContent, DialogActions, MenuItem, Select, FormControl, InputLabel, Tab, Tabs,
 } from "@mui/material";
 import { useTheme } from "@mui/material/styles";
@@ -21,16 +21,14 @@ import { formatDate } from "../../shared/utils/formatDate";
 import { formatCurrency } from "../../shared/utils/currency";
 import { exportCsv } from "../../shared/utils/exportCsv";
 import { listarClientes } from "../../services/clientes";
-import { MOCK, DIAS_PAGO_OPCIONES } from "./mockData";
-
-function sumarDias(fecha, dias) {
-  const d = new Date(fecha);
-  d.setDate(d.getDate() + Number(dias));
-  return d.toISOString().slice(0, 10);
-}
+import { crearFactura, listarFacturas, aplicarPagoFactura, reabrirFactura } from "../../services/cobranza";
+import { pedirRefrescoAlertas } from "../../shared/utils/alertasBus";
+import { DIAS_PAGO_OPCIONES } from "./mockData";
 
 function NuevoRegistroDialog({ open, onClose, onCreated }) {
   const [clientes, setClientes] = useState([]);
+  const [error, setError] = useState("");
+  const [guardando, setGuardando] = useState(false);
   const { register, control, handleSubmit, reset, formState: { errors } } = useForm({
     defaultValues: { oc: "", clienteId: "", folio: "", monto: "", fechaCr: "", diasPago: 30, comentarios: "" },
   });
@@ -40,19 +38,19 @@ function NuevoRegistroDialog({ open, onClose, onCreated }) {
     listarClientes({ pageSize: 200 }).then(({ items }) => setClientes(items)).catch(() => setClientes([]));
   }, [open]);
 
-  const cerrar = () => { reset(); onClose(); };
+  const cerrar = () => { reset(); setError(""); onClose(); };
 
-  const onSubmit = (data) => {
-    const cliente = clientes.find((c) => c._id === data.clienteId);
-    onCreated({
-      ...data,
-      clienteNombre: cliente?.nombre ?? "",
-      monto: Number(data.monto),
-      fechaPago: sumarDias(data.fechaCr, data.diasPago),
-      statusPago: 0,
-      fechaPagada: "",
-    });
-    cerrar();
+  const onSubmit = async (data) => {
+    setGuardando(true); setError("");
+    try {
+      const factura = await crearFactura({ ...data, cliente: data.clienteId, monto: Number(data.monto) });
+      onCreated(factura);
+      cerrar();
+    } catch (err) {
+      setError(err?.response?.data?.message || "No se pudo guardar el registro.");
+    } finally {
+      setGuardando(false);
+    }
   };
 
   return (
@@ -60,6 +58,7 @@ function NuevoRegistroDialog({ open, onClose, onCreated }) {
       <DialogTitle>Generar Nuevo Registro en Calendario</DialogTitle>
       <Box component="form" onSubmit={handleSubmit(onSubmit)}>
         <DialogContent>
+          {error && <Alert severity="error" sx={{ mb: 2, borderRadius: 2 }} onClose={() => setError("")}>{error}</Alert>}
           <Grid container spacing={2}>
             <Grid size={{ xs: 12, sm: 6 }}>
               <AppInput label="Orden de Compra" error={errors.oc} {...register("oc", { required: "Obligatorio" })} />
@@ -101,7 +100,7 @@ function NuevoRegistroDialog({ open, onClose, onCreated }) {
         </DialogContent>
         <DialogActions sx={{ px: 3, pb: 2 }}>
           <AppButton variant="outlined" onClick={cerrar} sx={{ borderRadius: 2 }}>Cancelar</AppButton>
-          <AppButton type="submit" sx={{ borderRadius: 2 }}>Guardar</AppButton>
+          <AppButton type="submit" loading={guardando} sx={{ borderRadius: 2 }}>Guardar</AppButton>
         </DialogActions>
       </Box>
     </Dialog>
@@ -132,14 +131,28 @@ const HOY = new Date().toISOString().slice(0, 10);
 // tabla `events`, con acciones Aplicar pago / Reabrir.
 export default function CobranzaPage() {
   const theme = useTheme();
-  const [registros, setRegistros] = useState(MOCK);
+  const [registros, setRegistros] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState(0);
   const [page, setPage] = useState(0);
   const [nuevoOpen, setNuevoOpen] = useState(false);
   const [aplicarTarget, setAplicarTarget] = useState(null);
+  const [error, setError] = useState("");
 
-  const atrasadas = useMemo(() => registros.filter((r) => r.statusPago === 0 && r.fechaPago < HOY), [registros]);
-  const porPagar = useMemo(() => registros.filter((r) => r.statusPago === 0 && r.fechaPago >= HOY), [registros]);
+  const cargar = () => {
+    setLoading(true);
+    listarFacturas()
+      .then(setRegistros)
+      .catch(() => setError("No se pudieron cargar las facturas."))
+      .finally(() => setLoading(false));
+  };
+
+  useEffect(() => { cargar(); }, []);
+
+  const fechaCorta = (v) => String(v).slice(0, 10);
+
+  const atrasadas = useMemo(() => registros.filter((r) => r.statusPago === 0 && fechaCorta(r.fechaPago) < HOY), [registros]);
+  const porPagar = useMemo(() => registros.filter((r) => r.statusPago === 0 && fechaCorta(r.fechaPago) >= HOY), [registros]);
   const pagadas = useMemo(() => registros.filter((r) => r.statusPago === 1), [registros]);
 
   const tabs = [
@@ -150,17 +163,31 @@ export default function CobranzaPage() {
   const rowsActuales = tabs[tab].rows;
   const totalActual = rowsActuales.reduce((s, r) => s + r.monto, 0);
 
-  const aplicarPago = (fechaPagada) => {
-    setRegistros((prev) => prev.map((r) => (r.id === aplicarTarget.id ? { ...r, statusPago: 1, fechaPagada } : r)));
-    setAplicarTarget(null);
+  const aplicarPago = async (fechaPagada) => {
+    setError("");
+    try {
+      await aplicarPagoFactura(aplicarTarget._id, fechaPagada);
+      setAplicarTarget(null);
+      cargar();
+      pedirRefrescoAlertas();
+    } catch (err) {
+      setError(err?.response?.data?.message || "No se pudo aplicar el pago.");
+    }
   };
 
-  const reabrir = (id) => {
-    setRegistros((prev) => prev.map((r) => (r.id === id ? { ...r, statusPago: 0, fechaPagada: "" } : r)));
+  const reabrir = async (id) => {
+    setError("");
+    try {
+      await reabrirFactura(id);
+      cargar();
+      pedirRefrescoAlertas();
+    } catch (err) {
+      setError(err?.response?.data?.message || "No se pudo reabrir el registro.");
+    }
   };
 
   const columns = [
-    { field: "clienteNombre", headerName: "Cliente" },
+    { field: "cliente", headerName: "Cliente", renderCell: (r) => r.cliente?.nombre || "—" },
     { field: "oc", headerName: "OC" },
     { field: "folio", headerName: "Folio" },
     { field: "monto", headerName: "Monto", renderCell: (r) => formatCurrency(r.monto) },
@@ -182,7 +209,7 @@ export default function CobranzaPage() {
             field: "acciones", headerName: "Acción", align: "center",
             renderCell: (r) => (
               <Tooltip title="Reabrir">
-                <IconButton size="small" onClick={() => reabrir(r.id)}>
+                <IconButton size="small" onClick={() => reabrir(r._id)}>
                   <ReplayOutlinedIcon fontSize="small" sx={{ color: "warning.main" }} />
                 </IconButton>
               </Tooltip>
@@ -206,9 +233,9 @@ export default function CobranzaPage() {
   const exportar = () => {
     exportCsv(
       registros.map((r) => ({
-        Cliente: r.clienteNombre, OC: r.oc, Folio: r.folio, Monto: r.monto,
-        FechaCR: r.fechaCr, FechaPago: r.fechaPago, Status: r.statusPago === 1 ? "Pagado" : "Pendiente",
-        FechaPagada: r.fechaPagada,
+        Cliente: r.cliente?.nombre || "", OC: r.oc, Folio: r.folio, Monto: r.monto,
+        FechaCR: fechaCorta(r.fechaCr), FechaPago: fechaCorta(r.fechaPago), Status: r.statusPago === 1 ? "Pagado" : "Pendiente",
+        FechaPagada: r.fechaPagada ? fechaCorta(r.fechaPagada) : "",
       })),
       "cuentas_por_cobrar.csv"
     );
@@ -230,6 +257,8 @@ export default function CobranzaPage() {
           </>
         }
       />
+
+      {error && <Alert severity="error" sx={{ mb: 2, borderRadius: 2 }} onClose={() => setError("")}>{error}</Alert>}
 
       <Grid container spacing={2.5} mb={3}>
         {[
@@ -260,13 +289,14 @@ export default function CobranzaPage() {
         page={page}
         rowsPerPage={10}
         onPageChange={setPage}
+        loading={loading}
         emptyText="Sin registros en esta pestaña"
       />
 
       <NuevoRegistroDialog
         open={nuevoOpen}
         onClose={() => setNuevoOpen(false)}
-        onCreated={(nuevo) => setRegistros((prev) => [...prev, { ...nuevo, id: Math.max(0, ...prev.map((r) => r.id)) + 1 }])}
+        onCreated={() => { cargar(); pedirRefrescoAlertas(); }}
       />
       <AplicarPagoDialog target={aplicarTarget} onClose={() => setAplicarTarget(null)} onConfirm={aplicarPago} />
     </Box>

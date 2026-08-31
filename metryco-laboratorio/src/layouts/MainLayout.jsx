@@ -4,6 +4,7 @@ import { Outlet, useLocation } from "react-router-dom";
 
 import Sidebar from "../components/Sidebar/Sidebar";
 import Navbar from "../components/Navbar/Navbar";
+import AlertasFlotantes from "../components/Alertas/AlertasFlotantes";
 
 const SIDEBAR_WIDTH = 280;
 
@@ -80,6 +81,8 @@ export default function MainLayout() {
           </Box>
         </Box>
       </Box>
+
+      <AlertasFlotantes />
     </Box>
   );
 }

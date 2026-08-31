@@ -8,6 +8,9 @@ const { uploadsDir } = require("../config/env");
 const destinoCertificados = path.join(uploadsDir, "certificados");
 fs.mkdirSync(destinoCertificados, { recursive: true });
 
+const destinoLogos = path.join(uploadsDir, "logos");
+fs.mkdirSync(destinoLogos, { recursive: true });
+
 const storage = multer.diskStorage({
   destination: (_req, _file, cb) => cb(null, destinoCertificados),
   filename: (_req, _file, cb) => {
@@ -40,4 +43,36 @@ function pdfCertificado(req, res, next) {
   });
 }
 
-module.exports = { pdfCertificado, destinoCertificados };
+const MIME_IMAGENES = ["image/png", "image/jpeg", "image/svg+xml", "image/webp"];
+
+const storageLogo = multer.diskStorage({
+  destination: (_req, _file, cb) => cb(null, destinoLogos),
+  filename: (_req, file, cb) => {
+    const ext = path.extname(file.originalname) || "";
+    cb(null, `${Date.now()}-${crypto.randomBytes(6).toString("hex")}${ext}`);
+  },
+});
+
+function soloImagen(_req, file, cb) {
+  if (MIME_IMAGENES.includes(file.mimetype)) return cb(null, true);
+  cb(new AppError("Solo se permiten imágenes PNG, JPG, SVG o WEBP", 400));
+}
+
+const subirImagenLogo = multer({
+  storage: storageLogo,
+  fileFilter: soloImagen,
+  limits: { fileSize: 3 * 1024 * 1024, files: 1 },
+}).single("archivo");
+
+function logo(req, res, next) {
+  subirImagenLogo(req, res, (err) => {
+    if (err instanceof multer.MulterError) {
+      const msg = err.code === "LIMIT_FILE_SIZE" ? "La imagen supera el tamaño máximo (3 MB)" : err.message;
+      return next(new AppError(msg, 400));
+    }
+    if (err) return next(err);
+    next();
+  });
+}
+
+module.exports = { pdfCertificado, destinoCertificados, logo, destinoLogos };

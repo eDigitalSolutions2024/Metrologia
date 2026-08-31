@@ -1,6 +1,7 @@
 import { Box, Button, Typography } from "@mui/material";
 import PrintOutlinedIcon from "@mui/icons-material/PrintOutlined";
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
+import { logoUrl } from "../../../services/configuracion";
 
 /** Mismo ícono de marca que el sidebar (components/Sidebar/Sidebar.jsx BrandMark). */
 function BrandMark({ size = 40 }) {
@@ -36,7 +37,7 @@ function BrandMark({ size = 40 }) {
  * la paleta de la app (theme/theme.js: navy #0F172A / azul #2563EB) en vez
  * del morado del formato legacy.
  */
-export default function PrintLayout({ laboratorio, titulo, subtitulo, folio, children }) {
+export default function PrintLayout({ laboratorio, logo, titulo, subtitulo, folio, children }) {
   return (
     <Box sx={{ bgcolor: "#fff", minHeight: "100dvh", color: "#111" }}>
       <Box
@@ -68,7 +69,11 @@ export default function PrintLayout({ laboratorio, titulo, subtitulo, folio, chi
 
       <Box sx={{ maxWidth: 900, mx: "auto", px: 4, py: 4, fontFamily: "Arial, Helvetica, sans-serif" }}>
         <Box sx={{ display: "flex", alignItems: "flex-start", gap: 1.5, mb: 1 }}>
-          <BrandMark />
+          {logo ? (
+            <Box component="img" src={logoUrl(logo.nombreArchivo)} alt="Logo" sx={{ width: 40, height: 40, objectFit: "contain", flexShrink: 0 }} />
+          ) : (
+            <BrandMark />
+          )}
           <Box>
             <Typography sx={{ fontWeight: 800, fontSize: 17, color: "#0F172A", letterSpacing: "-0.01em" }}>
               {laboratorio?.nombre || "Metrología · Laboratorio de Calibración"}

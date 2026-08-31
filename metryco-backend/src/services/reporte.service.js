@@ -140,7 +140,8 @@ async function paraImprimir(id) {
     .populate("performance", "nombre magnitud tipoInstrumento");
 
   const laboratorio = await configuracionService.obtenerLaboratorio();
-  return { reporte, asignaciones, laboratorio };
+  const logo = await configuracionService.obtenerLogo();
+  return { reporte, asignaciones, laboratorio, logo };
 }
 
 async function agregarComentario(id, texto, reqUser) {

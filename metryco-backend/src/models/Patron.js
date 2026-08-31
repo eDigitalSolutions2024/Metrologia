@@ -1,5 +1,5 @@
 const { Schema, model } = require("mongoose");
-const { CATEGORIAS_EQUIPO } = require("./_shared");
+const { CATEGORIAS_EQUIPO, vacioAUndefined } = require("./_shared");
 
 /**
  * Patrón de referencia propiedad del laboratorio (tabla `patrones` del legacy,
@@ -11,12 +11,13 @@ const patronSchema = new Schema(
     codigo: { type: String, required: true, unique: true, trim: true }, // PAT-001
     nombre: { type: String, required: true, trim: true },
     descripcion: { type: String, trim: true },
-    categoria: { type: String, enum: CATEGORIAS_EQUIPO },
+    categoria: { type: String, enum: CATEGORIAS_EQUIPO, set: vacioAUndefined },
     marca: String,
     modelo: String,
     serie: String,
 
     trazabilidad: { type: String, trim: true }, // CENAM, NIM, NIST, ...
+    comentarios: String,
     unidades: String,
     capacidad: String, // rango, ej. "0–100 mm"
     divisionMinima: String,

@@ -18,6 +18,7 @@ import { formatCurrency } from "../../shared/utils/currency";
 import { direccionCliente } from "../../shared/utils/direccionCliente";
 import { listarClientes } from "../../services/clientes";
 import { obtenerCotizacion, crearCotizacion, actualizarCotizacion } from "../../services/cotizaciones";
+import { pedirRefrescoAlertas } from "../../shared/utils/alertasBus";
 
 const STATUS_MAP = {
   pendiente: { label: "Pendiente", color: "warning" },
@@ -104,6 +105,7 @@ export default function CotizacionDialog({ open, cotizacionId, onClose, onSaved 
       } else {
         await crearCotizacion(data);
       }
+      pedirRefrescoAlertas();
       onSaved();
     } catch (err) {
       setSubmitError(err.response?.data?.message || "No se pudo guardar la cotización.");

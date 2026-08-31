@@ -8,12 +8,12 @@ import SearchIcon from "@mui/icons-material/Search";
 import { listarClientes } from "../../services/clientes";
 import { listarCotizaciones } from "../../services/cotizaciones";
 import { listarUsuarios } from "../../services/usuarios";
+import { listarEquipos } from "../../services/equipos";
+import { listarFacturas } from "../../services/cobranza";
 import { useDebounce } from "../../shared/hooks/useDebounce";
 
 import { MOCK as REPORTES_MOCK } from "../../pages/Reportes/mockData";
 import { MOCK as CALIDAD_MOCK } from "../../pages/Calidad/mockData";
-import { EQUIPOS_MOCK } from "../../pages/Equipos/mockData";
-import { MOCK as COBRANZA_MOCK } from "../../pages/Cobranza/mockData";
 
 function coincide(texto, query) {
   return (texto || "").toString().toLowerCase().includes(query.toLowerCase());
@@ -27,6 +27,8 @@ export default function SearchBar() {
   const [clientes, setClientes] = useState([]);
   const [cotizaciones, setCotizaciones] = useState([]);
   const [usuarios, setUsuarios] = useState([]);
+  const [equipos, setEquipos] = useState([]);
+  const [facturas, setFacturas] = useState([]);
   const containerRef = useRef(null);
 
   const debouncedQuery = useDebounce(query, 350);
@@ -52,15 +54,19 @@ export default function SearchBar() {
 
     (async () => {
       setLoading(true);
-      const [resClientes, resCotizaciones, resUsuarios] = await Promise.allSettled([
+      const [resClientes, resCotizaciones, resUsuarios, resEquipos, resFacturas] = await Promise.allSettled([
         listarClientes({ search: debouncedQuery, pageSize: 5 }),
         listarCotizaciones({ search: debouncedQuery, pageSize: 5 }),
         listarUsuarios({ search: debouncedQuery, pageSize: 5 }),
+        listarEquipos({ search: debouncedQuery, pageSize: 5 }),
+        listarFacturas(),
       ]);
       if (cancelado) return;
       setClientes(resClientes.status === "fulfilled" ? resClientes.value.items : []);
       setCotizaciones(resCotizaciones.status === "fulfilled" ? resCotizaciones.value.items : []);
       setUsuarios(resUsuarios.status === "fulfilled" ? resUsuarios.value.items : []);
+      setEquipos(resEquipos.status === "fulfilled" ? resEquipos.value.items : []);
+      setFacturas(resFacturas.status === "fulfilled" ? resFacturas.value : []);
       setLoading(false);
     })();
 
@@ -83,19 +89,12 @@ export default function SearchBar() {
     ).slice(0, 5);
   }, [debouncedQuery]);
 
-  const equipos = useMemo(() => {
-    if (!debouncedQuery.trim()) return [];
-    return EQUIPOS_MOCK.filter(
-      (e) => coincide(e.idInterno, debouncedQuery) || coincide(e.descripcion, debouncedQuery) || coincide(e.marca, debouncedQuery)
-    ).slice(0, 5);
-  }, [debouncedQuery]);
-
   const cobranza = useMemo(() => {
     if (!debouncedQuery.trim()) return [];
-    return COBRANZA_MOCK.filter(
-      (f) => coincide(f.folio, debouncedQuery) || coincide(f.clienteNombre, debouncedQuery) || coincide(f.oc, debouncedQuery)
+    return facturas.filter(
+      (f) => coincide(f.folio, debouncedQuery) || coincide(f.cliente?.nombre, debouncedQuery) || coincide(f.oc, debouncedQuery)
     ).slice(0, 5);
-  }, [debouncedQuery]);
+  }, [debouncedQuery, facturas]);
 
   const cerrar = () => setOpen(false);
 
@@ -109,10 +108,10 @@ export default function SearchBar() {
     { label: "Clientes", real: true, items: clientes, render: (c) => ({ key: c._id, primary: c.nombre, secondary: c.rfc, onClick: () => ir(`/clientes/${c._id}/editar`) }) },
     { label: "Cotizaciones", real: true, items: cotizaciones, render: (c) => ({ key: c._id, primary: c.folio, secondary: c.clienteInfo?.nombre, extra: c.status, onClick: () => ir(`/cotizaciones?editar=${c._id}`) }) },
     { label: "Usuarios", real: true, items: usuarios, render: (u) => ({ key: u._id, primary: u.nombre, secondary: `@${u.usuario}`, extra: u.rol, onClick: () => ir("/usuarios") }) },
-    { label: "Equipos", real: false, items: equipos, render: (e) => ({ key: e.id, primary: e.descripcion, secondary: e.idInterno, extra: e.clienteNombre, onClick: () => ir(`/equipos/${e.id}/editar`) }) },
+    { label: "Equipos", real: true, items: equipos, render: (e) => ({ key: e._id, primary: e.descripcion, secondary: e.idInterno, extra: e.cliente?.nombre, onClick: () => ir(`/equipos/${e._id}/editar`) }) },
     { label: "Reportes", real: false, items: reportes, render: (r) => ({ key: r.id, primary: r.folio, secondary: r.cliente, extra: r.status, onClick: () => ir("/reportes") }) },
     { label: "Calidad", real: false, items: calidad, render: (d) => ({ key: d.id, primary: d.titulo, secondary: d.codigo, onClick: () => ir("/calidad") }) },
-    { label: "Cobranza", real: false, items: cobranza, render: (f) => ({ key: f.id, primary: f.folio, secondary: f.clienteNombre, extra: f.statusPago === 1 ? "Pagado" : "Pendiente", onClick: () => ir("/cobranza") }) },
+    { label: "Cobranza", real: true, items: cobranza, render: (f) => ({ key: f._id, primary: f.folio, secondary: f.cliente?.nombre, extra: f.statusPago === 1 ? "Pagado" : "Pendiente", onClick: () => ir("/cobranza") }) },
   ];
 
   const hayResultados = grupos.some((g) => g.items.length > 0);

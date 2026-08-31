@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { useForm, Controller } from "react-hook-form";
 import {
-  Box, Typography, Grid, MenuItem, Select, FormControl, InputLabel, Chip,
+  Box, Typography, Grid, MenuItem, Select, FormControl, InputLabel, Chip, Alert,
 } from "@mui/material";
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
 
@@ -10,8 +10,9 @@ import AppButton from "../../shared/components/AppButton";
 import AppCard from "../../shared/components/AppCard";
 import AppInput from "../../shared/components/AppInput";
 import { listarClientes } from "../../services/clientes";
+import { listarPatrones } from "../../services/patrones";
+import { obtenerEquipo, crearEquipo, actualizarEquipo } from "../../services/equipos";
 import { CATEGORIAS } from "./categorias";
-import { EQUIPOS_MOCK, PATRONES_MOCK } from "./mockData";
 
 // Refleja php/nequipo.php: el equipo pertenece a un cliente (empId) y se le
 // asocian uno o más patrones de referencia usados para su calibración.
@@ -19,36 +20,61 @@ export default function EquipoForm() {
   const { id } = useParams();
   const navigate = useNavigate();
   const isEdit = !!id;
-  const equipoActual = isEdit ? EQUIPOS_MOCK.find((e) => String(e.id) === id) : null;
 
   const [clientes, setClientes] = useState([]);
+  const [patrones, setPatrones] = useState([]);
+  const [loading, setLoading] = useState(isEdit);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
 
-  const { register, handleSubmit, control, formState: { errors } } = useForm({
-    defaultValues: equipoActual
-      ? {
-          idInterno: equipoActual.idInterno, clienteId: equipoActual.clienteId,
-          marca: equipoActual.marca, modelo: equipoActual.modelo, serie: equipoActual.serie,
-          descripcion: equipoActual.descripcion, categoria: equipoActual.categoria,
-          costo: equipoActual.costo, moneda: equipoActual.moneda, comentarios: equipoActual.comentarios,
-          localizacion: equipoActual.localizacion, unidades: equipoActual.unidades,
-          divMinima: equipoActual.divMinima, rango: equipoActual.rango,
-          rangoUso: equipoActual.rangoUso, rangoCalibracion: equipoActual.rangoCalibracion,
-          patrones: equipoActual.patrones ?? [],
-        }
-      : { patrones: [] },
+  const { register, handleSubmit, control, reset, formState: { errors } } = useForm({
+    defaultValues: { patrones: [] },
   });
 
   useEffect(() => {
-    listarClientes({ pageSize: 200 })
-      .then(({ items }) => setClientes(items))
-      .catch(() => setClientes([]));
+    listarClientes({ pageSize: 200 }).then(({ items }) => setClientes(items)).catch(() => setClientes([]));
+    listarPatrones({ pageSize: 500 }).then(({ items }) => setPatrones(items)).catch(() => setPatrones([]));
   }, []);
 
-  const onSubmit = (data) => {
-    // Sin backend de Equipos todavía (ver memoria del proyecto): se simula el guardado.
-    console.log(data);
-    navigate("/equipos");
+  useEffect(() => {
+    if (!isEdit) return;
+    obtenerEquipo(id)
+      .then((e) => {
+        reset({
+          idInterno: e.idInterno, clienteId: e.cliente?._id, marca: e.marca, modelo: e.modelo,
+          serie: e.serie, descripcion: e.descripcion, categoria: e.categoria,
+          costo: e.costo, moneda: e.moneda, comentarios: e.comentarios,
+          localizacion: e.localizacion, unidades: e.unidades, divMinima: e.divisionMinima,
+          rango: e.rango, rangoUso: e.rangoUso, rangoCalibracion: e.rangoCalibracion,
+          patrones: (e.patronesSugeridos || []).map((p) => p._id ?? p),
+        });
+      })
+      .catch(() => setError("No se pudo cargar el equipo."))
+      .finally(() => setLoading(false));
+  }, [id, isEdit, reset]);
+
+  const onSubmit = async (data) => {
+    setSaving(true); setError("");
+    const payload = {
+      idInterno: data.idInterno, cliente: data.clienteId, marca: data.marca, modelo: data.modelo,
+      serie: data.serie, descripcion: data.descripcion, categoria: data.categoria || undefined,
+      costo: data.costo ? Number(data.costo) : undefined, moneda: data.moneda || undefined, comentarios: data.comentarios,
+      localizacion: data.localizacion, unidades: data.unidades, divisionMinima: data.divMinima,
+      rango: data.rango, rangoUso: data.rangoUso, rangoCalibracion: data.rangoCalibracion,
+      patronesSugeridos: data.patrones,
+    };
+    try {
+      if (isEdit) await actualizarEquipo(id, payload);
+      else await crearEquipo(payload);
+      navigate("/equipos");
+    } catch (err) {
+      setError(err?.response?.data?.message || "No se pudo guardar el equipo.");
+    } finally {
+      setSaving(false);
+    }
   };
+
+  if (loading) return <Typography color="text.secondary">Cargando…</Typography>;
 
   return (
     <Box>
@@ -62,6 +88,8 @@ export default function EquipoForm() {
         </Box>
       </Box>
 
+      {error && <Alert severity="error" sx={{ mb: 2, borderRadius: 2 }} onClose={() => setError("")}>{error}</Alert>}
+
       <Box component="form" onSubmit={handleSubmit(onSubmit)}>
         <AppCard title="Identificación" sx={{ mb: 3 }}>
           <Grid container spacing={2}>
@@ -69,20 +97,33 @@ export default function EquipoForm() {
               <AppInput label="ID Interno" error={errors.idInterno} {...register("idInterno", { required: "Obligatorio" })} />
             </Grid>
             <Grid size={{ xs: 12, md: 5 }}>
-              <FormControl fullWidth size="small" error={!!errors.clienteId}>
-                <InputLabel>Cliente</InputLabel>
-                <Select label="Cliente" defaultValue={equipoActual?.clienteId ?? ""} {...register("clienteId", { required: true })} sx={{ borderRadius: 2 }}>
-                  {clientes.map((c) => <MenuItem key={c._id} value={c._id}>{c.nombre}</MenuItem>)}
-                </Select>
-              </FormControl>
+              <Controller
+                name="clienteId"
+                control={control}
+                rules={{ required: true }}
+                render={({ field }) => (
+                  <FormControl fullWidth size="small" error={!!errors.clienteId}>
+                    <InputLabel>Cliente</InputLabel>
+                    <Select label="Cliente" {...field} value={field.value ?? ""} sx={{ borderRadius: 2 }}>
+                      {clientes.map((c) => <MenuItem key={c._id} value={c._id}>{c.nombre}</MenuItem>)}
+                    </Select>
+                  </FormControl>
+                )}
+              />
             </Grid>
             <Grid size={{ xs: 12, md: 4 }}>
-              <FormControl fullWidth size="small">
-                <InputLabel>Categoría</InputLabel>
-                <Select label="Categoría" defaultValue={equipoActual?.categoria ?? ""} {...register("categoria")} sx={{ borderRadius: 2 }}>
-                  {CATEGORIAS.map((c) => <MenuItem key={c} value={c}>{c}</MenuItem>)}
-                </Select>
-              </FormControl>
+              <Controller
+                name="categoria"
+                control={control}
+                render={({ field }) => (
+                  <FormControl fullWidth size="small">
+                    <InputLabel>Categoría</InputLabel>
+                    <Select label="Categoría" {...field} value={field.value ?? ""} sx={{ borderRadius: 2 }}>
+                      {CATEGORIAS.map((c) => <MenuItem key={c} value={c}>{c}</MenuItem>)}
+                    </Select>
+                  </FormControl>
+                )}
+              />
             </Grid>
           </Grid>
         </AppCard>
@@ -140,7 +181,6 @@ export default function EquipoForm() {
           <Controller
             name="patrones"
             control={control}
-            defaultValue={equipoActual?.patrones ?? []}
             render={({ field }) => (
               <FormControl fullWidth size="small">
                 <InputLabel>Patrones de referencia</InputLabel>
@@ -152,15 +192,15 @@ export default function EquipoForm() {
                   renderValue={(selected) => (
                     <Box sx={{ display: "flex", gap: 0.5, flexWrap: "wrap" }}>
                       {selected.map((val) => {
-                        const p = PATRONES_MOCK.find((pat) => pat.id === val);
-                        return <Chip key={val} label={p ? `${p.idInterno} — ${p.descripcion}` : val} size="small" />;
+                        const p = patrones.find((pat) => pat._id === val);
+                        return <Chip key={val} label={p ? `${p.codigo} — ${p.descripcion}` : val} size="small" />;
                       })}
                     </Box>
                   )}
                   sx={{ borderRadius: 2 }}
                 >
-                  {PATRONES_MOCK.map((p) => (
-                    <MenuItem key={p.id} value={p.id}>{p.idInterno} — {p.categoria} — {p.descripcion}</MenuItem>
+                  {patrones.map((p) => (
+                    <MenuItem key={p._id} value={p._id}>{p.codigo} — {p.categoria} — {p.descripcion}</MenuItem>
                   ))}
                 </Select>
               </FormControl>
@@ -170,7 +210,7 @@ export default function EquipoForm() {
 
         <Box sx={{ display: "flex", gap: 2, justifyContent: "flex-end" }}>
           <AppButton variant="outlined" onClick={() => navigate("/equipos")} sx={{ borderRadius: 2 }}>Cancelar</AppButton>
-          <AppButton type="submit" sx={{ borderRadius: 2 }}>{isEdit ? "Guardar cambios" : "Crear Equipo"}</AppButton>
+          <AppButton type="submit" loading={saving} sx={{ borderRadius: 2 }}>{isEdit ? "Guardar cambios" : "Crear Equipo"}</AppButton>
         </Box>
       </Box>
     </Box>

@@ -32,11 +32,11 @@ export default function ReporteServicioImprimir() {
   if (estado === "cargando") return <Centro><CircularProgress /></Centro>;
   if (estado === "error" || !data) return <Centro><Typography>No se pudo cargar el reporte.</Typography></Centro>;
 
-  const { reporte, asignaciones, laboratorio } = data;
+  const { reporte, asignaciones, laboratorio, logo } = data;
   const cliente = reporte.cliente || {};
 
   return (
-    <PrintLayout laboratorio={laboratorio} titulo="REPORTE DE SERVICIO" subtitulo="SERVICE REPORT" folio={reporte.folio}>
+    <PrintLayout laboratorio={laboratorio} logo={logo} titulo="REPORTE DE SERVICIO" subtitulo="SERVICE REPORT" folio={reporte.folio}>
       <div className="rep-band">INFORMACIÓN DEL CLIENTE</div>
       <Box sx={{ display: "grid", gridTemplateColumns: "110px 1fr 110px 1fr", rowGap: 0.5, fontSize: 12, mb: 1 }}>
         <b>Cliente:</b><span>{cliente.nombre || "—"}</span>

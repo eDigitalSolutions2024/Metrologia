@@ -24,6 +24,25 @@ const configuracionSchema = new Schema(
       domicilio: String,
       telefono: String,
     },
+
+    // Logo de la empresa — reemplaza el ícono genérico (BrandMark SVG) en
+    // sidebar, login y encabezado de PDFs cuando se sube uno.
+    logo: {
+      nombreArchivo: String, // nombre en disco (uploads/logos/<esto>)
+      nombreOriginal: String,
+      mimetype: String,
+      tamano: Number,
+      fecha: Date,
+    },
+
+    // Colores de marca de la interfaz — antes fijos en theme/theme.js.
+    // primario = tono oscuro (sidebar, botones principales); secundario =
+    // acento (botones de acción, enlaces, focos). Se aplican en vivo vía
+    // ThemeProvider, sin rebuild.
+    colores: {
+      primario: String,
+      secundario: String,
+    },
   },
   { timestamps: true }
 );

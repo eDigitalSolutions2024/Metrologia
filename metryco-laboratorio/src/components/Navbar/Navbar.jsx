@@ -1,8 +1,7 @@
 import {
-  AppBar, Toolbar, Typography, Box, IconButton, Avatar, Badge, Tooltip, useColorScheme,
+  AppBar, Toolbar, Typography, Box, IconButton, Avatar, Tooltip, useColorScheme,
 } from "@mui/material";
 import MenuIcon from "@mui/icons-material/Menu";
-import NotificationsNoneOutlinedIcon from "@mui/icons-material/NotificationsNoneOutlined";
 import SettingsOutlinedIcon from "@mui/icons-material/SettingsOutlined";
 import DarkModeOutlinedIcon from "@mui/icons-material/DarkModeOutlined";
 import LightModeOutlinedIcon from "@mui/icons-material/LightModeOutlined";
@@ -41,19 +40,21 @@ export default function Navbar({ onToggleSidebar, sidebarOpen = true }) {
     <AppBar
       position="fixed"
       elevation={0}
-      sx={{
-        top: 0,
-        left: sidebarOpen ? `${SIDEBAR_WIDTH}px` : 0,
-        width: sidebarOpen ? `calc(100% - ${SIDEBAR_WIDTH}px)` : "100%",
-        color: "text.primary",
-        borderBottom: 1,
-        borderColor: "divider",
-        zIndex: 1100,
-        transition: "left .25s ease, width .25s ease",
-        backgroundColor: "rgba(255,255,255,0.72)",
-        backdropFilter: "blur(12px)",
-        "@media (prefers-color-scheme: dark)": { backgroundColor: "rgba(15,24,38,0.72)" },
-      }}
+      sx={[
+        {
+          top: 0,
+          left: sidebarOpen ? `${SIDEBAR_WIDTH}px` : 0,
+          width: sidebarOpen ? `calc(100% - ${SIDEBAR_WIDTH}px)` : "100%",
+          color: "text.primary",
+          borderBottom: 1,
+          borderColor: "divider",
+          zIndex: 1100,
+          transition: "left .25s ease, width .25s ease",
+          backdropFilter: "blur(12px)",
+          backgroundColor: "rgba(255,255,255,0.72)",
+        },
+        (theme) => theme.applyStyles("dark", { backgroundColor: "rgba(15,24,38,0.72)" }),
+      ]}
     >
       <Toolbar sx={{ display: "flex", justifyContent: "space-between", gap: 2, height: 72 }}>
         <Box sx={{ display: "flex", alignItems: "center", gap: 1.5, minWidth: 0 }}>
@@ -78,15 +79,10 @@ export default function Navbar({ onToggleSidebar, sidebarOpen = true }) {
           <Tooltip title="Configuración">
             <IconButton size="small"><SettingsOutlinedIcon /></IconButton>
           </Tooltip>
-          <Tooltip title="Notificaciones">
-            <IconButton size="small">
-              <Badge badgeContent={5} color="error"><NotificationsNoneOutlinedIcon /></Badge>
-            </IconButton>
-          </Tooltip>
           <Avatar
             sx={{
               width: 36, height: 36, ml: 1, fontSize: 15, fontWeight: 700,
-              background: "linear-gradient(135deg, #2563EB, #1D4ED8)",
+              background: "linear-gradient(135deg, var(--mui-palette-secondary-light), var(--mui-palette-secondary-dark))",
             }}
           >
             {inicial}

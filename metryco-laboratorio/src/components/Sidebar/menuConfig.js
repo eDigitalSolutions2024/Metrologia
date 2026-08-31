@@ -132,6 +132,8 @@ const menu = [
           { title: "Usuarios", path: "/usuarios", roles: ["admin"] },
           { title: "General", path: "/general", roles: ["admin"] },
           { title: "Roles del Menú", path: "/administracion/roles-menu", roles: ["admin"] },
+          { title: "Datos del Laboratorio", path: "/administracion/laboratorio", roles: ["admin"] },
+          { title: "Colores", path: "/administracion/colores", roles: ["admin"] },
         ],
       },
     ],
