@@ -13,7 +13,8 @@ const escapeRegex = require("../utils/escapeRegex");
 const { siguienteFolio } = require("../utils/folio");
 const { crearEvento } = require("../utils/historial");
 const qr = require("../utils/qr");
-const { publicWebUrl, laboratorio, uploadsDir } = require("../config/env");
+const { publicWebUrl, uploadsDir } = require("../config/env");
+const configuracionService = require("./configuracion.service");
 
 const oid = (v) => (mongoose.isValidObjectId(v) ? new mongoose.Types.ObjectId(v) : null);
 
@@ -110,6 +111,7 @@ async function obtener(id) {
  * En ambos se guarda un SNAPSHOT inmutable de equipo/cliente/patrones.
  */
 async function emitir(datos, reqUser) {
+  const laboratorioActual = await configuracionService.obtenerLaboratorio();
   let equipoDoc;
   let clienteId;
   let reporteId;
@@ -217,7 +219,7 @@ async function emitir(datos, reqUser) {
         ? `${p.incertidumbre.valor} ${p.incertidumbre.unidad || ""} (k=${p.incertidumbre.k || 2})`
         : undefined,
     })),
-    laboratorio: { nombre: laboratorio.nombre, acreditacion: laboratorio.acreditacion },
+    laboratorio: { nombre: laboratorioActual.nombre, acreditacion: laboratorioActual.acreditacion },
     fechaCalibracion,
     fechaEmision: datos.fechaEmision || new Date(),
     vigencia: datos.vigencia || undefined,

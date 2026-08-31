@@ -6,7 +6,7 @@ const AppError = require("../utils/AppError");
 const escapeRegex = require("../utils/escapeRegex");
 const { siguienteFolio } = require("../utils/folio");
 const { crearEvento } = require("../utils/historial");
-const { laboratorio } = require("../config/env");
+const configuracionService = require("./configuracion.service");
 
 async function listar({ search = "", status = "todos", clienteId = "", mes = "", anio = "", page = 0, pageSize = 10 }) {
   const match = {};
@@ -139,6 +139,7 @@ async function paraImprimir(id) {
     .populate("patrones", "codigo nombre trazabilidad")
     .populate("performance", "nombre magnitud tipoInstrumento");
 
+  const laboratorio = await configuracionService.obtenerLaboratorio();
   return { reporte, asignaciones, laboratorio };
 }
 

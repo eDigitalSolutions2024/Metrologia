@@ -11,4 +11,9 @@ router.use(auth);
 router.get("/menu", c.obtenerMenuPermisos);
 router.put("/menu", requireRole("admin"), c.actualizarMenuPermisos);
 
+// Solo admin — la usa la pantalla de Administración y los generadores de PDF
+// (estos últimos llaman al servicio directo, sin pasar por HTTP).
+router.get("/laboratorio", requireRole("admin"), c.obtenerLaboratorio);
+router.put("/laboratorio", requireRole("admin"), c.actualizarLaboratorio);
+
 module.exports = router;

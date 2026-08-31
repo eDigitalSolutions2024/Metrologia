@@ -9,4 +9,12 @@ const actualizarMenuPermisos = asyncHandler(async (req, res) => {
   res.json({ success: true, data: await service.actualizarMenuPermisos(req.body.permisos) });
 });
 
-module.exports = { obtenerMenuPermisos, actualizarMenuPermisos };
+const obtenerLaboratorio = asyncHandler(async (req, res) => {
+  res.json({ success: true, data: await service.obtenerLaboratorio() });
+});
+
+const actualizarLaboratorio = asyncHandler(async (req, res) => {
+  res.json({ success: true, data: await service.actualizarLaboratorio(req.body) });
+});
+
+module.exports = { obtenerMenuPermisos, actualizarMenuPermisos, obtenerLaboratorio, actualizarLaboratorio };

@@ -13,6 +13,17 @@ const configuracionSchema = new Schema(
     // La key es `item.path` para hojas, o el título del grupo para los
     // encabezados sin ruta propia (ej. "Reportes", "Equipos").
     menuPermisos: { type: Map, of: [String], default: undefined },
+
+    // Datos del laboratorio para los PDFs (Reportes/Certificados) y la
+    // verificación pública — antes fijos en variables de entorno (LAB_*),
+    // ahora editables desde Administración sin tocar el .env ni reiniciar.
+    laboratorio: {
+      nombre: String,
+      acreditacion: String,
+      rfc: String,
+      domicilio: String,
+      telefono: String,
+    },
   },
   { timestamps: true }
 );
