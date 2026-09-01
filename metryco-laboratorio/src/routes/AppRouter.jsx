@@ -18,6 +18,7 @@ import General from "../pages/General/General";
 import RolesMenuPage from "../pages/Administracion/RolesMenuPage";
 import LaboratorioPage from "../pages/Administracion/LaboratorioPage";
 import ColoresPage from "../pages/Administracion/ColoresPage";
+import AuditoriaPage from "../pages/Administracion/AuditoriaPage";
 import ClientesPage from "../pages/Clientes/ClientesPage";
 import ClienteForm from "../pages/Clientes/ClienteForm";
 import CotizacionesPage from "../pages/Cotizaciones/CotizacionesPage";
@@ -104,6 +105,7 @@ export default function AppRouter() {
         <Route path="administracion/roles-menu" element={<RolesMenuPage />} />
         <Route path="administracion/laboratorio" element={<LaboratorioPage />} />
         <Route path="administracion/colores" element={<ColoresPage />} />
+        <Route path="administracion/auditoria" element={<AuditoriaPage />} />
         <Route path="clientes" element={<ClientesPage />} />
         <Route path="clientes/nuevo" element={<ClienteForm />} />
         <Route path="clientes/:id/editar" element={<ClienteForm />} />

@@ -75,4 +75,44 @@ function logo(req, res, next) {
   });
 }
 
-module.exports = { pdfCertificado, destinoCertificados, logo, destinoLogos };
+// Fábrica reutilizada para las imágenes del perfil (foto y firma) — mismo
+// patrón que el logo, solo cambia la carpeta destino y el tamaño máximo.
+function crearSubidaImagen(carpeta, maxMB) {
+  const destino = path.join(uploadsDir, carpeta);
+  fs.mkdirSync(destino, { recursive: true });
+
+  const storageImg = multer.diskStorage({
+    destination: (_req, _file, cb) => cb(null, destino),
+    filename: (_req, file, cb) => {
+      const ext = path.extname(file.originalname) || "";
+      cb(null, `${Date.now()}-${crypto.randomBytes(6).toString("hex")}${ext}`);
+    },
+  });
+
+  const subir = multer({
+    storage: storageImg,
+    fileFilter: soloImagen,
+    limits: { fileSize: maxMB * 1024 * 1024, files: 1 },
+  }).single("archivo");
+
+  const middleware = (req, res, next) => {
+    subir(req, res, (err) => {
+      if (err instanceof multer.MulterError) {
+        const msg = err.code === "LIMIT_FILE_SIZE" ? `La imagen supera el tamaño máximo (${maxMB} MB)` : err.message;
+        return next(new AppError(msg, 400));
+      }
+      if (err) return next(err);
+      next();
+    });
+  };
+
+  return { middleware, destino };
+}
+
+const { middleware: fotoPerfil, destino: destinoFotos } = crearSubidaImagen("fotos-perfil", 3);
+const { middleware: firma, destino: destinoFirmas } = crearSubidaImagen("firmas", 2);
+
+module.exports = {
+  pdfCertificado, destinoCertificados, logo, destinoLogos,
+  fotoPerfil, destinoFotos, firma, destinoFirmas,
+};

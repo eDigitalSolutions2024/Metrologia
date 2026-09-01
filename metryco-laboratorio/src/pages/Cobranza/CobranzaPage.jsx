@@ -23,7 +23,7 @@ import { exportCsv } from "../../shared/utils/exportCsv";
 import { listarClientes } from "../../services/clientes";
 import { crearFactura, listarFacturas, aplicarPagoFactura, reabrirFactura } from "../../services/cobranza";
 import { pedirRefrescoAlertas } from "../../shared/utils/alertasBus";
-import { DIAS_PAGO_OPCIONES } from "./mockData";
+import { DIAS_PAGO_OPCIONES } from "./constantes";
 
 function NuevoRegistroDialog({ open, onClose, onCreated }) {
   const [clientes, setClientes] = useState([]);

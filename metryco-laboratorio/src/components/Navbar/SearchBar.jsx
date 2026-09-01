@@ -10,10 +10,8 @@ import { listarCotizaciones } from "../../services/cotizaciones";
 import { listarUsuarios } from "../../services/usuarios";
 import { listarEquipos } from "../../services/equipos";
 import { listarFacturas } from "../../services/cobranza";
+import { listarReportes, listarCalidad } from "../../services/reportes";
 import { useDebounce } from "../../shared/hooks/useDebounce";
-
-import { MOCK as REPORTES_MOCK } from "../../pages/Reportes/mockData";
-import { MOCK as CALIDAD_MOCK } from "../../pages/Calidad/mockData";
 
 function coincide(texto, query) {
   return (texto || "").toString().toLowerCase().includes(query.toLowerCase());
@@ -29,6 +27,8 @@ export default function SearchBar() {
   const [usuarios, setUsuarios] = useState([]);
   const [equipos, setEquipos] = useState([]);
   const [facturas, setFacturas] = useState([]);
+  const [reportesRaw, setReportesRaw] = useState([]);
+  const [calidadRaw, setCalidadRaw] = useState([]);
   const containerRef = useRef(null);
 
   const debouncedQuery = useDebounce(query, 350);
@@ -54,12 +54,14 @@ export default function SearchBar() {
 
     (async () => {
       setLoading(true);
-      const [resClientes, resCotizaciones, resUsuarios, resEquipos, resFacturas] = await Promise.allSettled([
+      const [resClientes, resCotizaciones, resUsuarios, resEquipos, resFacturas, resReportes, resCalidad] = await Promise.allSettled([
         listarClientes({ search: debouncedQuery, pageSize: 5 }),
         listarCotizaciones({ search: debouncedQuery, pageSize: 5 }),
         listarUsuarios({ search: debouncedQuery, pageSize: 5 }),
         listarEquipos({ search: debouncedQuery, pageSize: 5 }),
         listarFacturas(),
+        listarReportes({ search: debouncedQuery, pageSize: 5 }),
+        listarCalidad({}),
       ]);
       if (cancelado) return;
       setClientes(resClientes.status === "fulfilled" ? resClientes.value.items : []);
@@ -67,6 +69,8 @@ export default function SearchBar() {
       setUsuarios(resUsuarios.status === "fulfilled" ? resUsuarios.value.items : []);
       setEquipos(resEquipos.status === "fulfilled" ? resEquipos.value.items : []);
       setFacturas(resFacturas.status === "fulfilled" ? resFacturas.value : []);
+      setReportesRaw(resReportes.status === "fulfilled" ? resReportes.value.items : []);
+      setCalidadRaw(resCalidad.status === "fulfilled" ? resCalidad.value : []);
       setLoading(false);
     })();
 
@@ -77,17 +81,17 @@ export default function SearchBar() {
 
   const reportes = useMemo(() => {
     if (!debouncedQuery.trim()) return [];
-    return REPORTES_MOCK.filter(
-      (r) => coincide(r.folio, debouncedQuery) || coincide(r.cliente, debouncedQuery) || coincide(r.tecnico, debouncedQuery)
+    return reportesRaw.filter(
+      (r) => coincide(r.folio, debouncedQuery) || coincide(r.cliente?.nombre, debouncedQuery)
     ).slice(0, 5);
-  }, [debouncedQuery]);
+  }, [debouncedQuery, reportesRaw]);
 
   const calidad = useMemo(() => {
     if (!debouncedQuery.trim()) return [];
-    return CALIDAD_MOCK.filter(
-      (d) => coincide(d.codigo, debouncedQuery) || coincide(d.titulo, debouncedQuery) || coincide(d.responsable, debouncedQuery)
+    return calidadRaw.filter(
+      (a) => coincide(a.reporte?.folio, debouncedQuery) || coincide(a.equipo?.idInterno, debouncedQuery) || coincide(a.tecnicoAsignado?.nombre, debouncedQuery)
     ).slice(0, 5);
-  }, [debouncedQuery]);
+  }, [debouncedQuery, calidadRaw]);
 
   const cobranza = useMemo(() => {
     if (!debouncedQuery.trim()) return [];
@@ -109,8 +113,8 @@ export default function SearchBar() {
     { label: "Cotizaciones", real: true, items: cotizaciones, render: (c) => ({ key: c._id, primary: c.folio, secondary: c.clienteInfo?.nombre, extra: c.status, onClick: () => ir(`/cotizaciones?editar=${c._id}`) }) },
     { label: "Usuarios", real: true, items: usuarios, render: (u) => ({ key: u._id, primary: u.nombre, secondary: `@${u.usuario}`, extra: u.rol, onClick: () => ir("/usuarios") }) },
     { label: "Equipos", real: true, items: equipos, render: (e) => ({ key: e._id, primary: e.descripcion, secondary: e.idInterno, extra: e.cliente?.nombre, onClick: () => ir(`/equipos/${e._id}/editar`) }) },
-    { label: "Reportes", real: false, items: reportes, render: (r) => ({ key: r.id, primary: r.folio, secondary: r.cliente, extra: r.status, onClick: () => ir("/reportes") }) },
-    { label: "Calidad", real: false, items: calidad, render: (d) => ({ key: d.id, primary: d.titulo, secondary: d.codigo, onClick: () => ir("/calidad") }) },
+    { label: "Reportes", real: true, items: reportes, render: (r) => ({ key: r._id, primary: r.folio, secondary: r.cliente?.nombre, extra: r.status, onClick: () => ir(`/reportes/${r._id}`) }) },
+    { label: "Calidad", real: true, items: calidad, render: (a) => ({ key: a._id, primary: a.reporte?.folio, secondary: a.equipo?.idInterno, extra: a.tecnicoAsignado?.nombre, onClick: () => ir(a.reporte?._id ? `/reportes/${a.reporte._id}` : "/calidad") }) },
     { label: "Cobranza", real: true, items: cobranza, render: (f) => ({ key: f._id, primary: f.folio, secondary: f.cliente?.nombre, extra: f.statusPago === 1 ? "Pagado" : "Pendiente", onClick: () => ir("/cobranza") }) },
   ];
 

@@ -5,6 +5,7 @@ import menu, { menuKey } from "./menuConfig";
 import SidebarItem from "./SidebarItem";
 import { useAuth } from "../../core/auth/useAuth";
 import { obtenerMenuPermisos, obtenerLogo, logoUrl } from "../../services/configuracion";
+import { fotoUrl } from "../../services/perfil";
 
 const ROL_LABELS = {
   admin: "Administrador",
@@ -162,12 +163,14 @@ export default function Sidebar({ open = true }) {
           <Box
             sx={{
               width: 38, height: 38, borderRadius: 2.5, display: "grid", placeItems: "center",
-              fontWeight: 800, fontSize: 15, color: "#fff",
-              background: "linear-gradient(135deg, #2563EB, #1D4ED8)",
+              fontWeight: 800, fontSize: 15, color: "#fff", flexShrink: 0, overflow: "hidden",
+              background: user?.fotoUrl
+                ? `url(${fotoUrl(user.fotoUrl)}) center/cover`
+                : user?.avatarColor || "linear-gradient(135deg, var(--mui-palette-secondary-light), var(--mui-palette-secondary-dark))",
               boxShadow: "0 6px 16px rgba(37,99,235,.35)",
             }}
           >
-            {inicial}
+            {!user?.fotoUrl && inicial}
           </Box>
           <Box sx={{ minWidth: 0 }}>
             <Typography sx={{ fontWeight: 700, fontSize: 13.5, lineHeight: 1.2 }} noWrap>{nombre}</Typography>

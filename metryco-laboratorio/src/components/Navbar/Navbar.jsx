@@ -2,13 +2,14 @@ import {
   AppBar, Toolbar, Typography, Box, IconButton, Avatar, Tooltip, useColorScheme,
 } from "@mui/material";
 import MenuIcon from "@mui/icons-material/Menu";
-import SettingsOutlinedIcon from "@mui/icons-material/SettingsOutlined";
 import DarkModeOutlinedIcon from "@mui/icons-material/DarkModeOutlined";
 import LightModeOutlinedIcon from "@mui/icons-material/LightModeOutlined";
 import { useLocation } from "react-router-dom";
 import SearchBar from "./SearchBar";
 import ProfileMenu from "./ProfileMenu";
+import ConfiguracionMenu from "./perfil/ConfiguracionMenu";
 import { useAuth } from "../../core/auth/useAuth";
+import { fotoUrl } from "../../services/perfil";
 
 const SIDEBAR_WIDTH = 280;
 
@@ -76,13 +77,15 @@ export default function Navbar({ onToggleSidebar, sidebarOpen = true }) {
               {mode === "dark" ? <LightModeOutlinedIcon /> : <DarkModeOutlinedIcon />}
             </IconButton>
           </Tooltip>
-          <Tooltip title="Configuración">
-            <IconButton size="small"><SettingsOutlinedIcon /></IconButton>
-          </Tooltip>
+          <ConfiguracionMenu />
           <Avatar
+            src={user?.fotoUrl ? fotoUrl(user.fotoUrl) : undefined}
             sx={{
               width: 36, height: 36, ml: 1, fontSize: 15, fontWeight: 700,
-              background: "linear-gradient(135deg, var(--mui-palette-secondary-light), var(--mui-palette-secondary-dark))",
+              bgcolor: user?.avatarColor,
+              background: user?.avatarColor
+                ? undefined
+                : "linear-gradient(135deg, var(--mui-palette-secondary-light), var(--mui-palette-secondary-dark))",
             }}
           >
             {inicial}
