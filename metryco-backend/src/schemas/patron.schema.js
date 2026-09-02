@@ -13,6 +13,12 @@ const ultimaCalibracionSchema = z.object({
   laboratorio: z.string().trim().optional(),
 }).partial().optional();
 
+const incertidumbreSchema = z.object({
+  valor: z.coerce.number().optional(),
+  unidad: z.string().trim().optional(),
+  k: z.coerce.number().optional(),
+}).partial().optional();
+
 const basePatron = {
   codigo: z.string().trim().min(1, "El código es obligatorio"),
   nombre: z.string().trim().min(1, "El nombre es obligatorio"),
@@ -27,6 +33,7 @@ const basePatron = {
   capacidad: z.string().trim().optional(),
   divisionMinima: z.string().trim().optional(),
   ultimaCalibracion: ultimaCalibracionSchema,
+  incertidumbre: incertidumbreSchema,
   manejo: z.string().trim().optional(),
   procedimiento: z.string().trim().optional(),
   transporte: z.string().trim().optional(),

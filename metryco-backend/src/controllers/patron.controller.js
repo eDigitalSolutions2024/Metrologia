@@ -40,4 +40,14 @@ const descargarCertificado = asyncHandler(async (req, res) => {
   res.download(ruta, nombre);
 });
 
-module.exports = { listar, obtener, crear, actualizar, eliminar, porVencer, adjuntarCertificado, descargarCertificado };
+const qrPng = asyncHandler(async (req, res) => {
+  res.type("png").send(await service.qrPng(req.params.id));
+});
+
+const qrSvg = asyncHandler(async (req, res) => {
+  res.type("svg").send(await service.qrSvg(req.params.id));
+});
+
+module.exports = {
+  listar, obtener, crear, actualizar, eliminar, porVencer, adjuntarCertificado, descargarCertificado, qrPng, qrSvg,
+};

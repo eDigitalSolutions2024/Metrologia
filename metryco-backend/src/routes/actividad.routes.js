@@ -1,6 +1,8 @@
 const { Router } = require("express");
 const auth = require("../middleware/auth");
 const requireRole = require("../middleware/requireRole");
+const validate = require("../middleware/validate");
+const { crearActividadSchema, actualizarActividadSchema } = require("../schemas/actividad.schema");
 const actividadController = require("../controllers/actividad.controller");
 
 const router = Router();
@@ -11,8 +13,8 @@ router.use(auth, requireRole("admin", "coordinador"));
 
 router.get("/", actividadController.listar);
 router.get("/:id", actividadController.obtener);
-router.post("/", actividadController.crear);
-router.put("/:id", actividadController.actualizar);
+router.post("/", validate(crearActividadSchema), actividadController.crear);
+router.put("/:id", validate(actualizarActividadSchema), actividadController.actualizar);
 router.delete("/:id", requireRole("admin", "coordinador"), actividadController.eliminar);
 
 module.exports = router;

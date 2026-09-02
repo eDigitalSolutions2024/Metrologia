@@ -14,6 +14,8 @@ router.get("/", c.listar);
 router.get("/por-vencer", c.porVencer);
 router.get("/:id", c.obtener);
 router.get("/:id/certificado", c.descargarCertificado);
+router.get("/:id/qr.png", c.qrPng);
+router.get("/:id/qr.svg", c.qrSvg);
 // Administrar el catálogo de patrones es de admin/coordinador/técnico — ventas
 // solo los consulta (los necesita al armar una asignación), no los administra.
 router.post("/", requireRole("admin", "coordinador", "tecnico"), validate(crearPatronSchema), c.crear);

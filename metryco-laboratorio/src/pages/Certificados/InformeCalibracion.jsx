@@ -5,6 +5,7 @@ import PrintOutlinedIcon from "@mui/icons-material/PrintOutlined";
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
 import { obtenerCertificado } from "../../services/certificados";
 import { formatDate } from "../../shared/utils/formatDate";
+import { firmaUrl } from "../../services/perfil";
 
 /* ---------- formateo estilo informe legacy ---------- */
 function sci(x, dp = 1) {
@@ -166,12 +167,20 @@ export default function InformeCalibracion() {
         {/* Pie */}
         <Box sx={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 3, mt: 5, fontSize: 11.5 }}>
           {[
-            ["Elaboró", cert.creadoPor?.nombre, formatDate(cert.fechaCalibracion)],
-            ["Revisó", cert.puntos?.[0]?.revisadoPor || "—", ""],
-            ["Autorizó (emisión)", "—", formatDate(cert.fechaEmision)],
-          ].map(([rol, quien, fecha]) => (
+            ["Elaboró", cert.creadoPor?.nombre, formatDate(cert.fechaCalibracion), cert.creadoPor?.firmaUrl],
+            ["Revisó", cert.puntos?.[0]?.revisadoPor || "—", "", null],
+            ["Autorizó (emisión)", "—", formatDate(cert.fechaEmision), null],
+          ].map(([rol, quien, fecha, firma]) => (
             <Box key={rol} sx={{ textAlign: "center" }}>
-              <Box sx={{ borderTop: "1px solid #111", mt: 4, pt: 0.5 }}>
+              {/* Si la persona subió su firma en Configuración de mi cuenta, se
+                  imprime aquí en vez de dejar el espacio en blanco para firmar
+                  a mano. */}
+              <Box sx={{ height: 36, display: "flex", alignItems: "flex-end", justifyContent: "center" }}>
+                {firma && (
+                  <Box component="img" src={firmaUrl(firma)} alt="Firma" sx={{ maxHeight: 34, maxWidth: "80%", objectFit: "contain" }} />
+                )}
+              </Box>
+              <Box sx={{ borderTop: "1px solid #111", pt: 0.5 }}>
                 <b>{rol}</b><br />{quien || "—"}<br />
                 <span style={{ color: "#666" }}>{fecha}</span>
               </Box>

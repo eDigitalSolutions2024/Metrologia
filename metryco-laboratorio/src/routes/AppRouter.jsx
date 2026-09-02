@@ -11,6 +11,8 @@ import ReporteServicioImprimir from "../pages/Reportes/imprimir/ReporteServicioI
 import EntregaEquipoImprimir from "../pages/Reportes/imprimir/EntregaEquipoImprimir";
 import EntregaCertificadosImprimir from "../pages/Reportes/imprimir/EntregaCertificadosImprimir";
 import IncertidumbrePage from "../pages/Incertidumbre/IncertidumbrePage";
+import PlantillasIncertidumbrePage from "../pages/Incertidumbre/PlantillasIncertidumbrePage";
+import PlantillaIncertidumbreForm from "../pages/Incertidumbre/PlantillaIncertidumbreForm";
 
 import Dashboard from "../pages/Dashboard/Dashboard";
 import Usuarios from "../pages/Usuarios/Usuarios";
@@ -100,6 +102,9 @@ export default function AppRouter() {
         <Route index element={<Dashboard />} />
         <Route path="reportes/certificados" element={<CertificadosPage />} />
         <Route path="incertidumbre" element={<IncertidumbrePage />} />
+        <Route path="incertidumbre/plantillas" element={<PlantillasIncertidumbrePage />} />
+        <Route path="incertidumbre/plantillas/nueva" element={<PlantillaIncertidumbreForm />} />
+        <Route path="incertidumbre/plantillas/:id/editar" element={<PlantillaIncertidumbreForm />} />
         <Route path="usuarios" element={<Usuarios />} />
         <Route path="general" element={<General />} />
         <Route path="administracion/roles-menu" element={<RolesMenuPage />} />

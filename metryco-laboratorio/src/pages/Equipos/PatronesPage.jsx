@@ -8,14 +8,16 @@ import AddIcon from "@mui/icons-material/Add";
 import EditOutlinedIcon from "@mui/icons-material/EditOutlined";
 import WarningAmberOutlinedIcon from "@mui/icons-material/WarningAmberOutlined";
 import FileDownloadOutlinedIcon from "@mui/icons-material/FileDownloadOutlined";
+import QrCode2OutlinedIcon from "@mui/icons-material/QrCode2Outlined";
 
 import AppButton from "../../shared/components/AppButton";
 import AppTable from "../../shared/components/AppTable";
 import PageHeader from "../../shared/components/PageHeader";
+import EtiquetaEquipoDialog from "../../shared/components/EtiquetaEquipoDialog";
 import StraightenOutlinedIcon from "@mui/icons-material/StraightenOutlined";
 import { formatDate } from "../../shared/utils/formatDate";
 import { exportCsv } from "../../shared/utils/exportCsv";
-import { listarPatrones } from "../../services/patrones";
+import { listarPatrones, fetchQrPatronBlob } from "../../services/patrones";
 
 function diasParaVencer(fecha) {
   if (!fecha) return null;
@@ -38,6 +40,7 @@ export default function PatronesPage() {
   const [items, setItems] = useState([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [etiquetaPatron, setEtiquetaPatron] = useState(null);
 
   useEffect(() => {
     setLoading(true);
@@ -83,11 +86,18 @@ export default function PatronesPage() {
       headerName: "Acciones",
       align: "center",
       renderCell: (row) => (
-        <Tooltip title="Editar patrón">
-          <IconButton size="small" onClick={() => navigate(`/equipos/patrones/${row._id}/editar`)}>
-            <EditOutlinedIcon fontSize="small" sx={{ color: "secondary.main" }} />
-          </IconButton>
-        </Tooltip>
+        <>
+          <Tooltip title="Editar patrón">
+            <IconButton size="small" onClick={() => navigate(`/equipos/patrones/${row._id}/editar`)}>
+              <EditOutlinedIcon fontSize="small" sx={{ color: "secondary.main" }} />
+            </IconButton>
+          </Tooltip>
+          <Tooltip title="Etiqueta / imprimir">
+            <IconButton size="small" onClick={() => setEtiquetaPatron(row)}>
+              <QrCode2OutlinedIcon fontSize="small" sx={{ color: "primary.main" }} />
+            </IconButton>
+          </Tooltip>
+        </>
       ),
     },
   ];
@@ -159,6 +169,14 @@ export default function PatronesPage() {
         rowsPerPage={10}
         onPageChange={setPage}
         loading={loading}
+      />
+
+      <EtiquetaEquipoDialog
+        open={!!etiquetaPatron}
+        onClose={() => setEtiquetaPatron(null)}
+        item={etiquetaPatron}
+        tipo="patron"
+        fetchQr={fetchQrPatronBlob}
       />
     </Box>
   );

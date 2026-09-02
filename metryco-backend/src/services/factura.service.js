@@ -1,6 +1,7 @@
 const mongoose = require("mongoose");
 const Factura = require("../models/Factura");
 const Cliente = require("../models/Cliente");
+const Cotizacion = require("../models/Cotizacion");
 const AppError = require("../utils/AppError");
 
 const oid = (v) => (mongoose.isValidObjectId(v) ? new mongoose.Types.ObjectId(v) : null);
@@ -38,6 +39,13 @@ async function crear(datos, usuarioId) {
     comentarios: datos.comentarios,
     registradoPor: usuarioId,
   });
+
+  // Si la factura viene de una cotización aprobada, se marca como facturada
+  // — así queda claro que ya no está "solo aprobada esperando facturarse".
+  if (datos.cotizacion && oid(datos.cotizacion)) {
+    await Cotizacion.updateOne({ _id: datos.cotizacion }, { status: "facturada" });
+  }
+
   return factura.populate("cliente", "nombre");
 }
 

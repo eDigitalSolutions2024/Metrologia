@@ -40,3 +40,8 @@ export async function fetchCertificadoPatronBlob(id) {
   const { data } = await api.get(`${ENDPOINTS.PATRONES}/${id}/certificado`, { responseType: "blob" });
   return data;
 }
+
+export async function fetchQrPatronBlob(id, tipo = "png") {
+  const { data } = await api.get(`${ENDPOINTS.PATRONES}/${id}/qr.${tipo}`, { responseType: "blob" });
+  return data;
+}

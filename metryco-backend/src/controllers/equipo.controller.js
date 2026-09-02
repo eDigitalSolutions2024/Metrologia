@@ -2,9 +2,9 @@ const asyncHandler = require("../utils/asyncHandler");
 const service = require("../services/equipo.service");
 
 const listar = asyncHandler(async (req, res) => {
-  const { search = "", clienteId = "", categoria = "", page = 0, pageSize = 10 } = req.query;
+  const { search = "", clienteId = "", categoria = "", incluirInactivos = "", page = 0, pageSize = 10 } = req.query;
   const { items, total } = await service.listar({
-    search, clienteId, categoria, page: Number(page), pageSize: Number(pageSize),
+    search, clienteId, categoria, incluirInactivos: incluirInactivos === "true", page: Number(page), pageSize: Number(pageSize),
   });
   res.json({ success: true, data: items, total });
 });
@@ -26,4 +26,16 @@ const eliminar = asyncHandler(async (req, res) => {
   res.json({ success: true, data: await service.eliminar(req.params.id) });
 });
 
-module.exports = { listar, obtener, crear, actualizar, eliminar };
+const reactivar = asyncHandler(async (req, res) => {
+  res.json({ success: true, data: await service.reactivar(req.params.id) });
+});
+
+const qrPng = asyncHandler(async (req, res) => {
+  res.type("png").send(await service.qrPng(req.params.id));
+});
+
+const qrSvg = asyncHandler(async (req, res) => {
+  res.type("svg").send(await service.qrSvg(req.params.id));
+});
+
+module.exports = { listar, obtener, crear, actualizar, eliminar, reactivar, qrPng, qrSvg };

@@ -129,13 +129,13 @@ async function paraImprimir(id) {
     .populate("cliente")
     .populate("contacto", "nombre correo telefono")
     .populate("cotizacion", "folio total")
-    .populate("creadoPor", "nombre usuario");
+    .populate("creadoPor", "nombre usuario firmaUrl");
   if (!reporte) throw new AppError("Reporte no encontrado", 404);
 
   const asignaciones = await Asignacion.find({ reporte: id })
     .populate("equipo")
     .populate("tecnicoAsignado", "nombre usuario")
-    .populate("tecnicoEjecutor", "nombre usuario")
+    .populate("tecnicoEjecutor", "nombre usuario firmaUrl")
     .populate("patrones", "codigo nombre trazabilidad")
     .populate("performance", "nombre magnitud tipoInstrumento");
 

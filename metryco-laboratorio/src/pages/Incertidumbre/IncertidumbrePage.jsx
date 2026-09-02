@@ -8,6 +8,8 @@ import DeleteOutlineIcon from "@mui/icons-material/DeleteOutlined";
 import ScienceOutlinedIcon from "@mui/icons-material/ScienceOutlined";
 import InsightsOutlinedIcon from "@mui/icons-material/InsightsOutlined";
 import LinkOutlinedIcon from "@mui/icons-material/LinkOutlined";
+import RuleFolderOutlinedIcon from "@mui/icons-material/RuleFolderOutlined";
+import { useNavigate } from "react-router-dom";
 
 import AppCard from "../../shared/components/AppCard";
 import AppButton from "../../shared/components/AppButton";
@@ -43,6 +45,7 @@ const numOrU = (x) => {
 };
 
 export default function IncertidumbrePage() {
+  const navigate = useNavigate();
   const [magnitudes, setMagnitudes] = useState([]);
   const [magnitud, setMagnitud] = useState("");
   const [tipo, setTipo] = useState("");
@@ -219,6 +222,16 @@ export default function IncertidumbrePage() {
         icon={<InsightsOutlinedIcon />}
         title="Análisis de Incertidumbre"
         subtitle="Método GUM (JCGM 100:2008) · EA-4/02 — motor determinístico, mismos datos = mismo resultado"
+        actions={
+          <AppButton
+            variant="outlined"
+            startIcon={<RuleFolderOutlinedIcon />}
+            onClick={() => navigate("/incertidumbre/plantillas")}
+            sx={{ borderRadius: 2 }}
+          >
+            Plantillas
+          </AppButton>
+        }
       />
 
       <Box sx={{ display: "flex", gap: 3, flexDirection: { xs: "column", lg: "row" }, alignItems: "flex-start" }}>

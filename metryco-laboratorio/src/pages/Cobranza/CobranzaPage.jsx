@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import {
   Box, Typography, Grid, Paper, Chip, Tooltip, IconButton, Alert,
   Dialog, DialogTitle, DialogContent, DialogActions, MenuItem, Select, FormControl, InputLabel, Tab, Tabs,
@@ -25,7 +26,7 @@ import { crearFactura, listarFacturas, aplicarPagoFactura, reabrirFactura } from
 import { pedirRefrescoAlertas } from "../../shared/utils/alertasBus";
 import { DIAS_PAGO_OPCIONES } from "./constantes";
 
-function NuevoRegistroDialog({ open, onClose, onCreated }) {
+function NuevoRegistroDialog({ open, onClose, onCreated, prefill }) {
   const [clientes, setClientes] = useState([]);
   const [error, setError] = useState("");
   const [guardando, setGuardando] = useState(false);
@@ -38,12 +39,25 @@ function NuevoRegistroDialog({ open, onClose, onCreated }) {
     listarClientes({ pageSize: 200 }).then(({ items }) => setClientes(items)).catch(() => setClientes([]));
   }, [open]);
 
+  // Prellenado al venir de "Generar factura" desde una Cotización aprobada.
+  useEffect(() => {
+    if (open && prefill) {
+      reset({
+        oc: "", clienteId: prefill.cliente || "", folio: prefill.folio ? `FAC-${prefill.folio}` : "",
+        monto: prefill.monto || "", fechaCr: "", diasPago: 30, comentarios: "",
+      });
+    }
+  }, [open, prefill, reset]);
+
   const cerrar = () => { reset(); setError(""); onClose(); };
 
   const onSubmit = async (data) => {
     setGuardando(true); setError("");
     try {
-      const factura = await crearFactura({ ...data, cliente: data.clienteId, monto: Number(data.monto) });
+      const factura = await crearFactura({
+        ...data, cliente: data.clienteId, monto: Number(data.monto),
+        cotizacion: prefill?.cotizacion || undefined,
+      });
       onCreated(factura);
       cerrar();
     } catch (err) {
@@ -55,7 +69,7 @@ function NuevoRegistroDialog({ open, onClose, onCreated }) {
 
   return (
     <Dialog open={open} onClose={cerrar} fullWidth maxWidth="sm">
-      <DialogTitle>Generar Nuevo Registro en Calendario</DialogTitle>
+      <DialogTitle>{prefill ? `Generar factura — Cotización ${prefill.folio}` : "Generar Nuevo Registro en Calendario"}</DialogTitle>
       <Box component="form" onSubmit={handleSubmit(onSubmit)}>
         <DialogContent>
           {error && <Alert severity="error" sx={{ mb: 2, borderRadius: 2 }} onClose={() => setError("")}>{error}</Alert>}
@@ -64,12 +78,19 @@ function NuevoRegistroDialog({ open, onClose, onCreated }) {
               <AppInput label="Orden de Compra" error={errors.oc} {...register("oc", { required: "Obligatorio" })} />
             </Grid>
             <Grid size={{ xs: 12, sm: 6 }}>
-              <FormControl fullWidth size="small" error={!!errors.clienteId}>
-                <InputLabel>Cliente</InputLabel>
-                <Select label="Cliente" defaultValue="" {...register("clienteId", { required: true })} sx={{ borderRadius: 2 }}>
-                  {clientes.map((c) => <MenuItem key={c._id} value={c._id}>{c.nombre}</MenuItem>)}
-                </Select>
-              </FormControl>
+              <Controller
+                name="clienteId"
+                control={control}
+                rules={{ required: true }}
+                render={({ field }) => (
+                  <FormControl fullWidth size="small" error={!!errors.clienteId}>
+                    <InputLabel>Cliente</InputLabel>
+                    <Select label="Cliente" {...field} value={field.value ?? ""} sx={{ borderRadius: 2 }}>
+                      {clientes.map((c) => <MenuItem key={c._id} value={c._id}>{c.nombre}</MenuItem>)}
+                    </Select>
+                  </FormControl>
+                )}
+              />
             </Grid>
             <Grid size={{ xs: 12, sm: 6 }}>
               <AppInput label="Folio" error={errors.folio} {...register("folio", { required: "Obligatorio" })} />
@@ -131,6 +152,8 @@ const HOY = new Date().toISOString().slice(0, 10);
 // tabla `events`, con acciones Aplicar pago / Reabrir.
 export default function CobranzaPage() {
   const theme = useTheme();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const [prefillFactura, setPrefillFactura] = useState(null);
   const [registros, setRegistros] = useState([]);
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState(0);
@@ -148,6 +171,22 @@ export default function CobranzaPage() {
   };
 
   useEffect(() => { cargar(); }, []);
+
+  // Llega desde Cotizaciones → "Generar factura" (cotización aprobada) con
+  // cliente/monto/folio ya resueltos — se prellena el diálogo y se abre solo.
+  useEffect(() => {
+    const cotizacionId = searchParams.get("cotizacion");
+    if (!cotizacionId) return;
+    setPrefillFactura({
+      cotizacion: cotizacionId,
+      cliente: searchParams.get("cliente") || "",
+      monto: searchParams.get("monto") || "",
+      folio: searchParams.get("folio") || "",
+    });
+    setNuevoOpen(true);
+    setSearchParams({}, { replace: true });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const fechaCorta = (v) => String(v).slice(0, 10);
 
@@ -251,7 +290,7 @@ export default function CobranzaPage() {
             <AppButton variant="outlined" startIcon={<FileDownloadOutlinedIcon />} onClick={exportar} sx={{ borderRadius: 2 }}>
               Exportar Reporte Excel
             </AppButton>
-            <AppButton startIcon={<AddIcon />} onClick={() => setNuevoOpen(true)} sx={{ borderRadius: 2 }}>
+            <AppButton startIcon={<AddIcon />} onClick={() => { setPrefillFactura(null); setNuevoOpen(true); }} sx={{ borderRadius: 2 }}>
               Nuevo Registro
             </AppButton>
           </>
@@ -295,8 +334,9 @@ export default function CobranzaPage() {
 
       <NuevoRegistroDialog
         open={nuevoOpen}
-        onClose={() => setNuevoOpen(false)}
+        onClose={() => { setNuevoOpen(false); setPrefillFactura(null); }}
         onCreated={() => { cargar(); pedirRefrescoAlertas(); }}
+        prefill={prefillFactura}
       />
       <AplicarPagoDialog target={aplicarTarget} onClose={() => setAplicarTarget(null)} onConfirm={aplicarPago} />
     </Box>

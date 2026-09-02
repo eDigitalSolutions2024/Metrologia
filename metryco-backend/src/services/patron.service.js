@@ -3,7 +3,12 @@ const path = require("path");
 const Patron = require("../models/Patron");
 const AppError = require("../utils/AppError");
 const escapeRegex = require("../utils/escapeRegex");
-const { uploadsDir } = require("../config/env");
+const { uploadsDir, publicWebUrl } = require("../config/env");
+const qr = require("../utils/qr");
+
+function urlInterna(id) {
+  return `${publicWebUrl.replace(/\/$/, "")}/equipos/patrones/${id}/editar`;
+}
 
 async function listar({ search = "", categoria = "", soloVigentes = "", page = 0, pageSize = 50 }) {
   const match = {};
@@ -86,4 +91,18 @@ async function porVencer(dias = 30) {
   }).sort({ "ultimaCalibracion.vencimiento": 1 });
 }
 
-module.exports = { listar, obtener, crear, actualizar, eliminar, porVencer, adjuntarCertificado, archivoStream };
+async function qrPng(id) {
+  const patron = await Patron.findById(id).select("_id");
+  if (!patron) throw new AppError("Patrón no encontrado", 404);
+  return qr.pngBuffer(urlInterna(patron._id));
+}
+
+async function qrSvg(id) {
+  const patron = await Patron.findById(id).select("_id");
+  if (!patron) throw new AppError("Patrón no encontrado", 404);
+  return qr.svg(urlInterna(patron._id));
+}
+
+module.exports = {
+  listar, obtener, crear, actualizar, eliminar, porVencer, adjuntarCertificado, archivoStream, qrPng, qrSvg,
+};

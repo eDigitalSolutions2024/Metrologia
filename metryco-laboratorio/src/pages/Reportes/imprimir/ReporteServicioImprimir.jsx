@@ -5,6 +5,7 @@ import { obtenerReporteParaImprimir } from "../../../services/reportes";
 import { formatDate } from "../../../shared/utils/formatDate";
 import PrintLayout from "./PrintLayout";
 import { direccionCliente } from "./shared";
+import { firmaUrl } from "../../../services/perfil";
 
 function Centro({ children }) {
   return <Box sx={{ minHeight: "100dvh", display: "grid", placeItems: "center", bgcolor: "#fff" }}>{children}</Box>;
@@ -89,7 +90,15 @@ export default function ReporteServicioImprimir() {
 
       <Box sx={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 3, fontSize: 11, mb: 3 }}>
         <Box sx={{ borderTop: "1px solid #111", pt: 0.5 }}>Nombre y firma de cliente · Fecha</Box>
-        <Box sx={{ borderTop: "1px solid #111", pt: 0.5 }}>Nombre de recibe METROLOGÍA · Fecha</Box>
+        <Box>
+          {/* Firma digital de quien generó el reporte, si la subió en su perfil. */}
+          <Box sx={{ height: 30, display: "flex", alignItems: "flex-end" }}>
+            {reporte.creadoPor?.firmaUrl && (
+              <Box component="img" src={firmaUrl(reporte.creadoPor.firmaUrl)} alt="Firma" sx={{ maxHeight: 28, maxWidth: "70%", objectFit: "contain" }} />
+            )}
+          </Box>
+          <Box sx={{ borderTop: "1px solid #111", pt: 0.5 }}>Nombre de recibe METROLOGÍA · Fecha</Box>
+        </Box>
       </Box>
 
       <Typography sx={{ textAlign: "center", fontWeight: 700, fontSize: 11, color: "#0F172A" }}>

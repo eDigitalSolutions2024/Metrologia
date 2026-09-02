@@ -98,7 +98,7 @@ async function obtener(id) {
     .populate("equipo", "idInterno marca modelo serie")
     .populate("reporte", "folio")
     .populate("asignacion", "folio estados")
-    .populate("creadoPor", "nombre usuario")
+    .populate("creadoPor", "nombre usuario firmaUrl")
     .populate("historial.usuario.id", "nombre usuario");
   if (!cert) throw new AppError("Certificado no encontrado", 404);
   return conEstadoVigente(cert);

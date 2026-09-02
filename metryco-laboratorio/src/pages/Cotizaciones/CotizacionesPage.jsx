@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useSearchParams } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import {
   Box, Typography, TextField, InputAdornment, IconButton,
   Chip, Tooltip, MenuItem, Select, FormControl, InputLabel, Alert,
@@ -9,6 +9,7 @@ import AddIcon from "@mui/icons-material/Add";
 import EditOutlinedIcon from "@mui/icons-material/EditOutlined";
 import VisibilityOutlinedIcon from "@mui/icons-material/VisibilityOutlined";
 import FileDownloadOutlinedIcon from "@mui/icons-material/FileDownloadOutlined";
+import ReceiptLongOutlinedIcon from "@mui/icons-material/ReceiptLongOutlined";
 import { DeleteOutlined as DeleteOutlineIcon } from "@mui/icons-material";
 
 import AppButton from "../../shared/components/AppButton";
@@ -48,6 +49,7 @@ function descripcionResumen(items) {
 }
 
 export default function CotizacionesPage() {
+  const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("todos");
@@ -150,6 +152,16 @@ export default function CotizacionesPage() {
 
   const cerrarDialog = () => setDialogAbierto(false);
 
+  const generarFactura = (row) => {
+    const params = new URLSearchParams({
+      cotizacion: row.id,
+      cliente: row.cliente,
+      monto: row.total,
+      folio: row.folio,
+    });
+    navigate(`/cobranza?${params.toString()}`);
+  };
+
   const alGuardar = () => {
     setDialogAbierto(false);
     setReloadKey((k) => k + 1);
@@ -182,6 +194,13 @@ export default function CotizacionesPage() {
             <IconButton size="small" onClick={() => abrirEditar(row)}>
               <VisibilityOutlinedIcon fontSize="small" sx={{ color: "secondary.main" }} />
             </IconButton>
+          </Tooltip>
+          <Tooltip title={row.status === "aprobada" ? "Generar factura" : "Solo disponible para cotizaciones aprobadas"}>
+            <span>
+              <IconButton size="small" onClick={() => generarFactura(row)} disabled={row.status !== "aprobada"}>
+                <ReceiptLongOutlinedIcon fontSize="small" sx={{ color: row.status === "aprobada" ? "success.main" : undefined }} />
+              </IconButton>
+            </span>
           </Tooltip>
           <Tooltip title="Descargar PDF (próximamente)">
             <span>

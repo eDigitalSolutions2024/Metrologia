@@ -84,6 +84,7 @@ const menu = [
         children: [
           { title: "Consultar", path: "/performance", roles: ADMIN_COORD_TECNICO },
           { title: "Incertidumbre", path: "/incertidumbre", roles: ADMIN_COORD_TECNICO },
+          { title: "Plantillas de Incertidumbre", path: "/incertidumbre/plantillas", roles: ADMIN_COORD },
         ],
       },
       {

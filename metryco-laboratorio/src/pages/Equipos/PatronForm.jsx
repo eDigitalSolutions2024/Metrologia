@@ -46,6 +46,8 @@ export default function PatronForm() {
           certificado: p.ultimaCalibracion?.certificadoNo ?? "",
           unidades: p.unidades, capacidad: p.capacidad, divMin: p.divisionMinima,
           manejo: p.manejo, proceso: p.procedimiento, transporte: p.transporte, almacenamiento: p.almacenamiento,
+          incertidumbreValor: p.incertidumbre?.valor ?? "", incertidumbreUnidad: p.incertidumbre?.unidad ?? "",
+          incertidumbreK: p.incertidumbre?.k ?? 2,
         });
       })
       .catch(() => setError("No se pudo cargar el patrón."))
@@ -62,6 +64,11 @@ export default function PatronForm() {
       trazabilidad: data.trazabilidad, comentarios: data.comentarios,
       unidades: data.unidades, capacidad: data.capacidad, divisionMinima: data.divMin,
       manejo: data.manejo, procedimiento: data.proceso, transporte: data.transporte, almacenamiento: data.almacenamiento,
+      incertidumbre: {
+        valor: data.incertidumbreValor === "" ? undefined : Number(data.incertidumbreValor),
+        unidad: data.incertidumbreUnidad || undefined,
+        k: data.incertidumbreK === "" ? undefined : Number(data.incertidumbreK),
+      },
       ultimaCalibracion: {
         fecha: data.fechaCalibracion || undefined,
         vencimiento: data.fechaVencimiento || undefined,
@@ -158,6 +165,15 @@ export default function PatronForm() {
             </Grid>
             <Grid size={{ xs: 12, md: 3 }}>
               <AppInput label="División mínima" {...register("divMin")} />
+            </Grid>
+            <Grid size={{ xs: 12, md: 4 }}>
+              <AppInput label="Incertidumbre (valor)" type="number" slotProps={{ htmlInput: { step: "any" } }} {...register("incertidumbreValor")} />
+            </Grid>
+            <Grid size={{ xs: 12, md: 4 }}>
+              <AppInput label="Incertidumbre (unidad)" placeholder="Ej. mm, kPa" {...register("incertidumbreUnidad")} />
+            </Grid>
+            <Grid size={{ xs: 12, md: 4 }}>
+              <AppInput label="Factor de cobertura (k)" type="number" slotProps={{ htmlInput: { step: "any" } }} {...register("incertidumbreK")} />
             </Grid>
             <Grid size={{ xs: 12, md: 9 }}>
               <Button

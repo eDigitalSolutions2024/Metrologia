@@ -3,9 +3,16 @@ const Equipo = require("../models/Equipo");
 const Cliente = require("../models/Cliente");
 const AppError = require("../utils/AppError");
 const escapeRegex = require("../utils/escapeRegex");
+const qr = require("../utils/qr");
+const { publicWebUrl } = require("../config/env");
 
-async function listar({ search = "", clienteId = "", categoria = "", page = 0, pageSize = 10 }) {
+function urlInterna(id) {
+  return `${publicWebUrl.replace(/\/$/, "")}/equipos/${id}/editar`;
+}
+
+async function listar({ search = "", clienteId = "", categoria = "", incluirInactivos = false, page = 0, pageSize = 10 }) {
   const match = {};
+  if (!incluirInactivos) match.status = "activo";
   if (clienteId && mongoose.isValidObjectId(clienteId)) {
     match.cliente = new mongoose.Types.ObjectId(clienteId);
   }
@@ -51,10 +58,33 @@ async function actualizar(id, datos) {
   return equipo;
 }
 
+// "Eliminar" un equipo es un soft-delete (inactivar): un equipo de cliente
+// puede tener historial de calibraciones detrás, borrarlo de verdad
+// rompería esas referencias. Deja de aparecer en los listados normales
+// (listar() ya filtra por status:"activo" salvo que se pida incluirInactivos)
+// pero sigue existiendo para consultas directas por id.
 async function eliminar(id) {
-  const equipo = await Equipo.findByIdAndDelete(id);
+  const equipo = await Equipo.findByIdAndUpdate(id, { status: "inactivo" }, { new: true });
   if (!equipo) throw new AppError("Equipo no encontrado", 404);
   return equipo;
 }
 
-module.exports = { listar, obtener, crear, actualizar, eliminar };
+async function reactivar(id) {
+  const equipo = await Equipo.findByIdAndUpdate(id, { status: "activo" }, { new: true });
+  if (!equipo) throw new AppError("Equipo no encontrado", 404);
+  return equipo;
+}
+
+async function qrPng(id) {
+  const equipo = await Equipo.findById(id).select("_id");
+  if (!equipo) throw new AppError("Equipo no encontrado", 404);
+  return qr.pngBuffer(urlInterna(equipo._id));
+}
+
+async function qrSvg(id) {
+  const equipo = await Equipo.findById(id).select("_id");
+  if (!equipo) throw new AppError("Equipo no encontrado", 404);
+  return qr.svg(urlInterna(equipo._id));
+}
+
+module.exports = { listar, obtener, crear, actualizar, eliminar, reactivar, qrPng, qrSvg };

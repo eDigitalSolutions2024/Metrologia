@@ -7,13 +7,15 @@ import {
 import SearchIcon from "@mui/icons-material/Search";
 import AddIcon from "@mui/icons-material/Add";
 import EditOutlinedIcon from "@mui/icons-material/EditOutlined";
+import QrCode2OutlinedIcon from "@mui/icons-material/QrCode2Outlined";
 
 import AppButton from "../../shared/components/AppButton";
 import AppTable from "../../shared/components/AppTable";
 import PageHeader from "../../shared/components/PageHeader";
+import EtiquetaEquipoDialog from "../../shared/components/EtiquetaEquipoDialog";
 import PrecisionManufacturingOutlinedIcon from "@mui/icons-material/PrecisionManufacturingOutlined";
 import { listarClientes } from "../../services/clientes";
-import { listarEquipos } from "../../services/equipos";
+import { listarEquipos, fetchQrEquipoBlob } from "../../services/equipos";
 
 // Consultar Equipos = php/equipo_buscar.php: el equipo pertenece a un cliente
 // (tabla `equipo`, campo empId). Certificado/Portada/Gráfica dependen de las
@@ -29,6 +31,7 @@ export default function EquiposPage() {
   const [items, setItems] = useState([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [etiquetaEquipo, setEtiquetaEquipo] = useState(null);
 
   useEffect(() => {
     listarClientes({ pageSize: 200 })
@@ -58,11 +61,18 @@ export default function EquiposPage() {
       headerName: "Acciones",
       align: "center",
       renderCell: (row) => (
-        <Tooltip title="Editar equipo">
-          <IconButton size="small" onClick={() => navigate(`/equipos/${row._id}/editar`)}>
-            <EditOutlinedIcon fontSize="small" sx={{ color: "secondary.main" }} />
-          </IconButton>
-        </Tooltip>
+        <>
+          <Tooltip title="Editar equipo">
+            <IconButton size="small" onClick={() => navigate(`/equipos/${row._id}/editar`)}>
+              <EditOutlinedIcon fontSize="small" sx={{ color: "secondary.main" }} />
+            </IconButton>
+          </Tooltip>
+          <Tooltip title="Etiqueta / imprimir">
+            <IconButton size="small" onClick={() => setEtiquetaEquipo(row)}>
+              <QrCode2OutlinedIcon fontSize="small" sx={{ color: "primary.main" }} />
+            </IconButton>
+          </Tooltip>
+        </>
       ),
     },
   ];
@@ -121,6 +131,14 @@ export default function EquiposPage() {
         rowsPerPage={10}
         onPageChange={setPage}
         loading={loading}
+      />
+
+      <EtiquetaEquipoDialog
+        open={!!etiquetaEquipo}
+        onClose={() => setEtiquetaEquipo(null)}
+        item={etiquetaEquipo}
+        tipo="equipo"
+        fetchQr={fetchQrEquipoBlob}
       />
     </Box>
   );
