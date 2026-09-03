@@ -134,6 +134,7 @@ const menu = [
           { title: "General", path: "/general", roles: ["admin"] },
           { title: "Roles del Menú", path: "/administracion/roles-menu", roles: ["admin"] },
           { title: "Datos del Laboratorio", path: "/administracion/laboratorio", roles: ["admin"] },
+          { title: "Razones Sociales", path: "/administracion/razones-sociales", roles: ["admin"] },
           { title: "Colores", path: "/administracion/colores", roles: ["admin"] },
           { title: "Auditoría", path: "/administracion/auditoria", roles: ["admin"] },
         ],

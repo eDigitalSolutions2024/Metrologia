@@ -8,6 +8,7 @@ import VerCertificado from "../pages/Publico/VerCertificado";
 import CertificadosPage from "../pages/Certificados/CertificadosPage";
 import InformeCalibracion from "../pages/Certificados/InformeCalibracion";
 import InformeReporteCertificados from "../pages/Certificados/InformeReporteCertificados";
+import CotizacionImprimir from "../pages/Cotizaciones/CotizacionImprimir";
 import ReporteServicioImprimir from "../pages/Reportes/imprimir/ReporteServicioImprimir";
 import EntregaEquipoImprimir from "../pages/Reportes/imprimir/EntregaEquipoImprimir";
 import EntregaCertificadosImprimir from "../pages/Reportes/imprimir/EntregaCertificadosImprimir";
@@ -21,6 +22,7 @@ import General from "../pages/General/General";
 import RolesMenuPage from "../pages/Administracion/RolesMenuPage";
 import LaboratorioPage from "../pages/Administracion/LaboratorioPage";
 import ColoresPage from "../pages/Administracion/ColoresPage";
+import RazonesSocialesPage from "../pages/Administracion/RazonesSocialesPage";
 import AuditoriaPage from "../pages/Administracion/AuditoriaPage";
 import ClientesPage from "../pages/Clientes/ClientesPage";
 import ClienteForm from "../pages/Clientes/ClienteForm";
@@ -63,6 +65,14 @@ export default function AppRouter() {
         element={
           <ProtectedRoute>
             <InformeReporteCertificados />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/informe/cotizacion/:id"
+        element={
+          <ProtectedRoute>
+            <CotizacionImprimir />
           </ProtectedRoute>
         }
       />
@@ -119,6 +129,7 @@ export default function AppRouter() {
         <Route path="administracion/roles-menu" element={<RolesMenuPage />} />
         <Route path="administracion/laboratorio" element={<LaboratorioPage />} />
         <Route path="administracion/colores" element={<ColoresPage />} />
+        <Route path="administracion/razones-sociales" element={<RazonesSocialesPage />} />
         <Route path="administracion/auditoria" element={<AuditoriaPage />} />
         <Route path="clientes" element={<ClientesPage />} />
         <Route path="clientes/nuevo" element={<ClienteForm />} />

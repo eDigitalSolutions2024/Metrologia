@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import {
-  Box, Typography, Grid, Paper, Chip, Tooltip, IconButton, Alert,
+  Box, Typography, Grid, Paper, Chip, Tooltip, IconButton, Alert, InputAdornment,
   Dialog, DialogTitle, DialogContent, DialogActions, MenuItem, Select, FormControl, InputLabel, Tab, Tabs,
 } from "@mui/material";
 import { useTheme } from "@mui/material/styles";
@@ -12,6 +12,7 @@ import ReplayOutlinedIcon from "@mui/icons-material/ReplayOutlined";
 import FileDownloadOutlinedIcon from "@mui/icons-material/FileDownloadOutlined";
 
 import AppButton from "../../shared/components/AppButton";
+import AppCard from "../../shared/components/AppCard";
 import AppTable from "../../shared/components/AppTable";
 import PageHeader from "../../shared/components/PageHeader";
 import StatCard from "../../shared/components/StatCard";
@@ -69,55 +70,88 @@ function NuevoRegistroDialog({ open, onClose, onCreated, prefill }) {
 
   return (
     <Dialog open={open} onClose={cerrar} fullWidth maxWidth="sm">
-      <DialogTitle>{prefill ? `Generar factura — Cotización ${prefill.folio}` : "Generar Nuevo Registro en Calendario"}</DialogTitle>
+      <DialogTitle sx={{ fontWeight: 700 }}>
+        {prefill ? `Generar factura — Cotización ${prefill.folio}` : "Nuevo Registro de Cuenta por Cobrar"}
+      </DialogTitle>
       <Box component="form" onSubmit={handleSubmit(onSubmit)}>
         <DialogContent>
           {error && <Alert severity="error" sx={{ mb: 2, borderRadius: 2 }} onClose={() => setError("")}>{error}</Alert>}
-          <Grid container spacing={2}>
-            <Grid size={{ xs: 12, sm: 6 }}>
-              <AppInput label="Orden de Compra" error={errors.oc} {...register("oc", { required: "Obligatorio" })} />
+
+          <AppCard dense title="Cliente y referencia" sx={{ mb: 2.5 }}>
+            <Grid container spacing={2}>
+              <Grid size={{ xs: 12, sm: 6 }}>
+                <Controller
+                  name="clienteId"
+                  control={control}
+                  rules={{ required: "Elige el cliente" }}
+                  render={({ field }) => (
+                    <FormControl fullWidth size="small" error={!!errors.clienteId}>
+                      <InputLabel>Cliente</InputLabel>
+                      <Select label="Cliente" {...field} value={field.value ?? ""} sx={{ borderRadius: 2 }}>
+                        {clientes.length === 0 && <MenuItem value="" disabled>No hay clientes registrados</MenuItem>}
+                        {clientes.map((c) => <MenuItem key={c._id} value={c._id}>{c.nombre}</MenuItem>)}
+                      </Select>
+                    </FormControl>
+                  )}
+                />
+              </Grid>
+              <Grid size={{ xs: 12, sm: 6 }}>
+                <AppInput
+                  label="Orden de Compra" placeholder="Ej. OC-2026-0451"
+                  helperText="Número de orden de compra del cliente"
+                  error={errors.oc} {...register("oc", { required: "Obligatorio" })}
+                />
+              </Grid>
             </Grid>
-            <Grid size={{ xs: 12, sm: 6 }}>
-              <Controller
-                name="clienteId"
-                control={control}
-                rules={{ required: true }}
-                render={({ field }) => (
-                  <FormControl fullWidth size="small" error={!!errors.clienteId}>
-                    <InputLabel>Cliente</InputLabel>
-                    <Select label="Cliente" {...field} value={field.value ?? ""} sx={{ borderRadius: 2 }}>
-                      {clientes.map((c) => <MenuItem key={c._id} value={c._id}>{c.nombre}</MenuItem>)}
-                    </Select>
-                  </FormControl>
-                )}
-              />
+          </AppCard>
+
+          <AppCard dense title="Datos de la factura" sx={{ mb: 1 }}>
+            <Grid container spacing={2}>
+              <Grid size={{ xs: 12, sm: 6 }}>
+                <AppInput
+                  label="Folio de factura" placeholder="Ej. FAC-2026-0089"
+                  helperText="Folio ya timbrado, o uno provisional"
+                  error={errors.folio} {...register("folio", { required: "Obligatorio" })}
+                />
+              </Grid>
+              <Grid size={{ xs: 12, sm: 6 }}>
+                <AppInput
+                  label="Monto" type="number" placeholder="0.00"
+                  slotProps={{
+                    htmlInput: { min: 0.01, step: "0.01" },
+                    input: {
+                      startAdornment: <InputAdornment position="start">$</InputAdornment>,
+                      endAdornment: <InputAdornment position="end">MXN</InputAdornment>,
+                    },
+                  }}
+                  error={errors.monto}
+                  {...register("monto", { required: "Obligatorio", min: { value: 0.01, message: "Debe ser mayor a 0" } })}
+                />
+              </Grid>
+              <Grid size={{ xs: 12, sm: 6 }}>
+                <Controller
+                  name="fechaCr"
+                  control={control}
+                  rules={{ required: "Obligatorio" }}
+                  render={({ field }) => <AppDatePicker label="Fecha C/R (creación/recepción)" error={errors.fechaCr} {...field} />}
+                />
+              </Grid>
+              <Grid size={{ xs: 12, sm: 6 }}>
+                <FormControl fullWidth size="small">
+                  <InputLabel>Días de Pago</InputLabel>
+                  <Select label="Días de Pago" defaultValue={30} {...register("diasPago")} sx={{ borderRadius: 2 }}>
+                    {DIAS_PAGO_OPCIONES.map((d) => <MenuItem key={d} value={d}>{d === 0 ? "Contado" : `${d} días`}</MenuItem>)}
+                  </Select>
+                </FormControl>
+              </Grid>
+              <Grid size={{ xs: 12 }}>
+                <AppInput
+                  label="Comentarios" placeholder="Notas visibles en el calendario de pagos (opcional)"
+                  multiline minRows={2} {...register("comentarios")}
+                />
+              </Grid>
             </Grid>
-            <Grid size={{ xs: 12, sm: 6 }}>
-              <AppInput label="Folio" error={errors.folio} {...register("folio", { required: "Obligatorio" })} />
-            </Grid>
-            <Grid size={{ xs: 12, sm: 6 }}>
-              <AppInput label="Monto" type="number" error={errors.monto} {...register("monto", { required: "Obligatorio", min: { value: 0.01, message: "Debe ser mayor a 0" } })} />
-            </Grid>
-            <Grid size={{ xs: 12, sm: 6 }}>
-              <Controller
-                name="fechaCr"
-                control={control}
-                rules={{ required: "Obligatorio" }}
-                render={({ field }) => <AppDatePicker label="Fecha C/R" error={errors.fechaCr} {...field} />}
-              />
-            </Grid>
-            <Grid size={{ xs: 12, sm: 6 }}>
-              <FormControl fullWidth size="small">
-                <InputLabel>Días de Pago</InputLabel>
-                <Select label="Días de Pago" defaultValue={30} {...register("diasPago")} sx={{ borderRadius: 2 }}>
-                  {DIAS_PAGO_OPCIONES.map((d) => <MenuItem key={d} value={d}>{d === 0 ? "Contado" : `${d} días`}</MenuItem>)}
-                </Select>
-              </FormControl>
-            </Grid>
-            <Grid size={{ xs: 12 }}>
-              <AppInput label="Comentarios" multiline minRows={2} {...register("comentarios")} />
-            </Grid>
-          </Grid>
+          </AppCard>
         </DialogContent>
         <DialogActions sx={{ px: 3, pb: 2 }}>
           <AppButton variant="outlined" onClick={cerrar} sx={{ borderRadius: 2 }}>Cancelar</AppButton>

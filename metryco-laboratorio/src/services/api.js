@@ -17,6 +17,7 @@ export const ENDPOINTS = {
   PATRONES: "/patrones",
   PERFORMANCE: "/performance",
   MAGNITUDES: "/magnitudes",
+  RAZONES_SOCIALES: "/razones-sociales",
   INCERTIDUMBRE: "/incertidumbre",
   PUBLICO: "/publico",
   CALIDAD: "/calidad",

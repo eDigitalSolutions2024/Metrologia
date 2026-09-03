@@ -15,6 +15,8 @@ import DescriptionOutlinedIcon from "@mui/icons-material/DescriptionOutlined";
 import HourglassTopOutlinedIcon from "@mui/icons-material/HourglassTopOutlined";
 import TaskAltOutlinedIcon from "@mui/icons-material/TaskAltOutlined";
 import LocalShippingOutlinedIcon from "@mui/icons-material/LocalShippingOutlined";
+import OpenInNewOutlinedIcon from "@mui/icons-material/OpenInNewOutlined";
+import RequestQuoteOutlinedIcon from "@mui/icons-material/RequestQuoteOutlined";
 
 import AppButton from "../../shared/components/AppButton";
 import AppTable from "../../shared/components/AppTable";
@@ -76,7 +78,19 @@ export default function ReportesPage() {
   }, [rows, theme]);
 
   const columns = [
-    { field: "folio", headerName: "Reporte de Servicio", renderCell: (r) => <Typography variant="body2" fontWeight={700}>{r.folio}</Typography> },
+    {
+      field: "folio", headerName: "Reporte de Servicio",
+      renderCell: (r) => (
+        <Tooltip title="Abrir reporte">
+          <Chip
+            size="small" clickable label={r.folio} icon={<OpenInNewOutlinedIcon sx={{ fontSize: 14 }} />}
+            onClick={() => navigate(`/reportes/${r._id}`)}
+            sx={{ fontWeight: 700, color: "secondary.main", borderColor: "secondary.main", "& .MuiChip-icon": { color: "secondary.main" } }}
+            variant="outlined"
+          />
+        </Tooltip>
+      ),
+    },
     { field: "cliente", headerName: "Cliente", renderCell: (r) => r.cliente?.nombre || "—" },
     { field: "fechaRecepcion", headerName: "Fecha", renderCell: (r) => formatDate(r.fechaRecepcion) },
     {
@@ -96,7 +110,20 @@ export default function ReportesPage() {
         </Tooltip>
       ),
     },
-    { field: "cotizacion", headerName: "Cotización", align: "center", renderCell: (r) => r.cotizacion?.folio || "—" },
+    {
+      field: "cotizacion", headerName: "Cotización", align: "center",
+      renderCell: (r) =>
+        r.cotizacion?._id ? (
+          <Tooltip title="Abrir cotización ligada">
+            <Chip
+              size="small" clickable label={r.cotizacion.folio} icon={<RequestQuoteOutlinedIcon sx={{ fontSize: 14 }} />}
+              onClick={() => navigate(`/cotizaciones?editar=${r.cotizacion._id}`)}
+              sx={{ color: "info.main", borderColor: "info.main", "& .MuiChip-icon": { color: "info.main" } }}
+              variant="outlined"
+            />
+          </Tooltip>
+        ) : "—",
+    },
     { field: "ordenCompra", headerName: "Orden de Compra", renderCell: (r) => r.ordenCompra || "—" },
     { field: "factura", headerName: "Factura", renderCell: (r) => r.factura || "—" },
     { field: "cantidadEnProceso", headerName: "Cantidad en Proceso", align: "center", renderCell: (r) => r.cantidadEnProceso ?? 0 },
