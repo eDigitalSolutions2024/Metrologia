@@ -73,7 +73,7 @@ const menu = [
           { title: "Alta de Equipo", path: "/equipos/nuevo", roles: TODOS },
           { title: "Consultar Equipos", path: "/equipos", roles: TODOS },
           { title: "Historial Certificados", path: "/equipos/historial-certificados", roles: ADMIN_COORD_TECNICO },
-          { title: "Alta de Patrón", path: "/equipos/patrones/nuevo", roles: ADMIN_COORD_TECNICO },
+          { title: "Alta de Patrón", path: "/equipos/patrones/nuevo", roles: ADMIN_COORD },
           { title: "Consultar Patrones", path: "/equipos/patrones", roles: ADMIN_COORD_TECNICO },
         ],
       },

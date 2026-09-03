@@ -3,26 +3,35 @@ import { useParams } from "react-router-dom";
 import { Box, Button, CircularProgress, Typography } from "@mui/material";
 import PrintOutlinedIcon from "@mui/icons-material/PrintOutlined";
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
-import { obtenerCertificado } from "../../services/certificados";
+import { listarCertificadosPorReporte } from "../../services/certificados";
 import HojaCertificado from "./HojaCertificado";
 
-export default function InformeCalibracion() {
+// Paquete de certificados de un mismo reporte, uno por equipo calibrado,
+// combinados en un solo documento imprimible (equivalente al "portada_merge"
+// del sistema legacy: un solo PDF para entregar al cliente en vez de uno
+// suelto por equipo).
+export default function InformeReporteCertificados() {
   const { id } = useParams();
-  const [cert, setCert] = useState(null);
+  const [certs, setCerts] = useState(null);
+  const [folioReporte, setFolioReporte] = useState("");
   const [estado, setEstado] = useState("cargando");
 
   useEffect(() => {
-    obtenerCertificado(id)
-      .then((c) => { setCert(c); setEstado("ok"); })
+    listarCertificadosPorReporte(id)
+      .then((lista) => {
+        setCerts(lista);
+        setFolioReporte(lista[0]?.reporte?.folio || "");
+        setEstado("ok");
+      })
       .catch(() => setEstado("error"));
   }, [id]);
 
   if (estado === "cargando") return <Centro><CircularProgress /></Centro>;
-  if (estado === "error" || !cert) return <Centro><Typography>No se pudo cargar el certificado.</Typography></Centro>;
+  if (estado === "error") return <Centro><Typography>No se pudo cargar el paquete de certificados.</Typography></Centro>;
+  if (!certs?.length) return <Centro><Typography>Este reporte todavía no tiene certificados emitidos.</Typography></Centro>;
 
   return (
     <Box sx={{ bgcolor: "#fff", minHeight: "100dvh", color: "#111" }}>
-      {/* Barra de acciones — no se imprime */}
       <Box
         className="no-print"
         sx={{
@@ -33,7 +42,7 @@ export default function InformeCalibracion() {
         <Button startIcon={<ArrowBackIcon />} onClick={() => window.close()} size="small">Cerrar</Button>
         <Box sx={{ flex: 1 }} />
         <Typography variant="body2" sx={{ color: "#6b7280" }}>
-          Imprimir → destino <b>“Guardar como PDF”</b>, tamaño Carta/A4
+          {certs.length} certificado{certs.length === 1 ? "" : "s"}{folioReporte ? ` · ${folioReporte}` : ""} — Imprimir → destino <b>“Guardar como PDF”</b>
         </Typography>
         <Button variant="contained" startIcon={<PrintOutlinedIcon />} onClick={() => window.print()}>
           Imprimir / PDF
@@ -51,7 +60,9 @@ export default function InformeCalibracion() {
                     letter-spacing: .05em; padding: 5px; margin: 16px 0 0; font-size: 12px; }
       `}</style>
 
-      <HojaCertificado cert={cert} />
+      {certs.map((cert, i) => (
+        <HojaCertificado key={cert._id} cert={cert} ultima={i === certs.length - 1} />
+      ))}
     </Box>
   );
 }

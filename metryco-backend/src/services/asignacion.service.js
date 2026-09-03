@@ -1,3 +1,5 @@
+const fs = require("fs");
+const path = require("path");
 const mongoose = require("mongoose");
 const Asignacion = require("../models/Asignacion");
 const Reporte = require("../models/Reporte");
@@ -5,6 +7,7 @@ const Equipo = require("../models/Equipo");
 const Patron = require("../models/Patron");
 const AppError = require("../utils/AppError");
 const { crearEvento } = require("../utils/historial");
+const { destinoGraficas } = require("../middleware/upload");
 
 const oid = (v) => (mongoose.isValidObjectId(v) ? new mongoose.Types.ObjectId(v) : null);
 
@@ -200,4 +203,43 @@ async function eliminar(id) {
   return a;
 }
 
-module.exports = { listar, listarParaCalidad, obtener, crear, actualizar, cambiarEstado, eliminar };
+function rutaGrafica(asig) {
+  if (!asig?.grafica?.nombreArchivo) return null;
+  return path.join(destinoGraficas, asig.grafica.nombreArchivo);
+}
+
+async function subirGrafica(id, file, usuarioId) {
+  if (!file) throw new AppError("No se recibió el archivo", 400);
+  const asig = await Asignacion.findById(id);
+  if (!asig) {
+    fs.unlink(file.path, () => {});
+    throw new AppError("Asignación no encontrada", 404);
+  }
+
+  const anterior = rutaGrafica(asig);
+  if (anterior && fs.existsSync(anterior)) fs.unlink(anterior, () => {});
+
+  asig.grafica = {
+    nombreArchivo: file.filename,
+    nombreOriginal: file.originalname,
+    mimetype: file.mimetype,
+    tamano: file.size,
+    subidoPor: usuarioId,
+    fecha: new Date(),
+  };
+  await asig.save();
+  return asig;
+}
+
+async function archivoGraficaStream(id) {
+  const asig = await Asignacion.findById(id);
+  if (!asig) throw new AppError("Asignación no encontrada", 404);
+  const ruta = rutaGrafica(asig);
+  if (!ruta || !fs.existsSync(ruta)) throw new AppError("Esta asignación no tiene gráfica adjunta", 404);
+  return { ruta, nombre: asig.grafica.nombreOriginal || `grafica-${id}` , mimetype: asig.grafica.mimetype };
+}
+
+module.exports = {
+  listar, listarParaCalidad, obtener, crear, actualizar, cambiarEstado, eliminar,
+  subirGrafica, archivoGraficaStream,
+};

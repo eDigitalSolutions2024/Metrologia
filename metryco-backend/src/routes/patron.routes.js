@@ -16,11 +16,12 @@ router.get("/:id", c.obtener);
 router.get("/:id/certificado", c.descargarCertificado);
 router.get("/:id/qr.png", c.qrPng);
 router.get("/:id/qr.svg", c.qrSvg);
-// Administrar el catálogo de patrones es de admin/coordinador/técnico — ventas
-// solo los consulta (los necesita al armar una asignación), no los administra.
-router.post("/", requireRole("admin", "coordinador", "tecnico"), validate(crearPatronSchema), c.crear);
-router.put("/:id", requireRole("admin", "coordinador", "tecnico"), validate(actualizarPatronSchema), c.actualizar);
-router.post("/:id/certificado", requireRole("admin", "coordinador", "tecnico"), pdfCertificado, c.adjuntarCertificado);
+// Administrar el catálogo de patrones es solo de admin/coordinador (regla del
+// sistema legacy: el técnico consulta y usa patrones al calibrar, pero no da
+// de alta ni edita el catálogo) — ventas tampoco lo administra, solo consulta.
+router.post("/", requireRole("admin", "coordinador"), validate(crearPatronSchema), c.crear);
+router.put("/:id", requireRole("admin", "coordinador"), validate(actualizarPatronSchema), c.actualizar);
+router.post("/:id/certificado", requireRole("admin", "coordinador"), pdfCertificado, c.adjuntarCertificado);
 router.delete("/:id", requireRole("admin", "coordinador"), auditar("patron_eliminado", "Patron"), c.eliminar);
 
 module.exports = router;

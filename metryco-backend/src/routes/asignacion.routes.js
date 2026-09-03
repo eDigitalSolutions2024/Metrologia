@@ -1,6 +1,7 @@
 const { Router } = require("express");
 const auth = require("../middleware/auth");
 const requireRole = require("../middleware/requireRole");
+const { grafica: subirGraficaMiddleware } = require("../middleware/upload");
 const c = require("../controllers/asignacion.controller");
 
 const router = Router();
@@ -19,5 +20,10 @@ router.put("/:id", requireRole("admin", "coordinador", "tecnico"), c.actualizar)
 // (certificado = solo Calidad) se valida dentro del servicio, no aquí.
 router.patch("/:id/estado", requireRole("admin", "coordinador", "tecnico"), c.cambiarEstado);
 router.delete("/:id", requireRole("admin", "coordinador"), c.eliminar);
+
+// Gráfica de calibración: la sube quien ejecuta/supervisa el trabajo, la
+// descarga cualquier autenticado (Calidad la necesita para revisar).
+router.post("/:id/grafica", requireRole("admin", "coordinador", "tecnico"), subirGraficaMiddleware, c.subirGrafica);
+router.get("/:id/grafica", c.descargarGrafica);
 
 module.exports = router;

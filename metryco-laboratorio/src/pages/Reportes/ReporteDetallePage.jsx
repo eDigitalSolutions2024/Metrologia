@@ -14,6 +14,8 @@ import CheckRoundedIcon from "@mui/icons-material/CheckRounded";
 import BiotechOutlinedIcon from "@mui/icons-material/BiotechOutlined";
 import LocalShippingOutlined from "@mui/icons-material/LocalShippingOutlined";
 import WorkspacePremiumOutlinedIcon from "@mui/icons-material/WorkspacePremiumOutlined";
+import InsertChartOutlinedIcon from "@mui/icons-material/InsertChartOutlined";
+import UploadFileOutlinedIcon from "@mui/icons-material/UploadFileOutlined";
 
 import AppButton from "../../shared/components/AppButton";
 import PageHeader from "../../shared/components/PageHeader";
@@ -22,6 +24,7 @@ import FactCheckOutlinedIcon from "@mui/icons-material/FactCheckOutlined";
 import {
   obtenerReporte, actualizarReporte, agregarComentarioReporte,
   crearAsignacion, actualizarAsignacion, cambiarEstadoAsignacion,
+  subirGraficaAsignacion, fetchGraficaAsignacionBlob,
 } from "../../services/reportes";
 import { listarEquipos } from "../../services/equipos";
 import { obtenerDirectorio } from "../../services/usuarios";
@@ -186,6 +189,28 @@ export default function ReporteDetallePage() {
     }
   };
 
+  const subirGrafica = async (asignacionId, archivo) => {
+    try {
+      await subirGraficaAsignacion(asignacionId, archivo);
+      cargar();
+    } catch {
+      setError("No se pudo subir la gráfica de calibración.");
+    }
+  };
+
+  const descargarGrafica = async (asignacionId, nombreOriginal) => {
+    try {
+      const blob = await fetchGraficaAsignacionBlob(asignacionId);
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url; a.download = nombreOriginal || "grafica";
+      a.click();
+      setTimeout(() => URL.revokeObjectURL(url), 60000);
+    } catch {
+      setError("No se pudo descargar la gráfica.");
+    }
+  };
+
   const onCambiarEstado = (asignacionId, dominio, valor) => {
     if (dominio === "certificado" && valor === "rechazado") {
       setRechazoTarget(asignacionId);
@@ -284,6 +309,11 @@ export default function ReporteDetallePage() {
           <Tooltip title="PDF de Entrega de Certificados">
             <IconButton size="small" onClick={() => window.open(`/informe/reporte-entrega-certificados/${id}`, "_blank")}>
               <PictureAsPdfOutlinedIcon sx={{ color: "error.main" }} />
+            </IconButton>
+          </Tooltip>
+          <Tooltip title="Paquete de Certificados (todos los equipos, un solo PDF)">
+            <IconButton size="small" onClick={() => window.open(`/informe/reporte/${id}/certificados`, "_blank")}>
+              <PictureAsPdfOutlinedIcon sx={{ color: "success.main" }} />
             </IconButton>
           </Tooltip>
         </Box>
@@ -415,6 +445,26 @@ export default function ReporteDetallePage() {
                 </Box>
                 <TextField size="small" label="Factura" defaultValue={a.factura || ""} disabled={!puedeOperarAsignacion}
                   onBlur={(e) => guardarFacturaAsignacion(a._id, e.target.value)} />
+
+                {a.grafica?.nombreArchivo ? (
+                  <AppButton
+                    variant="text" size="small" startIcon={<InsertChartOutlinedIcon />}
+                    onClick={() => descargarGrafica(a._id, a.grafica.nombreOriginal)}
+                  >
+                    Ver gráfica
+                  </AppButton>
+                ) : (
+                  <Button
+                    component="label" variant="outlined" size="small" startIcon={<UploadFileOutlinedIcon />}
+                    disabled={!puedeOperarAsignacion} sx={{ borderRadius: 2, height: 40 }}
+                  >
+                    Subir gráfica
+                    <input
+                      type="file" accept="image/*" hidden
+                      onChange={(e) => { const f = e.target.files?.[0]; if (f) subirGrafica(a._id, f); e.target.value = ""; }}
+                    />
+                  </Button>
+                )}
               </Box>
             </Paper>
           );

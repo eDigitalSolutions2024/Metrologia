@@ -13,7 +13,7 @@ import AppButton from "../../shared/components/AppButton";
 import AppCard from "../../shared/components/AppCard";
 import AppInput from "../../shared/components/AppInput";
 import {
-  obtenerModelo, crearModelo, actualizarModelo,
+  obtenerModelo, crearModelo, actualizarModelo, listarMagnitudes,
 } from "../../services/incertidumbre";
 
 const TIPOS = ["A", "B"];
@@ -37,8 +37,10 @@ export default function PlantillaIncertidumbreForm() {
   const [loading, setLoading] = useState(isEdit);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+  const [magnitudes, setMagnitudes] = useState([]);
+  const [unidadTocada, setUnidadTocada] = useState(false);
 
-  const { register, control, handleSubmit, reset, formState: { errors } } = useForm({
+  const { register, control, handleSubmit, reset, watch, setValue, formState: { errors } } = useForm({
     defaultValues: {
       magnitud: "", tipoInstrumento: "", nombre: "", mensurando: "", unidad: "",
       normaReferencia: "JCGM 100:2008 (GUM); EA-4/02", nivelConfianza: "95.45%",
@@ -48,6 +50,30 @@ export default function PlantillaIncertidumbreForm() {
     },
   });
   const { fields, append, remove } = useFieldArray({ control, name: "contribuciones" });
+
+  const magnitudSel = watch("magnitud");
+  const tipoSel = watch("tipoInstrumento");
+  const { onChange: onChangeUnidadRHF, ...unidadReg } = register("unidad");
+  const tiposDeLaMagnitud = magnitudes.find((m) => m.clave === magnitudSel)?.tipos || [];
+
+  useEffect(() => {
+    listarMagnitudes().then(setMagnitudes).catch(() => setMagnitudes([]));
+  }, []);
+
+  // La unidad se propone sola a partir del catálogo (unidadSugerida del tipo
+  // de instrumento elegido) — se puede seguir editando a mano si hace falta.
+  useEffect(() => {
+    if (unidadTocada) return;
+    const sugerida = tiposDeLaMagnitud.find((t) => t.clave === tipoSel)?.unidadSugerida;
+    if (sugerida) setValue("unidad", sugerida);
+  }, [tipoSel]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Si cambian la magnitud a mano, el tipo elegido antes puede ya no
+  // pertenecer a ella — se limpia solo en ese caso (no al cargar en edición).
+  useEffect(() => {
+    if (magnitudes.length === 0) return;
+    if (tipoSel && !tiposDeLaMagnitud.some((t) => t.clave === tipoSel)) setValue("tipoInstrumento", "");
+  }, [magnitudSel]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (!isEdit) return;
@@ -123,10 +149,30 @@ export default function PlantillaIncertidumbreForm() {
         <AppCard title="Información General" sx={{ mb: 3 }}>
           <Grid container spacing={2}>
             <Grid size={{ xs: 12, md: 4 }}>
-              <AppInput label="Magnitud" placeholder="Ej. longitud" error={errors.magnitud} {...register("magnitud", { required: "Obligatorio" })} />
+              <FormControl fullWidth size="small" error={!!errors.magnitud}>
+                <InputLabel>Magnitud</InputLabel>
+                <Controller
+                  name="magnitud" control={control} rules={{ required: true }}
+                  render={({ field }) => (
+                    <Select label="Magnitud" {...field} sx={{ borderRadius: 2 }}>
+                      {magnitudes.map((m) => <MenuItem key={m.clave} value={m.clave}>{m.nombre}</MenuItem>)}
+                    </Select>
+                  )}
+                />
+              </FormControl>
             </Grid>
             <Grid size={{ xs: 12, md: 4 }}>
-              <AppInput label="Tipo de instrumento" placeholder="Ej. micrómetro" error={errors.tipoInstrumento} {...register("tipoInstrumento", { required: "Obligatorio" })} />
+              <FormControl fullWidth size="small" error={!!errors.tipoInstrumento} disabled={!magnitudSel}>
+                <InputLabel>Tipo de instrumento</InputLabel>
+                <Controller
+                  name="tipoInstrumento" control={control} rules={{ required: true }}
+                  render={({ field }) => (
+                    <Select label="Tipo de instrumento" {...field} sx={{ borderRadius: 2 }}>
+                      {tiposDeLaMagnitud.map((t) => <MenuItem key={t.clave} value={t.clave}>{t.nombre}</MenuItem>)}
+                    </Select>
+                  )}
+                />
+              </FormControl>
             </Grid>
             <Grid size={{ xs: 12, md: 4 }}>
               <AppInput label="Nombre de la plantilla" error={errors.nombre} {...register("nombre", { required: "Obligatorio" })} />
@@ -135,7 +181,11 @@ export default function PlantillaIncertidumbreForm() {
               <AppInput label="Mensurando" {...register("mensurando")} />
             </Grid>
             <Grid size={{ xs: 12, md: 4 }}>
-              <AppInput label="Unidad" placeholder="Ej. mm" {...register("unidad")} />
+              <AppInput
+                label="Unidad" placeholder="Ej. mm" helperText="Se sugiere del tipo de instrumento — puedes cambiarla"
+                {...unidadReg}
+                onChange={(e) => { setUnidadTocada(true); onChangeUnidadRHF(e); }}
+              />
             </Grid>
             <Grid size={{ xs: 12, md: 4 }}>
               <AppInput label="Rango típico" placeholder="Ej. 0-25 mm" {...register("rangoTipico")} />

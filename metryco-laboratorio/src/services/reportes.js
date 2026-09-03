@@ -64,3 +64,17 @@ export async function cambiarEstadoAsignacion(id, { dominio, valor, motivo }) {
   const { data } = await api.patch(`${ENDPOINTS.ASIGNACIONES}/${id}/estado`, { dominio, valor, motivo });
   return data.data;
 }
+
+export async function subirGraficaAsignacion(id, archivo) {
+  const form = new FormData();
+  form.append("archivo", archivo);
+  const { data } = await api.post(`${ENDPOINTS.ASIGNACIONES}/${id}/grafica`, form, {
+    headers: { "Content-Type": "multipart/form-data" },
+  });
+  return data.data;
+}
+
+export async function fetchGraficaAsignacionBlob(id) {
+  const { data } = await api.get(`${ENDPOINTS.ASIGNACIONES}/${id}/grafica`, { responseType: "blob" });
+  return data;
+}

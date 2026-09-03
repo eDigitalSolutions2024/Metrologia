@@ -99,9 +99,24 @@ async function obtener(id) {
     .populate("reporte", "folio")
     .populate("asignacion", "folio estados")
     .populate("creadoPor", "nombre usuario firmaUrl")
+    .populate("revisadoPor.id", "firmaUrl")
+    .populate("autorizadoPor.id", "firmaUrl")
     .populate("historial.usuario.id", "nombre usuario");
   if (!cert) throw new AppError("Certificado no encontrado", 404);
   return conEstadoVigente(cert);
+}
+
+/** Todos los certificados emitidos de un reporte — para el PDF combinado. */
+async function porReporte(reporteId) {
+  if (!oid(reporteId)) throw new AppError("Reporte inválido", 400);
+  const certs = await Certificado.find({ reporte: reporteId })
+    .populate("cliente", "nombre rfc")
+    .populate("reporte", "folio")
+    .populate("creadoPor", "nombre usuario firmaUrl")
+    .populate("revisadoPor.id", "firmaUrl")
+    .populate("autorizadoPor.id", "firmaUrl")
+    .sort({ createdAt: 1 });
+  return certs.map(conEstadoVigente);
 }
 
 /**
@@ -126,6 +141,9 @@ async function emitir(datos, reqUser) {
     if (await Certificado.exists({ asignacion: asig._id })) {
       throw new AppError("Esa asignación ya tiene un certificado", 409);
     }
+    if (asig.estados?.certificado !== "autorizado") {
+      throw new AppError("Solo se puede emitir certificado de una calibración ya autorizada por Calidad", 400);
+    }
     equipoDoc = asig.equipo;
     patronesDocs = asig.patrones || [];
     asignacionId = asig._id;
@@ -147,7 +165,27 @@ async function emitir(datos, reqUser) {
   if (!fechaCalibracion) throw new AppError("La fecha de calibración es obligatoria", 400);
 
   const Cliente = require("../models/Cliente");
-  const clienteDoc = await Cliente.findById(clienteId).select("nombre");
+  const clienteDoc = await Cliente.findById(clienteId).select("nombre domicilioFiscal");
+  const d = clienteDoc?.domicilioFiscal;
+  const direccionCliente = d
+    ? [
+        [d.calle, d.numExterior, d.numInterior].filter(Boolean).join(" "),
+        d.colonia, d.municipio || d.ciudad, [d.estado, d.cp].filter(Boolean).join(" C.P. "),
+      ].filter(Boolean).join(", ")
+    : undefined;
+
+  let revisadoPor;
+  if (datos.revisadoPor && oid(datos.revisadoPor)) {
+    const Usuario = require("../models/Usuario");
+    const u = await Usuario.findById(datos.revisadoPor).select("nombre");
+    if (u) revisadoPor = { id: u._id, nombre: u.nombre };
+  }
+  let autorizadoPor;
+  if (datos.autorizadoPor && oid(datos.autorizadoPor)) {
+    const Usuario = require("../models/Usuario");
+    const u = await Usuario.findById(datos.autorizadoPor).select("nombre");
+    if (u) autorizadoPor = { id: u._id, nombre: u.nombre };
+  }
 
   // Puntos: toma los CalculoIncertidumbre APROBADOS de la asignación.
   let puntos = [];
@@ -208,13 +246,20 @@ async function emitir(datos, reqUser) {
       accuracy: equipoDoc?.accuracy,
       unidades: equipoDoc?.unidades,
       divisionMinima: equipoDoc?.divisionMinima,
+      resolucion: equipoDoc?.resolucion,
       rango: equipoDoc?.rangoCalibracion || equipoDoc?.rango,
+      rangoUso: equipoDoc?.rangoUso,
+      rangoCalibracion: equipoDoc?.rangoCalibracion,
+      localizacion: equipoDoc?.localizacion,
     },
-    clienteSnapshot: { nombre: clienteDoc?.nombre },
+    clienteSnapshot: { nombre: clienteDoc?.nombre, direccion: direccionCliente },
     patronesSnapshot: patronesDocs.map((p) => ({
       codigo: p.codigo,
       nombre: p.nombre,
+      modelo: p.modelo,
       trazabilidad: p.trazabilidad,
+      certificadoNo: p.ultimaCalibracion?.certificadoNo,
+      vencimiento: p.ultimaCalibracion?.vencimiento,
       incertidumbre: p.incertidumbre?.valor
         ? `${p.incertidumbre.valor} ${p.incertidumbre.unidad || ""} (k=${p.incertidumbre.k || 2})`
         : undefined,
@@ -223,6 +268,18 @@ async function emitir(datos, reqUser) {
     fechaCalibracion,
     fechaEmision: datos.fechaEmision || new Date(),
     vigencia: datos.vigencia || undefined,
+    servicio: {
+      razon: datos.servicio?.razon,
+      tipo: datos.servicio?.tipo,
+      procedimiento: datos.servicio?.procedimiento,
+    },
+    condiciones: {
+      temperatura: datos.condiciones?.temperatura,
+      humedad: datos.condiciones?.humedad,
+    },
+    comentarios: datos.comentarios,
+    revisadoPor,
+    autorizadoPor,
     estado: "borrador",
     resultado: resultadoResumen,
     puntos,
@@ -245,7 +302,10 @@ async function actualizar(id, datos, reqUser) {
   if (!cert) throw new AppError("Certificado no encontrado", 404);
   if (cert.estado === "anulado") throw new AppError("El certificado está anulado", 409);
 
-  for (const campo of ["fechaCalibracion", "fechaEmision", "vigencia", "resultado"]) {
+  for (const campo of [
+    "fechaCalibracion", "fechaEmision", "vigencia", "resultado",
+    "servicio", "condiciones", "comentarios",
+  ]) {
     if (datos[campo] !== undefined) cert[campo] = datos[campo];
   }
   cert.historial.push(await crearEvento(reqUser, "certificado_editado", {}));
@@ -366,6 +426,6 @@ async function archivoStream(id) {
 
 module.exports = {
   listar, obtener, exportar, emitir, actualizar, cambiarEstado, adjuntarPdf,
-  anular, regenerarToken, qrPng, qrSvg, archivoStream, porVencer,
+  anular, regenerarToken, qrPng, qrSvg, archivoStream, porVencer, porReporte,
   urlPublica, rutaArchivo,
 };

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   Dialog, DialogTitle, DialogContent, DialogActions, Grid, Alert, Box, Divider, Typography,
   MenuItem, Select, FormControl, InputLabel, IconButton, InputAdornment, Tooltip,
@@ -13,6 +13,17 @@ import AppInput from "../AppInput";
 import AppButton from "../AppButton";
 import { crearUsuario } from "../../../services/usuarios";
 import { generarPasswordSegura } from "../../utils/generarPassword";
+
+// "Juan Pérez" -> "juanp" (nombre completo + inicial del/los apellidos),
+// sin acentos ni espacios — mismo patrón que ya usan las cuentas reales.
+function usuarioDesdeNombre(nombre) {
+  const limpio = (nombre || "")
+    .normalize("NFD").replace(/[̀-ͯ]/g, "")
+    .toLowerCase().replace(/[^a-z\s]/g, "").trim();
+  const partes = limpio.split(/\s+/).filter(Boolean);
+  if (!partes.length) return "";
+  return partes[0] + partes.slice(1).map((p) => p[0]).join("");
+}
 
 const ROLES = [
   { value: "admin", label: "Administrador" },
@@ -42,6 +53,7 @@ export default function NuevoUsuario({ open, onClose, onCreated }) {
   const theme = useTheme();
   const [submitError, setSubmitError] = useState("");
   const [copiado, setCopiado] = useState(false);
+  const [usuarioTocado, setUsuarioTocado] = useState(false);
   const {
     register,
     handleSubmit,
@@ -56,11 +68,21 @@ export default function NuevoUsuario({ open, onClose, onCreated }) {
   });
 
   const password = watch("password");
+  const nombre = watch("nombre");
+  const { onChange: onChangeUsuarioRHF, ...usuarioReg } = register("usuario", { required: "Campo obligatorio" });
+
+  // Mientras el usuario no haya escrito su propio login, se lo proponemos a
+  // partir del nombre (editable en cualquier momento — deja de auto-rellenarse
+  // en cuanto lo toca a mano).
+  useEffect(() => {
+    if (!usuarioTocado) setValue("usuario", usuarioDesdeNombre(nombre));
+  }, [nombre, usuarioTocado, setValue]);
 
   const cerrar = () => {
     reset({ password: generarPasswordSegura() });
     setSubmitError("");
     setCopiado(false);
+    setUsuarioTocado(false);
     onClose();
   };
 
@@ -129,8 +151,10 @@ export default function NuevoUsuario({ open, onClose, onCreated }) {
               <AppInput
                 label="Usuario"
                 placeholder="Ej. juanp"
+                helperText="Se sugiere solo a partir del nombre — puedes cambiarlo"
                 error={errors.usuario}
-                {...register("usuario", { required: "Campo obligatorio" })}
+                {...usuarioReg}
+                onChange={(e) => { setUsuarioTocado(true); onChangeUsuarioRHF(e); }}
               />
             </Grid>
             <Grid size={{ xs: 12, sm: 6 }}>

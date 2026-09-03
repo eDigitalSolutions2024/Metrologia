@@ -68,6 +68,18 @@ const asignacionSchema = new Schema(
     // factura general del Reporte, que cubre el servicio completo).
     factura: String,
 
+    // Gráfica de calibración adjunta por el técnico (imagen/foto del equipo
+    // de medición o del trazo original) — visible en la cola de Calidad
+    // como respaldo antes de autorizar. Legacy: grafica_path.
+    grafica: {
+      nombreArchivo: String,
+      nombreOriginal: String,
+      mimetype: String,
+      tamano: Number,
+      subidoPor: { type: Schema.Types.ObjectId, ref: "Usuario" },
+      fecha: Date,
+    },
+
     historial: [eventoSchema],
   },
   { timestamps: true }

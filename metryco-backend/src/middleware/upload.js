@@ -111,8 +111,10 @@ function crearSubidaImagen(carpeta, maxMB) {
 
 const { middleware: fotoPerfil, destino: destinoFotos } = crearSubidaImagen("fotos-perfil", 3);
 const { middleware: firma, destino: destinoFirmas } = crearSubidaImagen("firmas", 2);
+const { middleware: grafica, destino: destinoGraficas } = crearSubidaImagen("graficas", 8);
 
 module.exports = {
   pdfCertificado, destinoCertificados, logo, destinoLogos,
   fotoPerfil, destinoFotos, firma, destinoFirmas,
+  grafica, destinoGraficas,
 };

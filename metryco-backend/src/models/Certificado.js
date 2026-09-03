@@ -47,11 +47,18 @@ const certificadoSchema = new Schema(
       accuracy: Number,
       unidades: String,
       divisionMinima: String,
+      resolucion: String,
       rango: String,
+      rangoUso: String,
+      rangoCalibracion: String,
+      localizacion: String,
     },
-    clienteSnapshot: { nombre: String },
+    clienteSnapshot: { nombre: String, direccion: String },
     patronesSnapshot: [
-      { codigo: String, nombre: String, trazabilidad: String, incertidumbre: String },
+      {
+        codigo: String, nombre: String, modelo: String, trazabilidad: String,
+        certificadoNo: String, vencimiento: Date, incertidumbre: String,
+      },
     ],
 
     laboratorio: { nombre: String, acreditacion: String },
@@ -59,6 +66,27 @@ const certificadoSchema = new Schema(
     fechaCalibracion: { type: Date, required: true },
     fechaEmision: { type: Date, default: Date.now },
     vigencia: Date, // opcional — "cuando aplique"
+
+    // Detalle del servicio que exige un certificado formal (antes solo se
+    // preguntaba la asignación) — captura lo mismo que ya se calcula en el
+    // sistema (resultado/criterio) más el contexto operativo del día de la
+    // calibración, que no vive en ningún otro lado.
+    servicio: {
+      razon: String, // "Calibración", "Revisión", "Reparación"...
+      tipo: String, // "Acreditado" | "No acreditado"
+      procedimiento: String, // PRO-CAL-023
+    },
+    condiciones: {
+      temperatura: Number, // °C
+      humedad: Number, // % HR
+    },
+    comentarios: String,
+
+    // Firmantes del certificado — se separan de `creadoPor` porque en un
+    // laboratorio real quien calibra, quien revisa técnicamente y quien
+    // autoriza calidad casi nunca son la misma persona.
+    revisadoPor: { id: { type: Schema.Types.ObjectId, ref: "Usuario" }, nombre: String },
+    autorizadoPor: { id: { type: Schema.Types.ObjectId, ref: "Usuario" }, nombre: String },
 
     estado: { type: String, enum: ESTADOS, default: "borrador" },
 

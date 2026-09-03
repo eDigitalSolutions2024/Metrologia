@@ -13,10 +13,13 @@ import { listarClientes } from "../../services/clientes";
 import { listarPatrones } from "../../services/patrones";
 import { obtenerEquipo, crearEquipo, actualizarEquipo } from "../../services/equipos";
 import { CATEGORIAS } from "./categorias";
+import { useAuth } from "../../core/auth/useAuth";
 
 // Refleja php/nequipo.php: el equipo pertenece a un cliente (empId) y se le
 // asocian uno o más patrones de referencia usados para su calibración.
 export default function EquipoForm() {
+  const { user } = useAuth();
+  const verCosto = user?.rol !== "tecnico";
   const { id } = useParams();
   const navigate = useNavigate();
   const isEdit = !!id;
@@ -58,11 +61,22 @@ export default function EquipoForm() {
     const payload = {
       idInterno: data.idInterno, cliente: data.clienteId, marca: data.marca, modelo: data.modelo,
       serie: data.serie, descripcion: data.descripcion, categoria: data.categoria || undefined,
-      costo: data.costo ? Number(data.costo) : undefined, moneda: data.moneda || undefined, comentarios: data.comentarios,
+      comentarios: data.comentarios,
       localizacion: data.localizacion, unidades: data.unidades, divisionMinima: data.divMinima,
-      rango: data.rango, rangoUso: data.rangoUso, rangoCalibracion: data.rangoCalibracion,
+      // Si no se especifica un rango de uso/calibración distinto, se asume
+      // el mismo Rango general del equipo (es lo más común) en vez de
+      // dejarlos vacíos — se pueden editar después si de verdad difieren.
+      rango: data.rango,
+      rangoUso: data.rangoUso || data.rango,
+      rangoCalibracion: data.rangoCalibracion || data.rango,
       patronesSugeridos: data.patrones,
     };
+    // El técnico no ve Costo/Moneda — no se manda el campo, así no se corre
+    // el riesgo de borrar un valor existente al guardar desde su formulario.
+    if (verCosto) {
+      payload.costo = data.costo ? Number(data.costo) : undefined;
+      payload.moneda = data.moneda || undefined;
+    }
     try {
       if (isEdit) await actualizarEquipo(id, payload);
       else await crearEquipo(payload);
@@ -155,23 +169,27 @@ export default function EquipoForm() {
               <AppInput label="Localización" {...register("localizacion")} />
             </Grid>
             <Grid size={{ xs: 12, md: 6 }}>
-              <AppInput label="Rango de Uso" {...register("rangoUso")} />
+              <AppInput label="Rango de Uso" helperText="Si se deja vacío, se usa el mismo Rango" {...register("rangoUso")} />
             </Grid>
             <Grid size={{ xs: 12, md: 6 }}>
-              <AppInput label="Rango de Calibración" {...register("rangoCalibracion")} />
+              <AppInput label="Rango de Calibración" helperText="Si se deja vacío, se usa el mismo Rango" {...register("rangoCalibracion")} />
             </Grid>
           </Grid>
         </AppCard>
 
-        <AppCard title="Costo y comentarios" sx={{ mb: 3 }}>
+        <AppCard title={verCosto ? "Costo y comentarios" : "Comentarios"} sx={{ mb: 3 }}>
           <Grid container spacing={2}>
-            <Grid size={{ xs: 12, md: 4 }}>
-              <AppInput label="Costo" type="number" {...register("costo")} />
-            </Grid>
-            <Grid size={{ xs: 12, md: 4 }}>
-              <AppInput label="Moneda" placeholder="MXN" {...register("moneda")} />
-            </Grid>
-            <Grid size={{ xs: 12, md: 4 }}>
+            {verCosto && (
+              <>
+                <Grid size={{ xs: 12, md: 4 }}>
+                  <AppInput label="Costo" type="number" {...register("costo")} />
+                </Grid>
+                <Grid size={{ xs: 12, md: 4 }}>
+                  <AppInput label="Moneda" placeholder="MXN" {...register("moneda")} />
+                </Grid>
+              </>
+            )}
+            <Grid size={{ xs: 12, md: verCosto ? 4 : 12 }}>
               <AppInput label="Comentarios" {...register("comentarios")} />
             </Grid>
           </Grid>

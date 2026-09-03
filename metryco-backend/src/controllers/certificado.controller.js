@@ -18,6 +18,10 @@ const obtener = asyncHandler(async (req, res) => {
   res.json({ success: true, data: await service.obtener(req.params.id) });
 });
 
+const porReporte = asyncHandler(async (req, res) => {
+  res.json({ success: true, data: await service.porReporte(req.params.reporteId) });
+});
+
 const emitir = asyncHandler(async (req, res) => {
   res.status(201).json({ success: true, data: await service.emitir(req.body, req.user) });
 });
@@ -59,5 +63,5 @@ const descargarPdf = asyncHandler(async (req, res) => {
 
 module.exports = {
   listar, obtener, exportar, emitir, actualizar, cambiarEstado, adjuntarPdf,
-  anular, regenerarToken, qrPng, qrSvg, descargarPdf,
+  anular, regenerarToken, qrPng, qrSvg, descargarPdf, porReporte,
 };

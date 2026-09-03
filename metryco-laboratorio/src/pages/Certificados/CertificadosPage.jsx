@@ -28,6 +28,8 @@ import {
   listarCertificados, emitirCertificado, cambiarEstadoCertificado, anularCertificado, fetchPdfBlob,
 } from "../../services/certificados";
 import { listarAsignaciones } from "../../services/reportes";
+import { obtenerDirectorio } from "../../services/usuarios";
+import { obtenerLaboratorio } from "../../services/configuracion";
 import QrDialog from "./QrDialog";
 import EtiquetaDialog from "./EtiquetaDialog";
 
@@ -229,26 +231,69 @@ export default function CertificadosPage() {
 }
 
 /* --------------------------- Emitir --------------------------- */
+const RAZONES_SERVICIO = ["Calibración", "Revisión", "Reparación", "Verificación"];
+const TIPOS_SERVICIO = ["Acreditado", "No acreditado"];
+
+const emitirVacio = {
+  sel: "", vigencia: "", razon: "Calibración", tipo: "Acreditado", procedimiento: "",
+  temperatura: "", humedad: "", comentarios: "", revisadoPor: "", autorizadoPor: "",
+};
+
 function EmitirDialog({ open, onClose, onDone }) {
+  const { user } = useAuth();
   const [asignaciones, setAsignaciones] = useState([]);
-  const [sel, setSel] = useState("");
-  const [vigencia, setVigencia] = useState("");
+  const [usuarios, setUsuarios] = useState([]);
+  const [f, setF] = useState(emitirVacio);
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
+  const [vigenciaTocada, setVigenciaTocada] = useState(false);
+  const set = (campo) => (e) => setF((s) => ({ ...s, [campo]: e.target.value }));
 
   useEffect(() => {
     if (!open) return;
-    setSel(""); setVigencia(""); setError("");
-    listarAsignaciones({ estadoCertificado: "sin_generar", pageSize: 100 })
+    // Se pre-selecciona a quien está emitiendo como revisor técnico — sigue
+    // siendo editable, casi siempre es la misma persona quien hace ambas cosas.
+    setF({ ...emitirVacio, revisadoPor: user?.id || "" });
+    setError(""); setVigenciaTocada(false);
+    listarAsignaciones({ estadoCertificado: "autorizado", pageSize: 100 })
       .then(({ items }) => setAsignaciones(items))
       .catch(() => setAsignaciones([]));
-  }, [open]);
+    obtenerDirectorio().then(setUsuarios).catch(() => setUsuarios([]));
+    // Si el laboratorio tiene acreditación configurada, el default razonable
+    // es "Acreditado" — si no, "No acreditado". Solo admin puede leer esta
+    // configuración; si falla (coordinador), se deja el default fijo.
+    obtenerLaboratorio()
+      .then((lab) => setF((s) => ({ ...s, tipo: lab?.acreditacion ? "Acreditado" : "No acreditado" })))
+      .catch(() => {});
+  }, [open, user?.id]);
+
+  // Al elegir la calibración, se propone vigencia = fecha de calibración + 1
+  // año (intervalo típico) — se puede ajustar si el equipo requiere otro.
+  useEffect(() => {
+    if (!f.sel || vigenciaTocada) return;
+    const asig = asignaciones.find((a) => a._id === f.sel);
+    if (!asig?.fechaCalibracion) return;
+    const v = new Date(asig.fechaCalibracion);
+    v.setFullYear(v.getFullYear() + 1);
+    setF((s) => ({ ...s, vigencia: v.toISOString().slice(0, 10) }));
+  }, [f.sel]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const emitir = async () => {
-    if (!sel) { setError("Elige una calibración."); return; }
+    if (!f.sel) { setError("Elige una calibración."); return; }
     setSaving(true); setError("");
     try {
-      await emitirCertificado({ asignacion: sel, vigencia: vigencia || undefined });
+      await emitirCertificado({
+        asignacion: f.sel,
+        vigencia: f.vigencia || undefined,
+        servicio: { razon: f.razon || undefined, tipo: f.tipo || undefined, procedimiento: f.procedimiento || undefined },
+        condiciones: {
+          temperatura: f.temperatura === "" ? undefined : Number(f.temperatura),
+          humedad: f.humedad === "" ? undefined : Number(f.humedad),
+        },
+        comentarios: f.comentarios || undefined,
+        revisadoPor: f.revisadoPor || undefined,
+        autorizadoPor: f.autorizadoPor || undefined,
+      });
       onDone();
     } catch (e) {
       setError(e?.response?.data?.message || "No se pudo emitir el certificado.");
@@ -263,25 +308,71 @@ function EmitirDialog({ open, onClose, onDone }) {
       <DialogContent>
         {error && <Alert severity="error" sx={{ mb: 2, borderRadius: 2 }}>{error}</Alert>}
         <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-          Se genera desde una calibración sin certificado. El equipo, cliente y patrones se
+          Se genera desde una calibración ya autorizada por Calidad. El equipo, cliente y patrones se
           copian como snapshot inmutable.
         </Typography>
-        <TextField
-          select fullWidth size="small" label="Calibración" value={sel}
-          onChange={(e) => setSel(e.target.value)} sx={{ mb: 2 }}
-        >
-          {asignaciones.length === 0 && <MenuItem value="" disabled>No hay calibraciones pendientes de certificar</MenuItem>}
-          {asignaciones.map((a) => (
-            <MenuItem key={a._id} value={a._id}>
-              {a.reporte?.folio} · {a.equipo?.idInterno} — {a.equipo?.marca} {a.equipo?.modelo}
-            </MenuItem>
-          ))}
-        </TextField>
-        <TextField
-          type="date" fullWidth size="small" label="Vigencia (opcional)"
-          value={vigencia} onChange={(e) => setVigencia(e.target.value)}
-          slotProps={{ inputLabel: { shrink: true } }}
-        />
+
+        <Grid container spacing={2}>
+          <Grid size={12}>
+            <TextField
+              select fullWidth size="small" label="Calibración" value={f.sel}
+              onChange={set("sel")}
+            >
+              {asignaciones.length === 0 && <MenuItem value="" disabled>No hay calibraciones autorizadas por certificar</MenuItem>}
+              {asignaciones.map((a) => (
+                <MenuItem key={a._id} value={a._id}>
+                  {a.reporte?.folio} · {a.equipo?.idInterno} — {a.equipo?.marca} {a.equipo?.modelo}
+                </MenuItem>
+              ))}
+            </TextField>
+          </Grid>
+
+          <Grid size={{ xs: 6, md: 4 }}>
+            <TextField select fullWidth size="small" label="Razón del servicio" value={f.razon} onChange={set("razon")}>
+              {RAZONES_SERVICIO.map((r) => <MenuItem key={r} value={r}>{r}</MenuItem>)}
+            </TextField>
+          </Grid>
+          <Grid size={{ xs: 6, md: 4 }}>
+            <TextField select fullWidth size="small" label="Tipo de servicio" value={f.tipo} onChange={set("tipo")}>
+              {TIPOS_SERVICIO.map((t) => <MenuItem key={t} value={t}>{t}</MenuItem>)}
+            </TextField>
+          </Grid>
+          <Grid size={{ xs: 12, md: 4 }}>
+            <TextField fullWidth size="small" label="Procedimiento" placeholder="PRO-CAL-023" value={f.procedimiento} onChange={set("procedimiento")} />
+          </Grid>
+
+          <Grid size={{ xs: 6, md: 3 }}>
+            <TextField fullWidth size="small" type="number" label="Temperatura (°C)" value={f.temperatura} onChange={set("temperatura")} />
+          </Grid>
+          <Grid size={{ xs: 6, md: 3 }}>
+            <TextField fullWidth size="small" type="number" label="Humedad (% HR)" value={f.humedad} onChange={set("humedad")} />
+          </Grid>
+          <Grid size={{ xs: 12, md: 6 }}>
+            <TextField
+              type="date" fullWidth size="small" label="Vigencia"
+              helperText="Sugerida a 1 año de la calibración — puedes cambiarla"
+              value={f.vigencia} onChange={(e) => { setVigenciaTocada(true); set("vigencia")(e); }}
+              slotProps={{ inputLabel: { shrink: true } }}
+            />
+          </Grid>
+
+          <Grid size={{ xs: 6 }}>
+            <TextField select fullWidth size="small" label="Revisó (aprobación técnica)" value={f.revisadoPor} onChange={set("revisadoPor")}>
+              <MenuItem value="">— Sin especificar —</MenuItem>
+              {usuarios.map((u) => <MenuItem key={u._id} value={u._id}>{u.nombre}</MenuItem>)}
+            </TextField>
+          </Grid>
+          <Grid size={{ xs: 6 }}>
+            <TextField select fullWidth size="small" label="Autorizó (aseguramiento de calidad)" value={f.autorizadoPor} onChange={set("autorizadoPor")}>
+              <MenuItem value="">— Sin especificar —</MenuItem>
+              {usuarios.map((u) => <MenuItem key={u._id} value={u._id}>{u.nombre}</MenuItem>)}
+            </TextField>
+          </Grid>
+
+          <Grid size={12}>
+            <TextField fullWidth size="small" multiline minRows={2} label="Comentarios" value={f.comentarios} onChange={set("comentarios")} />
+          </Grid>
+        </Grid>
       </DialogContent>
       <DialogActions sx={{ px: 3, pb: 2 }}>
         <Button onClick={onClose}>Cancelar</Button>

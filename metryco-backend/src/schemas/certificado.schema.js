@@ -9,6 +9,19 @@ const resultadoSchema = z.object({
   nivelConfianza: z.string().trim().optional(),
 }).partial().optional();
 
+const vacio = (schema) => z.preprocess((v) => (v === "" ? undefined : v), schema.optional());
+
+const servicioSchema = z.object({
+  razon: z.string().trim().optional(),
+  tipo: vacio(z.enum(["Acreditado", "No acreditado"], { error: "Tipo de servicio inválido" })),
+  procedimiento: z.string().trim().optional(),
+}).partial().optional();
+
+const condicionesSchema = z.object({
+  temperatura: z.coerce.number().optional(),
+  humedad: z.coerce.number().optional(),
+}).partial().optional();
+
 // emitir(): o viene de una Asignación (equipo/cliente/patrones se resuelven
 // solos), o hay que mandar el equipo suelto — igual que valida el service,
 // solo que aquí se rechaza antes de tocar la base de datos.
@@ -21,6 +34,11 @@ const emitirCertificadoSchema = z.object({
   fechaEmision: z.coerce.date().optional(),
   vigencia: z.coerce.date().optional(),
   resultado: resultadoSchema,
+  servicio: servicioSchema,
+  condiciones: condicionesSchema,
+  comentarios: z.string().trim().optional(),
+  revisadoPor: objectId.optional(),
+  autorizadoPor: objectId.optional(),
 }).refine((d) => d.asignacion || d.equipo, {
   message: "Falta el equipo (o una asignación)",
   path: ["equipo"],
@@ -31,6 +49,9 @@ const actualizarCertificadoSchema = z.object({
   fechaEmision: z.coerce.date().optional(),
   vigencia: z.coerce.date().optional(),
   resultado: resultadoSchema,
+  servicio: servicioSchema,
+  condiciones: condicionesSchema,
+  comentarios: z.string().trim().optional(),
 });
 
 const cambiarEstadoCertificadoSchema = z.object({

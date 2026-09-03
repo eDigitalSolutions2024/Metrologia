@@ -18,6 +18,7 @@ import StraightenOutlinedIcon from "@mui/icons-material/StraightenOutlined";
 import { formatDate } from "../../shared/utils/formatDate";
 import { exportCsv } from "../../shared/utils/exportCsv";
 import { listarPatrones, fetchQrPatronBlob } from "../../services/patrones";
+import { useAuth } from "../../core/auth/useAuth";
 
 function diasParaVencer(fecha) {
   if (!fecha) return null;
@@ -35,6 +36,8 @@ function estadoVigencia(fecha) {
 // Consultar Patrones = php/patrones_buscar.php.
 export default function PatronesPage() {
   const navigate = useNavigate();
+  const { user } = useAuth();
+  const puedeEditar = user?.rol !== "tecnico";
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(0);
   const [items, setItems] = useState([]);
@@ -87,11 +90,13 @@ export default function PatronesPage() {
       align: "center",
       renderCell: (row) => (
         <>
-          <Tooltip title="Editar patrón">
-            <IconButton size="small" onClick={() => navigate(`/equipos/patrones/${row._id}/editar`)}>
-              <EditOutlinedIcon fontSize="small" sx={{ color: "secondary.main" }} />
-            </IconButton>
-          </Tooltip>
+          {puedeEditar && (
+            <Tooltip title="Editar patrón">
+              <IconButton size="small" onClick={() => navigate(`/equipos/patrones/${row._id}/editar`)}>
+                <EditOutlinedIcon fontSize="small" sx={{ color: "secondary.main" }} />
+              </IconButton>
+            </Tooltip>
+          )}
           <Tooltip title="Etiqueta / imprimir">
             <IconButton size="small" onClick={() => setEtiquetaPatron(row)}>
               <QrCode2OutlinedIcon fontSize="small" sx={{ color: "primary.main" }} />
