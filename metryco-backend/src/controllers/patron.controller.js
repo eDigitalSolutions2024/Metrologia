@@ -34,4 +34,24 @@ const porVencer = asyncHandler(async (req, res) => {
   res.json({ success: true, data: await service.porVencer(dias) });
 });
 
-module.exports = { listar, obtener, crear, actualizar, eliminar, adjuntarPdf, porVencer };
+const adjuntarCertificado = asyncHandler(async (req, res) => {
+  res.json({ success: true, data: await service.adjuntarCertificado(req.params.id, req.file) });
+});
+
+const descargarCertificado = asyncHandler(async (req, res) => {
+  const { ruta, nombre } = await service.archivoStream(req.params.id);
+  res.download(ruta, nombre);
+});
+
+const qrPng = asyncHandler(async (req, res) => {
+  res.type("png").send(await service.qrPng(req.params.id));
+});
+
+const qrSvg = asyncHandler(async (req, res) => {
+  res.type("svg").send(await service.qrSvg(req.params.id));
+});
+
+module.exports = {
+  listar, obtener, crear, actualizar, eliminar, adjuntarPdf, porVencer,
+  adjuntarCertificado, descargarCertificado, qrPng, qrSvg,
+};

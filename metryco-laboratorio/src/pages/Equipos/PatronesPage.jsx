@@ -8,11 +8,13 @@ import SearchIcon from "@mui/icons-material/Search";
 import AddIcon from "@mui/icons-material/Add";
 import EditOutlinedIcon from "@mui/icons-material/EditOutlined";
 import FileDownloadOutlinedIcon from "@mui/icons-material/FileDownloadOutlined";
+import QrCode2OutlinedIcon from "@mui/icons-material/QrCode2Outlined";
 
 import AppButton from "../../shared/components/AppButton";
 import AppTable from "../../shared/components/AppTable";
 import PageHeader from "../../shared/components/PageHeader";
 import StatCard from "../../shared/components/StatCard";
+import EtiquetaEquipoDialog from "../../shared/components/EtiquetaEquipoDialog";
 import StraightenOutlinedIcon from "@mui/icons-material/StraightenOutlined";
 import VerifiedOutlinedIcon from "@mui/icons-material/VerifiedOutlined";
 import ScheduleOutlinedIcon from "@mui/icons-material/ScheduleOutlined";
@@ -20,7 +22,8 @@ import ReportGmailerrorredOutlinedIcon from "@mui/icons-material/ReportGmailerro
 import { formatDate } from "../../shared/utils/formatDate";
 import { exportCsv } from "../../shared/utils/exportCsv";
 import { CATEGORIAS } from "./categorias";
-import { listarPatrones } from "../../services/patrones";
+import { listarPatrones, fetchQrPatronBlob } from "../../services/patrones";
+import { useAuth } from "../../core/auth/useAuth";
 
 const VIG = {
   vigente: { label: "Vigente", color: "success" },
@@ -31,6 +34,8 @@ const VIG = {
 
 export default function PatronesPage() {
   const navigate = useNavigate();
+  const { user } = useAuth();
+  const puedeEditar = user?.rol !== "tecnico";
   const [rows, setRows] = useState([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -38,6 +43,7 @@ export default function PatronesPage() {
   const [categoria, setCategoria] = useState("");
   const [vigencia, setVigencia] = useState("");
   const [page, setPage] = useState(0);
+  const [etiquetaPatron, setEtiquetaPatron] = useState(null);
 
   const cargar = useCallback(() => {
     setLoading(true);
@@ -82,11 +88,20 @@ export default function PatronesPage() {
     {
       field: "acciones", headerName: "Acciones", align: "center",
       renderCell: (r) => (
-        <Tooltip title="Editar patrón">
-          <IconButton size="small" onClick={() => navigate(`/equipos/patrones/${r._id}/editar`)}>
-            <EditOutlinedIcon fontSize="small" sx={{ color: "secondary.main" }} />
-          </IconButton>
-        </Tooltip>
+        <>
+          {puedeEditar && (
+            <Tooltip title="Editar patrón">
+              <IconButton size="small" onClick={() => navigate(`/equipos/patrones/${r._id}/editar`)}>
+                <EditOutlinedIcon fontSize="small" sx={{ color: "secondary.main" }} />
+              </IconButton>
+            </Tooltip>
+          )}
+          <Tooltip title="Etiqueta / imprimir">
+            <IconButton size="small" onClick={() => setEtiquetaPatron(r)}>
+              <QrCode2OutlinedIcon fontSize="small" sx={{ color: "primary.main" }} />
+            </IconButton>
+          </Tooltip>
+        </>
       ),
     },
   ];
@@ -161,6 +176,14 @@ export default function PatronesPage() {
         rowsPerPage={10}
         onPageChange={setPage}
         emptyText="Sin patrones registrados"
+      />
+
+      <EtiquetaEquipoDialog
+        open={!!etiquetaPatron}
+        onClose={() => setEtiquetaPatron(null)}
+        item={etiquetaPatron}
+        tipo="patron"
+        fetchQr={fetchQrPatronBlob}
       />
     </Box>
   );

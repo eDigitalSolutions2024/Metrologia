@@ -1,8 +1,8 @@
 import api, { ENDPOINTS } from "./api";
 
-export async function listarReportes({ search = "", status = "todos", clienteId = "", page = 0, pageSize = 10 } = {}) {
+export async function listarReportes({ search = "", status = "todos", clienteId = "", mes = "", anio = "", page = 0, pageSize = 10 } = {}) {
   const { data } = await api.get(ENDPOINTS.REPORTES, {
-    params: { search, status, clienteId, page, pageSize },
+    params: { search, status, clienteId, mes, anio, page, pageSize },
   });
   return { items: data.data, total: data.total };
 }
@@ -10,6 +10,11 @@ export async function listarReportes({ search = "", status = "todos", clienteId 
 export async function obtenerReporte(id) {
   const { data } = await api.get(`${ENDPOINTS.REPORTES}/${id}`);
   return data.data; // { reporte, asignaciones }
+}
+
+export async function obtenerReporteParaImprimir(id) {
+  const { data } = await api.get(`${ENDPOINTS.REPORTES}/${id}/imprimir`);
+  return data.data; // { reporte, asignaciones, laboratorio }
 }
 
 export async function crearReporte(payload) {
@@ -27,12 +32,22 @@ export async function eliminarReporte(id) {
   return data.data;
 }
 
+export async function agregarComentarioReporte(id, texto) {
+  const { data } = await api.post(`${ENDPOINTS.REPORTES}/${id}/comentarios`, { texto });
+  return data.data;
+}
+
 /* ---- Asignaciones ---- */
-export async function listarAsignaciones({ reporteId = "", estadoCertificado = "", estadoCalibracion = "", page = 0, pageSize = 50 } = {}) {
+export async function listarAsignaciones({ reporteId = "", estadoCertificado = "", estadoCalibracion = "", tecnicoAsignado = "", page = 0, pageSize = 50 } = {}) {
   const { data } = await api.get(ENDPOINTS.ASIGNACIONES, {
-    params: { reporteId, estadoCertificado, estadoCalibracion, page, pageSize },
+    params: { reporteId, estadoCertificado, estadoCalibracion, tecnicoAsignado, page, pageSize },
   });
   return { items: data.data, total: data.total };
+}
+
+export async function listarCalidad({ clienteId = "" } = {}) {
+  const { data } = await api.get(`${ENDPOINTS.ASIGNACIONES}/calidad`, { params: { clienteId } });
+  return data.data;
 }
 
 export async function crearAsignacion(payload) {
@@ -40,7 +55,26 @@ export async function crearAsignacion(payload) {
   return data.data;
 }
 
+export async function actualizarAsignacion(id, payload) {
+  const { data } = await api.put(`${ENDPOINTS.ASIGNACIONES}/${id}`, payload);
+  return data.data;
+}
+
 export async function cambiarEstadoAsignacion(id, { dominio, valor, motivo }) {
   const { data } = await api.patch(`${ENDPOINTS.ASIGNACIONES}/${id}/estado`, { dominio, valor, motivo });
   return data.data;
+}
+
+export async function subirGraficaAsignacion(id, archivo) {
+  const form = new FormData();
+  form.append("archivo", archivo);
+  const { data } = await api.post(`${ENDPOINTS.ASIGNACIONES}/${id}/grafica`, form, {
+    headers: { "Content-Type": "multipart/form-data" },
+  });
+  return data.data;
+}
+
+export async function fetchGraficaAsignacionBlob(id) {
+  const { data } = await api.get(`${ENDPOINTS.ASIGNACIONES}/${id}/grafica`, { responseType: "blob" });
+  return data;
 }

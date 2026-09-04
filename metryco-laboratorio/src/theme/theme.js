@@ -1,31 +1,37 @@
-import { createTheme } from "@mui/material/styles";
+import { createTheme, lighten, darken } from "@mui/material/styles";
 
 /* ------------------------------------------------------------------ *
- *  Paleta                                                             *
+ *  Paleta — parametrizable por marca (Administración → Colores)       *
  * ------------------------------------------------------------------ */
-const light = {
-  primary:   { main: "#0F172A", light: "#334155", dark: "#020617", contrastText: "#fff" },
-  secondary: { main: "#2563EB", light: "#3B82F6", dark: "#1D4ED8", contrastText: "#fff" },
-  success:   { main: "#16A34A", light: "#22C55E", dark: "#15803D" },
-  warning:   { main: "#D97706", light: "#F59E0B", dark: "#B45309" },
-  error:     { main: "#DC2626", light: "#EF4444", dark: "#B91C1C" },
-  info:      { main: "#0891B2", light: "#06B6D4", dark: "#0E7490" },
-  background:{ default: "#F6F8FC", paper: "#FFFFFF" },
-  text:      { primary: "#0F172A", secondary: "#5B6B7C" },
-  divider:   "#E4E9F2",
-};
+export const COLORES_MARCA_DEFAULT = { primario: "#0F172A", secundario: "#2563EB" };
 
-const dark = {
-  primary:   { main: "#E2E8F0", light: "#F1F5F9", dark: "#CBD5E1", contrastText: "#0B1220" },
-  secondary: { main: "#3B82F6", light: "#60A5FA", dark: "#2563EB", contrastText: "#fff" },
-  success:   { main: "#22C55E" },
-  warning:   { main: "#F59E0B" },
-  error:     { main: "#F87171" },
-  info:      { main: "#22D3EE" },
-  background:{ default: "#080D16", paper: "#0F1826" },
-  text:      { primary: "#E6EDF6", secondary: "#93A4B7" },
-  divider:   "#1E2A3C",
-};
+function construirPaleta({ primario, secundario } = COLORES_MARCA_DEFAULT) {
+  const light = {
+    primary:   { main: primario, light: lighten(primario, 0.28), dark: darken(primario, 0.35), contrastText: "#fff" },
+    secondary: { main: secundario, light: lighten(secundario, 0.18), dark: darken(secundario, 0.18), contrastText: "#fff" },
+    success:   { main: "#16A34A", light: "#22C55E", dark: "#15803D" },
+    warning:   { main: "#D97706", light: "#F59E0B", dark: "#B45309" },
+    error:     { main: "#DC2626", light: "#EF4444", dark: "#B91C1C" },
+    info:      { main: "#0891B2", light: "#06B6D4", dark: "#0E7490" },
+    background:{ default: "#F6F8FC", paper: "#FFFFFF" },
+    text:      { primary: "#0F172A", secondary: "#5B6B7C" },
+    divider:   "#E4E9F2",
+  };
+
+  const dark = {
+    primary:   { main: "#E2E8F0", light: "#F1F5F9", dark: "#CBD5E1", contrastText: "#0B1220" },
+    secondary: { main: lighten(secundario, 0.2), light: lighten(secundario, 0.35), dark: secundario, contrastText: "#fff" },
+    success:   { main: "#22C55E" },
+    warning:   { main: "#F59E0B" },
+    error:     { main: "#F87171" },
+    info:      { main: "#22D3EE" },
+    background:{ default: "#080D16", paper: "#0F1826" },
+    text:      { primary: "#E6EDF6", secondary: "#93A4B7" },
+    divider:   "#1E2A3C",
+  };
+
+  return { light, dark };
+}
 
 /* sombras suaves y en capas (look "producto", no material clásico) */
 const softShadows = [
@@ -39,8 +45,31 @@ const softShadows = [
   ...Array(18).fill("0 24px 60px rgba(15,23,42,.14)"),
 ];
 
-const theme = createTheme({
-  cssVariables: true,
+export function hexToRgb(hex) {
+  const n = hex.replace("#", "");
+  const r = parseInt(n.substring(0, 2), 16);
+  const g = parseInt(n.substring(2, 4), 16);
+  const b = parseInt(n.substring(4, 6), 16);
+  return `${r},${g},${b}`;
+}
+
+/** Crea el theme de MUI a partir de los colores de marca (default o los guardados en Administración → Colores). */
+export function crearTheme(coloresMarca = COLORES_MARCA_DEFAULT) {
+  const primario = coloresMarca.primario || COLORES_MARCA_DEFAULT.primario;
+  const secundario = coloresMarca.secundario || COLORES_MARCA_DEFAULT.secundario;
+  const { light, dark } = construirPaleta({ primario, secundario });
+  const rgbSecundario = hexToRgb(secundario);
+  const primarioOscuro = darken(primario, 0.55);
+  const primarioClaro = lighten(primario, 0.15);
+  const secundarioOscuro = darken(secundario, 0.28);
+  const secundarioClaro = lighten(secundario, 0.18);
+
+  return createTheme({
+  // "media" (el default) solo reacciona a la preferencia del SO — el botón
+  // de modo oscuro/claro del Navbar (useColorScheme().setMode) no hacía nada
+  // visualmente porque las reglas CSS del dark quedaban dentro de un
+  // @media (prefers-color-scheme: dark) en vez de activarse por selector.
+  cssVariables: { colorSchemeSelector: "class" },
   colorSchemes: { light: { palette: light }, dark: { palette: dark } },
   colorSchemeSelector: "class", // permite que el toggle claro/oscuro tenga efecto
   shape: { borderRadius: 14 },
@@ -91,13 +120,13 @@ const theme = createTheme({
         },
         sizeLarge: { paddingBlock: 10, paddingInline: 22, fontSize: 15 },
         containedSecondary: {
-          background: "linear-gradient(135deg, #2563EB 0%, #1D4ED8 100%)",
-          boxShadow: "0 6px 16px rgba(37,99,235,.28)",
-          "&:hover": { background: "linear-gradient(135deg, #1D4ED8 0%, #1E40AF 100%)", boxShadow: "0 8px 22px rgba(37,99,235,.34)" },
+          background: `linear-gradient(135deg, ${secundarioClaro} 0%, ${secundario} 100%)`,
+          boxShadow: `0 6px 16px rgba(${rgbSecundario},.28)`,
+          "&:hover": { background: `linear-gradient(135deg, ${secundario} 0%, ${secundarioOscuro} 100%)`, boxShadow: `0 8px 22px rgba(${rgbSecundario},.34)` },
         },
         containedPrimary: {
-          background: "linear-gradient(135deg, #1E293B 0%, #0F172A 100%)",
-          "&:hover": { background: "linear-gradient(135deg, #0F172A 0%, #020617 100%)" },
+          background: `linear-gradient(135deg, ${primarioClaro} 0%, ${primario} 100%)`,
+          "&:hover": { background: `linear-gradient(135deg, ${primario} 0%, ${primarioOscuro} 100%)` },
         },
         outlined: { borderColor: "var(--mui-palette-divider)", "&:hover": { borderColor: "var(--mui-palette-text-disabled)", background: "var(--mui-palette-action-hover)" } },
       },
@@ -110,7 +139,7 @@ const theme = createTheme({
           transition: "box-shadow .15s ease, border-color .15s ease",
           "& .MuiOutlinedInput-notchedOutline": { borderColor: "var(--mui-palette-divider)" },
           "&:hover .MuiOutlinedInput-notchedOutline": { borderColor: "var(--mui-palette-text-disabled)" },
-          "&.Mui-focused": { boxShadow: "0 0 0 4px rgba(37,99,235,.12)" },
+          "&.Mui-focused": { boxShadow: `0 0 0 4px rgba(${rgbSecundario},.12)` },
         },
       },
     },
@@ -153,6 +182,7 @@ const theme = createTheme({
     MuiAlert: { styleOverrides: { root: { borderRadius: 12 } } },
     MuiLinearProgress: { styleOverrides: { root: { borderRadius: 999, height: 6 } } },
   },
-});
+  });
+}
 
-export default theme;
+export default crearTheme();

@@ -7,15 +7,29 @@ import GuestRoute from "../core/auth/GuestRoute";
 import VerCertificado from "../pages/Publico/VerCertificado";
 import CertificadosPage from "../pages/Certificados/CertificadosPage";
 import InformeCalibracion from "../pages/Certificados/InformeCalibracion";
+import InformeReporteCertificados from "../pages/Certificados/InformeReporteCertificados";
+import CotizacionImprimir from "../pages/Cotizaciones/CotizacionImprimir";
+import ReporteServicioImprimir from "../pages/Reportes/imprimir/ReporteServicioImprimir";
+import EntregaEquipoImprimir from "../pages/Reportes/imprimir/EntregaEquipoImprimir";
+import EntregaCertificadosImprimir from "../pages/Reportes/imprimir/EntregaCertificadosImprimir";
 import IncertidumbrePage from "../pages/Incertidumbre/IncertidumbrePage";
+import PlantillasIncertidumbrePage from "../pages/Incertidumbre/PlantillasIncertidumbrePage";
+import PlantillaIncertidumbreForm from "../pages/Incertidumbre/PlantillaIncertidumbreForm";
 
 import Dashboard from "../pages/Dashboard/Dashboard";
 import Usuarios from "../pages/Usuarios/Usuarios";
 import General from "../pages/General/General";
+import RolesMenuPage from "../pages/Administracion/RolesMenuPage";
+import LaboratorioPage from "../pages/Administracion/LaboratorioPage";
+import ColoresPage from "../pages/Administracion/ColoresPage";
+import RazonesSocialesPage from "../pages/Administracion/RazonesSocialesPage";
+import AuditoriaPage from "../pages/Administracion/AuditoriaPage";
 import ClientesPage from "../pages/Clientes/ClientesPage";
 import ClienteForm from "../pages/Clientes/ClienteForm";
 import CotizacionesPage from "../pages/Cotizaciones/CotizacionesPage";
 import ReportesPage from "../pages/Reportes/ReportesPage";
+import MisAsignacionesPage from "../pages/Reportes/MisAsignacionesPage";
+import ReporteDetallePage from "../pages/Reportes/ReporteDetallePage";
 import ReportesExportar from "../pages/Reportes/ReportesExportar";
 import CalidadPage from "../pages/Calidad/CalidadPage";
 import EquiposPage from "../pages/Equipos/EquiposPage";
@@ -46,6 +60,46 @@ export default function AppRouter() {
           </ProtectedRoute>
         }
       />
+      <Route
+        path="/informe/reporte/:id/certificados"
+        element={
+          <ProtectedRoute>
+            <InformeReporteCertificados />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/informe/cotizacion/:id"
+        element={
+          <ProtectedRoute>
+            <CotizacionImprimir />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/informe/reporte/:id"
+        element={
+          <ProtectedRoute>
+            <ReporteServicioImprimir />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/informe/reporte-entrega/:id"
+        element={
+          <ProtectedRoute>
+            <EntregaEquipoImprimir />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/informe/reporte-entrega-certificados/:id"
+        element={
+          <ProtectedRoute>
+            <EntregaCertificadosImprimir />
+          </ProtectedRoute>
+        }
+      />
 
       <Route
         path={ROUTES.LOGIN}
@@ -67,14 +121,24 @@ export default function AppRouter() {
         <Route index element={<Dashboard />} />
         <Route path="reportes/certificados" element={<CertificadosPage />} />
         <Route path="incertidumbre" element={<IncertidumbrePage />} />
+        <Route path="incertidumbre/plantillas" element={<PlantillasIncertidumbrePage />} />
+        <Route path="incertidumbre/plantillas/nueva" element={<PlantillaIncertidumbreForm />} />
+        <Route path="incertidumbre/plantillas/:id/editar" element={<PlantillaIncertidumbreForm />} />
         <Route path="usuarios" element={<Usuarios />} />
         <Route path="general" element={<General />} />
+        <Route path="administracion/roles-menu" element={<RolesMenuPage />} />
+        <Route path="administracion/laboratorio" element={<LaboratorioPage />} />
+        <Route path="administracion/colores" element={<ColoresPage />} />
+        <Route path="administracion/razones-sociales" element={<RazonesSocialesPage />} />
+        <Route path="administracion/auditoria" element={<AuditoriaPage />} />
         <Route path="clientes" element={<ClientesPage />} />
         <Route path="clientes/nuevo" element={<ClienteForm />} />
         <Route path="clientes/:id/editar" element={<ClienteForm />} />
         <Route path="cotizaciones" element={<CotizacionesPage />} />
         <Route path="reportes" element={<ReportesPage />} />
+        <Route path="reportes/mis-asignaciones" element={<MisAsignacionesPage />} />
         <Route path="reportes/exportar" element={<ReportesExportar />} />
+        <Route path="reportes/:id" element={<ReporteDetallePage />} />
         <Route path="calidad" element={<CalidadPage />} />
         <Route path="equipos" element={<EquiposPage />} />
         <Route path="equipos/nuevo" element={<EquipoForm />} />

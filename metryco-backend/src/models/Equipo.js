@@ -1,5 +1,5 @@
 const { Schema, model } = require("mongoose");
-const { CATEGORIAS_EQUIPO } = require("./_shared");
+const { CATEGORIAS_EQUIPO, vacioAUndefined } = require("./_shared");
 
 /**
  * Equipo del CLIENTE que entra al laboratorio a calibrarse (tabla `equipo` del
@@ -15,7 +15,7 @@ const equipoSchema = new Schema(
     modelo: String,
     serie: String,
     descripcion: { type: String, trim: true },
-    categoria: { type: String, enum: CATEGORIAS_EQUIPO },
+    categoria: { type: String, enum: CATEGORIAS_EQUIPO, set: vacioAUndefined },
     subtipo: String, // "DIGITAL", "ANALÓGICO", "CARÁTULA"... (campo TIPO del informe)
     accuracy: Number, // exactitud / EMP del instrumento, en `unidades`
 
@@ -29,7 +29,7 @@ const equipoSchema = new Schema(
     localizacion: String,
     comentarios: String,
     costo: Number,
-    moneda: { type: String, enum: ["MXN", "USD"] },
+    moneda: { type: String, enum: ["MXN", "USD"], set: vacioAUndefined },
 
     // Catálogo: patrones que normalmente se usan para calibrar este equipo.
     // (Los patrones REALMENTE usados en una calibración se guardan en Asignacion.)

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   Box, Typography, Paper, Grid, Button, Dialog, DialogTitle, DialogContent, DialogActions, Chip,
@@ -10,7 +10,7 @@ import ReceiptLongOutlinedIcon from "@mui/icons-material/ReceiptLongOutlined";
 import AppButton from "../../shared/components/AppButton";
 import { formatDate } from "../../shared/utils/formatDate";
 import { formatCurrency } from "../../shared/utils/currency";
-import { MOCK } from "./mockData";
+import { listarFacturas } from "../../services/cobranza";
 
 const MESES = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
   "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"];
@@ -36,6 +36,11 @@ export default function CalendarioPagosPage() {
   const [year, setYear] = useState(now.getFullYear());
   const [month, setMonth] = useState(now.getMonth());
   const [diaSeleccionado, setDiaSeleccionado] = useState(null);
+  const [registros, setRegistros] = useState([]);
+
+  useEffect(() => {
+    listarFacturas().then(setRegistros).catch(() => setRegistros([]));
+  }, []);
 
   const daysInMonth = getDaysInMonth(year, month);
   const firstDay = getFirstDayMonFirst(year, month);
@@ -45,8 +50,9 @@ export default function CalendarioPagosPage() {
   const prevMonth = () => { if (month === 0) { setMonth(11); setYear((y) => y - 1); } else setMonth((m) => m - 1); };
   const nextMonth = () => { if (month === 11) { setMonth(0); setYear((y) => y + 1); } else setMonth((m) => m + 1); };
 
-  const registrosPorDia = MOCK.reduce((acc, r) => {
-    (acc[r.fechaPago] ??= []).push(r);
+  const registrosPorDia = registros.reduce((acc, r) => {
+    const fecha = String(r.fechaPago).slice(0, 10);
+    (acc[fecha] ??= []).push(r);
     return acc;
   }, {});
 
@@ -125,9 +131,9 @@ export default function CalendarioPagosPage() {
             <Typography variant="body2" color="text.secondary">Sin registros para este día.</Typography>
           ) : (
             registrosDelDia.map((r) => (
-              <Box key={r.id} sx={{ py: 1.25, borderBottom: 1, borderColor: "divider" }}>
+              <Box key={r._id} sx={{ py: 1.25, borderBottom: 1, borderColor: "divider" }}>
                 <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                  <Typography variant="body2" fontWeight={700}>{r.clienteNombre} — {r.oc}</Typography>
+                  <Typography variant="body2" fontWeight={700}>{r.cliente?.nombre || "—"} — {r.oc}</Typography>
                   <Chip label={r.statusPago === 1 ? "Pagado" : "Pendiente"} color={r.statusPago === 1 ? "success" : "warning"} size="small" />
                 </Box>
                 <Typography variant="caption" color="text.secondary" sx={{ display: "block" }}>

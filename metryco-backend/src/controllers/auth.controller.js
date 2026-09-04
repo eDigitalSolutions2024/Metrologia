@@ -1,6 +1,7 @@
 const asyncHandler = require("../utils/asyncHandler");
 const AppError = require("../utils/AppError");
 const authService = require("../services/auth.service");
+const auditoriaService = require("../services/auditoria.service");
 
 const REFRESH_COOKIE = "metryco_refresh";
 const isProd = process.env.NODE_ENV === "production";
@@ -11,7 +12,23 @@ const login = asyncHandler(async (req, res) => {
     throw new AppError("Usuario y contraseña son obligatorios", 400);
   }
 
-  const { accessToken, refreshToken, user } = await authService.login(usuario, password);
+  let resultado;
+  try {
+    resultado = await authService.login(usuario, password);
+  } catch (err) {
+    auditoriaService.registrar({
+      accion: "login_fallido", usuarioIntentado: usuario, exito: false, ip: req.ip,
+    });
+    throw err;
+  }
+
+  const { accessToken, refreshToken, user } = resultado;
+
+  auditoriaService.registrar({
+    accion: "login_exitoso",
+    reqUser: { id: user.id, usuario: user.usuario, rol: user.rol },
+    ip: req.ip,
+  });
 
   res.cookie(REFRESH_COOKIE, refreshToken, {
     httpOnly: true,

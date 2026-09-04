@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import {
-  Box, Typography, Grid, Paper, Chip, Tooltip, IconButton,
+  Box, Typography, Grid, Paper, Chip, Tooltip, IconButton, Alert, InputAdornment,
   Dialog, DialogTitle, DialogContent, DialogActions, MenuItem, Select, FormControl, InputLabel, Tab, Tabs,
 } from "@mui/material";
 import { useTheme } from "@mui/material/styles";
@@ -11,6 +12,7 @@ import ReplayOutlinedIcon from "@mui/icons-material/ReplayOutlined";
 import FileDownloadOutlinedIcon from "@mui/icons-material/FileDownloadOutlined";
 
 import AppButton from "../../shared/components/AppButton";
+import AppCard from "../../shared/components/AppCard";
 import AppTable from "../../shared/components/AppTable";
 import PageHeader from "../../shared/components/PageHeader";
 import StatCard from "../../shared/components/StatCard";
@@ -21,16 +23,14 @@ import { formatDate } from "../../shared/utils/formatDate";
 import { formatCurrency } from "../../shared/utils/currency";
 import { exportCsv } from "../../shared/utils/exportCsv";
 import { listarClientes } from "../../services/clientes";
-import { MOCK, DIAS_PAGO_OPCIONES } from "./mockData";
+import { crearFactura, listarFacturas, aplicarPagoFactura, reabrirFactura } from "../../services/cobranza";
+import { pedirRefrescoAlertas } from "../../shared/utils/alertasBus";
+import { DIAS_PAGO_OPCIONES } from "./constantes";
 
-function sumarDias(fecha, dias) {
-  const d = new Date(fecha);
-  d.setDate(d.getDate() + Number(dias));
-  return d.toISOString().slice(0, 10);
-}
-
-function NuevoRegistroDialog({ open, onClose, onCreated }) {
+function NuevoRegistroDialog({ open, onClose, onCreated, prefill }) {
   const [clientes, setClientes] = useState([]);
+  const [error, setError] = useState("");
+  const [guardando, setGuardando] = useState(false);
   const { register, control, handleSubmit, reset, formState: { errors } } = useForm({
     defaultValues: { oc: "", clienteId: "", folio: "", monto: "", fechaCr: "", diasPago: 30, comentarios: "" },
   });
@@ -40,68 +40,122 @@ function NuevoRegistroDialog({ open, onClose, onCreated }) {
     listarClientes({ pageSize: 200 }).then(({ items }) => setClientes(items)).catch(() => setClientes([]));
   }, [open]);
 
-  const cerrar = () => { reset(); onClose(); };
+  // Prellenado al venir de "Generar factura" desde una Cotización aprobada.
+  useEffect(() => {
+    if (open && prefill) {
+      reset({
+        oc: "", clienteId: prefill.cliente || "", folio: prefill.folio ? `FAC-${prefill.folio}` : "",
+        monto: prefill.monto || "", fechaCr: "", diasPago: 30, comentarios: "",
+      });
+    }
+  }, [open, prefill, reset]);
 
-  const onSubmit = (data) => {
-    const cliente = clientes.find((c) => c._id === data.clienteId);
-    onCreated({
-      ...data,
-      clienteNombre: cliente?.nombre ?? "",
-      monto: Number(data.monto),
-      fechaPago: sumarDias(data.fechaCr, data.diasPago),
-      statusPago: 0,
-      fechaPagada: "",
-    });
-    cerrar();
+  const cerrar = () => { reset(); setError(""); onClose(); };
+
+  const onSubmit = async (data) => {
+    setGuardando(true); setError("");
+    try {
+      const factura = await crearFactura({
+        ...data, cliente: data.clienteId, monto: Number(data.monto),
+        cotizacion: prefill?.cotizacion || undefined,
+      });
+      onCreated(factura);
+      cerrar();
+    } catch (err) {
+      setError(err?.response?.data?.message || "No se pudo guardar el registro.");
+    } finally {
+      setGuardando(false);
+    }
   };
 
   return (
     <Dialog open={open} onClose={cerrar} fullWidth maxWidth="sm">
-      <DialogTitle>Generar Nuevo Registro en Calendario</DialogTitle>
+      <DialogTitle sx={{ fontWeight: 700 }}>
+        {prefill ? `Generar factura — Cotización ${prefill.folio}` : "Nuevo Registro de Cuenta por Cobrar"}
+      </DialogTitle>
       <Box component="form" onSubmit={handleSubmit(onSubmit)}>
         <DialogContent>
-          <Grid container spacing={2}>
-            <Grid size={{ xs: 12, sm: 6 }}>
-              <AppInput label="Orden de Compra" error={errors.oc} {...register("oc", { required: "Obligatorio" })} />
+          {error && <Alert severity="error" sx={{ mb: 2, borderRadius: 2 }} onClose={() => setError("")}>{error}</Alert>}
+
+          <AppCard dense title="Cliente y referencia" sx={{ mb: 2.5 }}>
+            <Grid container spacing={2}>
+              <Grid size={{ xs: 12, sm: 6 }}>
+                <Controller
+                  name="clienteId"
+                  control={control}
+                  rules={{ required: "Elige el cliente" }}
+                  render={({ field }) => (
+                    <FormControl fullWidth size="small" error={!!errors.clienteId}>
+                      <InputLabel>Cliente</InputLabel>
+                      <Select label="Cliente" {...field} value={field.value ?? ""} sx={{ borderRadius: 2 }}>
+                        {clientes.length === 0 && <MenuItem value="" disabled>No hay clientes registrados</MenuItem>}
+                        {clientes.map((c) => <MenuItem key={c._id} value={c._id}>{c.nombre}</MenuItem>)}
+                      </Select>
+                    </FormControl>
+                  )}
+                />
+              </Grid>
+              <Grid size={{ xs: 12, sm: 6 }}>
+                <AppInput
+                  label="Orden de Compra" placeholder="Ej. OC-2026-0451"
+                  helperText="Número de orden de compra del cliente"
+                  error={errors.oc} {...register("oc", { required: "Obligatorio" })}
+                />
+              </Grid>
             </Grid>
-            <Grid size={{ xs: 12, sm: 6 }}>
-              <FormControl fullWidth size="small" error={!!errors.clienteId}>
-                <InputLabel>Cliente</InputLabel>
-                <Select label="Cliente" defaultValue="" {...register("clienteId", { required: true })} sx={{ borderRadius: 2 }}>
-                  {clientes.map((c) => <MenuItem key={c._id} value={c._id}>{c.nombre}</MenuItem>)}
-                </Select>
-              </FormControl>
+          </AppCard>
+
+          <AppCard dense title="Datos de la factura" sx={{ mb: 1 }}>
+            <Grid container spacing={2}>
+              <Grid size={{ xs: 12, sm: 6 }}>
+                <AppInput
+                  label="Folio de factura" placeholder="Ej. FAC-2026-0089"
+                  helperText="Folio ya timbrado, o uno provisional"
+                  error={errors.folio} {...register("folio", { required: "Obligatorio" })}
+                />
+              </Grid>
+              <Grid size={{ xs: 12, sm: 6 }}>
+                <AppInput
+                  label="Monto" type="number" placeholder="0.00"
+                  slotProps={{
+                    htmlInput: { min: 0.01, step: "0.01" },
+                    input: {
+                      startAdornment: <InputAdornment position="start">$</InputAdornment>,
+                      endAdornment: <InputAdornment position="end">MXN</InputAdornment>,
+                    },
+                  }}
+                  error={errors.monto}
+                  {...register("monto", { required: "Obligatorio", min: { value: 0.01, message: "Debe ser mayor a 0" } })}
+                />
+              </Grid>
+              <Grid size={{ xs: 12, sm: 6 }}>
+                <Controller
+                  name="fechaCr"
+                  control={control}
+                  rules={{ required: "Obligatorio" }}
+                  render={({ field }) => <AppDatePicker label="Fecha C/R (creación/recepción)" error={errors.fechaCr} {...field} />}
+                />
+              </Grid>
+              <Grid size={{ xs: 12, sm: 6 }}>
+                <FormControl fullWidth size="small">
+                  <InputLabel>Días de Pago</InputLabel>
+                  <Select label="Días de Pago" defaultValue={30} {...register("diasPago")} sx={{ borderRadius: 2 }}>
+                    {DIAS_PAGO_OPCIONES.map((d) => <MenuItem key={d} value={d}>{d === 0 ? "Contado" : `${d} días`}</MenuItem>)}
+                  </Select>
+                </FormControl>
+              </Grid>
+              <Grid size={{ xs: 12 }}>
+                <AppInput
+                  label="Comentarios" placeholder="Notas visibles en el calendario de pagos (opcional)"
+                  multiline minRows={2} {...register("comentarios")}
+                />
+              </Grid>
             </Grid>
-            <Grid size={{ xs: 12, sm: 6 }}>
-              <AppInput label="Folio" error={errors.folio} {...register("folio", { required: "Obligatorio" })} />
-            </Grid>
-            <Grid size={{ xs: 12, sm: 6 }}>
-              <AppInput label="Monto" type="number" error={errors.monto} {...register("monto", { required: "Obligatorio", min: { value: 0.01, message: "Debe ser mayor a 0" } })} />
-            </Grid>
-            <Grid size={{ xs: 12, sm: 6 }}>
-              <Controller
-                name="fechaCr"
-                control={control}
-                rules={{ required: "Obligatorio" }}
-                render={({ field }) => <AppDatePicker label="Fecha C/R" error={errors.fechaCr} {...field} />}
-              />
-            </Grid>
-            <Grid size={{ xs: 12, sm: 6 }}>
-              <FormControl fullWidth size="small">
-                <InputLabel>Días de Pago</InputLabel>
-                <Select label="Días de Pago" defaultValue={30} {...register("diasPago")} sx={{ borderRadius: 2 }}>
-                  {DIAS_PAGO_OPCIONES.map((d) => <MenuItem key={d} value={d}>{d === 0 ? "Contado" : `${d} días`}</MenuItem>)}
-                </Select>
-              </FormControl>
-            </Grid>
-            <Grid size={{ xs: 12 }}>
-              <AppInput label="Comentarios" multiline minRows={2} {...register("comentarios")} />
-            </Grid>
-          </Grid>
+          </AppCard>
         </DialogContent>
         <DialogActions sx={{ px: 3, pb: 2 }}>
           <AppButton variant="outlined" onClick={cerrar} sx={{ borderRadius: 2 }}>Cancelar</AppButton>
-          <AppButton type="submit" sx={{ borderRadius: 2 }}>Guardar</AppButton>
+          <AppButton type="submit" loading={guardando} sx={{ borderRadius: 2 }}>Guardar</AppButton>
         </DialogActions>
       </Box>
     </Dialog>
@@ -132,14 +186,46 @@ const HOY = new Date().toISOString().slice(0, 10);
 // tabla `events`, con acciones Aplicar pago / Reabrir.
 export default function CobranzaPage() {
   const theme = useTheme();
-  const [registros, setRegistros] = useState(MOCK);
+  const [searchParams, setSearchParams] = useSearchParams();
+  const [prefillFactura, setPrefillFactura] = useState(null);
+  const [registros, setRegistros] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState(0);
   const [page, setPage] = useState(0);
   const [nuevoOpen, setNuevoOpen] = useState(false);
   const [aplicarTarget, setAplicarTarget] = useState(null);
+  const [error, setError] = useState("");
 
-  const atrasadas = useMemo(() => registros.filter((r) => r.statusPago === 0 && r.fechaPago < HOY), [registros]);
-  const porPagar = useMemo(() => registros.filter((r) => r.statusPago === 0 && r.fechaPago >= HOY), [registros]);
+  const cargar = () => {
+    setLoading(true);
+    listarFacturas()
+      .then(setRegistros)
+      .catch(() => setError("No se pudieron cargar las facturas."))
+      .finally(() => setLoading(false));
+  };
+
+  useEffect(() => { cargar(); }, []);
+
+  // Llega desde Cotizaciones → "Generar factura" (cotización aprobada) con
+  // cliente/monto/folio ya resueltos — se prellena el diálogo y se abre solo.
+  useEffect(() => {
+    const cotizacionId = searchParams.get("cotizacion");
+    if (!cotizacionId) return;
+    setPrefillFactura({
+      cotizacion: cotizacionId,
+      cliente: searchParams.get("cliente") || "",
+      monto: searchParams.get("monto") || "",
+      folio: searchParams.get("folio") || "",
+    });
+    setNuevoOpen(true);
+    setSearchParams({}, { replace: true });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const fechaCorta = (v) => String(v).slice(0, 10);
+
+  const atrasadas = useMemo(() => registros.filter((r) => r.statusPago === 0 && fechaCorta(r.fechaPago) < HOY), [registros]);
+  const porPagar = useMemo(() => registros.filter((r) => r.statusPago === 0 && fechaCorta(r.fechaPago) >= HOY), [registros]);
   const pagadas = useMemo(() => registros.filter((r) => r.statusPago === 1), [registros]);
 
   const tabs = [
@@ -150,17 +236,31 @@ export default function CobranzaPage() {
   const rowsActuales = tabs[tab].rows;
   const totalActual = rowsActuales.reduce((s, r) => s + r.monto, 0);
 
-  const aplicarPago = (fechaPagada) => {
-    setRegistros((prev) => prev.map((r) => (r.id === aplicarTarget.id ? { ...r, statusPago: 1, fechaPagada } : r)));
-    setAplicarTarget(null);
+  const aplicarPago = async (fechaPagada) => {
+    setError("");
+    try {
+      await aplicarPagoFactura(aplicarTarget._id, fechaPagada);
+      setAplicarTarget(null);
+      cargar();
+      pedirRefrescoAlertas();
+    } catch (err) {
+      setError(err?.response?.data?.message || "No se pudo aplicar el pago.");
+    }
   };
 
-  const reabrir = (id) => {
-    setRegistros((prev) => prev.map((r) => (r.id === id ? { ...r, statusPago: 0, fechaPagada: "" } : r)));
+  const reabrir = async (id) => {
+    setError("");
+    try {
+      await reabrirFactura(id);
+      cargar();
+      pedirRefrescoAlertas();
+    } catch (err) {
+      setError(err?.response?.data?.message || "No se pudo reabrir el registro.");
+    }
   };
 
   const columns = [
-    { field: "clienteNombre", headerName: "Cliente" },
+    { field: "cliente", headerName: "Cliente", renderCell: (r) => r.cliente?.nombre || "—" },
     { field: "oc", headerName: "OC" },
     { field: "folio", headerName: "Folio" },
     { field: "monto", headerName: "Monto", renderCell: (r) => formatCurrency(r.monto) },
@@ -182,7 +282,7 @@ export default function CobranzaPage() {
             field: "acciones", headerName: "Acción", align: "center",
             renderCell: (r) => (
               <Tooltip title="Reabrir">
-                <IconButton size="small" onClick={() => reabrir(r.id)}>
+                <IconButton size="small" onClick={() => reabrir(r._id)}>
                   <ReplayOutlinedIcon fontSize="small" sx={{ color: "warning.main" }} />
                 </IconButton>
               </Tooltip>
@@ -206,9 +306,9 @@ export default function CobranzaPage() {
   const exportar = () => {
     exportCsv(
       registros.map((r) => ({
-        Cliente: r.clienteNombre, OC: r.oc, Folio: r.folio, Monto: r.monto,
-        FechaCR: r.fechaCr, FechaPago: r.fechaPago, Status: r.statusPago === 1 ? "Pagado" : "Pendiente",
-        FechaPagada: r.fechaPagada,
+        Cliente: r.cliente?.nombre || "", OC: r.oc, Folio: r.folio, Monto: r.monto,
+        FechaCR: fechaCorta(r.fechaCr), FechaPago: fechaCorta(r.fechaPago), Status: r.statusPago === 1 ? "Pagado" : "Pendiente",
+        FechaPagada: r.fechaPagada ? fechaCorta(r.fechaPagada) : "",
       })),
       "cuentas_por_cobrar.csv"
     );
@@ -224,12 +324,14 @@ export default function CobranzaPage() {
             <AppButton variant="outlined" startIcon={<FileDownloadOutlinedIcon />} onClick={exportar} sx={{ borderRadius: 2 }}>
               Exportar Reporte Excel
             </AppButton>
-            <AppButton startIcon={<AddIcon />} onClick={() => setNuevoOpen(true)} sx={{ borderRadius: 2 }}>
+            <AppButton startIcon={<AddIcon />} onClick={() => { setPrefillFactura(null); setNuevoOpen(true); }} sx={{ borderRadius: 2 }}>
               Nuevo Registro
             </AppButton>
           </>
         }
       />
+
+      {error && <Alert severity="error" sx={{ mb: 2, borderRadius: 2 }} onClose={() => setError("")}>{error}</Alert>}
 
       <Grid container spacing={2.5} mb={3}>
         {[
@@ -260,13 +362,15 @@ export default function CobranzaPage() {
         page={page}
         rowsPerPage={10}
         onPageChange={setPage}
+        loading={loading}
         emptyText="Sin registros en esta pestaña"
       />
 
       <NuevoRegistroDialog
         open={nuevoOpen}
-        onClose={() => setNuevoOpen(false)}
-        onCreated={(nuevo) => setRegistros((prev) => [...prev, { ...nuevo, id: Math.max(0, ...prev.map((r) => r.id)) + 1 }])}
+        onClose={() => { setNuevoOpen(false); setPrefillFactura(null); }}
+        onCreated={() => { cargar(); pedirRefrescoAlertas(); }}
+        prefill={prefillFactura}
       />
       <AplicarPagoDialog target={aplicarTarget} onClose={() => setAplicarTarget(null)} onConfirm={aplicarPago} />
     </Box>

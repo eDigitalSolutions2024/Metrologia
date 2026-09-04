@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useForm } from "react-hook-form";
 import {
@@ -10,8 +10,10 @@ import {
   InputAdornment,
   IconButton,
   Alert,
+  Tooltip,
+  useColorScheme,
 } from "@mui/material";
-import { alpha } from "@mui/material/styles";
+import { alpha, lighten } from "@mui/material/styles";
 import PersonOutlineRoundedIcon from "@mui/icons-material/PersonOutlineRounded";
 import LockOutlinedIcon from "@mui/icons-material/LockOutlined";
 import VisibilityOutlinedIcon from "@mui/icons-material/VisibilityOutlined";
@@ -19,8 +21,13 @@ import VisibilityOffOutlinedIcon from "@mui/icons-material/VisibilityOffOutlined
 import PrecisionManufacturingOutlinedIcon from "@mui/icons-material/PrecisionManufacturingOutlined";
 import VerifiedOutlinedIcon from "@mui/icons-material/VerifiedOutlined";
 import ShieldOutlinedIcon from "@mui/icons-material/ShieldOutlined";
+import DarkModeOutlinedIcon from "@mui/icons-material/DarkModeOutlined";
+import LightModeOutlinedIcon from "@mui/icons-material/LightModeOutlined";
 import { useAuth } from "../../core/auth/useAuth";
 import ROUTES from "../../shared/constants/routes";
+import { obtenerLogo, logoUrl } from "../../services/configuracion";
+import { useColoresMarca } from "../../theme/AppThemeProvider";
+import { hexToRgb } from "../../theme/theme";
 
 const YEAR = new Date().getFullYear();
 
@@ -59,7 +66,7 @@ function BrandMark({ size = 40, color = "currentColor" }) {
   );
 }
 
-function Feature({ icon, children }) {
+function Feature({ icon, children, accentColor }) {
   return (
     <Box sx={{ display: "flex", alignItems: "center", gap: 1.75 }}>
       <Box
@@ -70,7 +77,7 @@ function Feature({ icon, children }) {
           height: 38,
           borderRadius: 2,
           flexShrink: 0,
-          color: "#93C5FD",
+          color: accentColor,
           bgcolor: "rgba(255,255,255,0.08)",
           border: "1px solid rgba(255,255,255,0.12)",
         }}
@@ -87,9 +94,18 @@ function Feature({ icon, children }) {
 export default function Login() {
   const { login } = useAuth();
   const navigate = useNavigate();
+  const { mode, setMode } = useColorScheme();
+  const { colores } = useColoresMarca();
+  const rgbSecundario = hexToRgb(colores.secundario);
+  const secundarioClaro = lighten(colores.secundario, 0.35);
   const [showPass, setShowPass] = useState(false);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [logo, setLogo] = useState(null);
+
+  useEffect(() => {
+    obtenerLogo().then(setLogo).catch(() => setLogo(null));
+  }, []);
 
   const {
     register,
@@ -124,11 +140,12 @@ export default function Login() {
       "& fieldset": { borderColor: "divider" },
       "&:hover fieldset": { borderColor: "text.disabled" },
     },
-    // Evita el fondo amarillo del autocompletado de Chrome
+    // Evita el fondo amarillo (o blanco fijo) del autocompletado del navegador —
+    // usa las variables del tema para que respete modo claro/oscuro.
     "& input:-webkit-autofill": {
-      WebkitBoxShadow: "0 0 0 100px #fff inset",
-      WebkitTextFillColor: "#0F172A",
-      caretColor: "#0F172A",
+      WebkitBoxShadow: "0 0 0 100px var(--mui-palette-background-paper) inset",
+      WebkitTextFillColor: "var(--mui-palette-text-primary)",
+      caretColor: "var(--mui-palette-text-primary)",
       transition: "background-color 9999s ease-in-out 0s",
     },
   };
@@ -153,7 +170,7 @@ export default function Login() {
           p: 7,
           color: "#E2E8F0",
           background:
-            "radial-gradient(1100px 520px at 12% 8%, rgba(37,99,235,0.38), transparent 58%)," +
+            `radial-gradient(1100px 520px at 12% 8%, rgba(${rgbSecundario},0.38), transparent 58%),` +
             "linear-gradient(158deg, #0B1220 0%, #0F172A 48%, #111E3A 100%)",
         }}
       >
@@ -169,7 +186,7 @@ export default function Login() {
             width: 520,
             height: 520,
             opacity: 0.07,
-            color: "#93C5FD",
+            color: secundarioClaro,
           }}
         >
           <circle cx="200" cy="200" r="190" fill="none" stroke="currentColor" strokeWidth="2" />
@@ -180,8 +197,12 @@ export default function Login() {
         </Box>
 
         <Box sx={{ position: "relative", display: "flex", alignItems: "center", gap: 1.75 }}>
-          <Box sx={{ color: "#60A5FA" }}>
-            <BrandMark size={44} />
+          <Box sx={{ color: secundarioClaro }}>
+            {logo ? (
+              <Box component="img" src={logoUrl(logo.nombreArchivo)} alt="Logo" sx={{ width: 44, height: 44, objectFit: "contain" }} />
+            ) : (
+              <BrandMark size={44} />
+            )}
           </Box>
           <Box>
             <Typography sx={{ fontWeight: 800, letterSpacing: 3, fontSize: 20, lineHeight: 1 }}>
@@ -203,13 +224,13 @@ export default function Login() {
           </Typography>
 
           <Box sx={{ display: "flex", flexDirection: "column", gap: 2, mt: 4.5 }}>
-            <Feature icon={<PrecisionManufacturingOutlinedIcon fontSize="small" />}>
+            <Feature icon={<PrecisionManufacturingOutlinedIcon fontSize="small" />} accentColor={secundarioClaro}>
               Calibraciones, equipos y patrones centralizados
             </Feature>
-            <Feature icon={<VerifiedOutlinedIcon fontSize="small" />}>
+            <Feature icon={<VerifiedOutlinedIcon fontSize="small" />} accentColor={secundarioClaro}>
               Trazabilidad metrológica de extremo a extremo
             </Feature>
-            <Feature icon={<ShieldOutlinedIcon fontSize="small" />}>
+            <Feature icon={<ShieldOutlinedIcon fontSize="small" />} accentColor={secundarioClaro}>
               Reportes y calidad conforme a ISO/IEC 17025
             </Feature>
           </Box>
@@ -222,14 +243,41 @@ export default function Login() {
 
       {/* ---------- Panel de formulario ---------- */}
       <Box
-        sx={{
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          px: { xs: 3, sm: 6 },
-          py: { xs: 6, sm: 4 },
-        }}
+        sx={[
+          {
+            position: "relative",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            px: { xs: 3, sm: 6 },
+            py: { xs: 6, sm: 4 },
+            overflow: "hidden",
+            backgroundImage:
+              `radial-gradient(900px 480px at 108% -8%, rgba(${rgbSecundario},0.09), transparent 60%),` +
+              `radial-gradient(700px 420px at -8% 108%, rgba(${rgbSecundario},0.05), transparent 55%),` +
+              "radial-gradient(rgba(15,23,42,0.06) 1px, transparent 1px)",
+            backgroundSize: "auto, auto, 26px 26px",
+            backgroundPosition: "0 0, 0 0, -13px -13px",
+          },
+          (theme) =>
+            theme.applyStyles("dark", {
+              backgroundImage:
+                `radial-gradient(900px 480px at 108% -8%, rgba(${rgbSecundario},0.16), transparent 60%),` +
+                `radial-gradient(700px 420px at -8% 108%, rgba(${rgbSecundario},0.08), transparent 55%),` +
+                "radial-gradient(rgba(226,232,240,0.05) 1px, transparent 1px)",
+            }),
+        ]}
       >
+        <Tooltip title={mode === "dark" ? "Modo claro" : "Modo oscuro"}>
+          <IconButton
+            size="small"
+            onClick={() => setMode(mode === "dark" ? "light" : "dark")}
+            sx={{ position: "absolute", top: 16, right: 16 }}
+          >
+            {mode === "dark" ? <LightModeOutlinedIcon /> : <DarkModeOutlinedIcon />}
+          </IconButton>
+        </Tooltip>
+
         <Box sx={{ width: "100%", maxWidth: 400 }}>
           {/* Marca compacta (solo móvil) */}
           <Box
@@ -241,7 +289,11 @@ export default function Login() {
               color: "secondary.main",
             }}
           >
-            <BrandMark size={38} />
+            {logo ? (
+              <Box component="img" src={logoUrl(logo.nombreArchivo)} alt="Logo" sx={{ width: 38, height: 38, objectFit: "contain" }} />
+            ) : (
+              <BrandMark size={38} />
+            )}
             <Typography
               sx={{ fontWeight: 800, letterSpacing: 3, fontSize: 18, color: "text.primary" }}
             >
@@ -327,6 +379,7 @@ export default function Login() {
             <Button
               type="submit"
               variant="contained"
+              color="secondary"
               fullWidth
               size="large"
               disableElevation
@@ -337,12 +390,7 @@ export default function Login() {
                 borderRadius: 2,
                 fontWeight: 700,
                 fontSize: 15,
-                background: "linear-gradient(135deg, #2563EB 0%, #1D4ED8 100%)",
-                boxShadow: (t) => `0 10px 24px ${alpha(t.palette.secondary.main, 0.35)}`,
-                "&:hover": {
-                  background: "linear-gradient(135deg, #1D4ED8 0%, #1E40AF 100%)",
-                },
-                "&.Mui-disabled": { background: "#93A9D8", color: "#fff" },
+                "&.Mui-disabled": { background: (t) => alpha(t.palette.secondary.main, 0.45), color: "#fff" },
               }}
             >
               {loading ? <CircularProgress size={22} color="inherit" /> : "Iniciar sesión"}

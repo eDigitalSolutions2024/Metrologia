@@ -35,4 +35,24 @@ const eliminar = asyncHandler(async (req, res) => {
   res.json({ success: true });
 });
 
-module.exports = { listar, obtener, crear, actualizar, eliminar };
+const paraImprimir = asyncHandler(async (req, res) => {
+  res.json({ success: true, data: await cotizacionService.paraImprimir(req.params.id) });
+});
+
+const subirAdjunto = asyncHandler(async (req, res) => {
+  res.json({ success: true, data: await cotizacionService.subirAdjunto(req.params.id, req.file, req.user?.id) });
+});
+
+const descargarAdjunto = asyncHandler(async (req, res) => {
+  const { ruta, nombre } = await cotizacionService.archivoAdjuntoStream(req.params.id, req.params.adjuntoId);
+  res.download(ruta, nombre);
+});
+
+const eliminarAdjunto = asyncHandler(async (req, res) => {
+  res.json({ success: true, data: await cotizacionService.eliminarAdjunto(req.params.id, req.params.adjuntoId) });
+});
+
+module.exports = {
+  listar, obtener, crear, actualizar, eliminar, paraImprimir,
+  subirAdjunto, descargarAdjunto, eliminarAdjunto,
+};

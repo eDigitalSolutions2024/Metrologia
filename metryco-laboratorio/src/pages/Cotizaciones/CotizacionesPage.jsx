@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useSearchParams } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import {
   Box, Typography, TextField, InputAdornment, IconButton,
   Chip, Tooltip, MenuItem, Select, FormControl, InputLabel, Alert,
@@ -9,6 +9,8 @@ import AddIcon from "@mui/icons-material/Add";
 import EditOutlinedIcon from "@mui/icons-material/EditOutlined";
 import VisibilityOutlinedIcon from "@mui/icons-material/VisibilityOutlined";
 import FileDownloadOutlinedIcon from "@mui/icons-material/FileDownloadOutlined";
+import ReceiptLongOutlinedIcon from "@mui/icons-material/ReceiptLongOutlined";
+import ContentCopyOutlinedIcon from "@mui/icons-material/ContentCopyOutlined";
 import { DeleteOutlined as DeleteOutlineIcon } from "@mui/icons-material";
 
 import AppButton from "../../shared/components/AppButton";
@@ -48,6 +50,7 @@ function descripcionResumen(items) {
 }
 
 export default function CotizacionesPage() {
+  const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("todos");
@@ -55,6 +58,7 @@ export default function CotizacionesPage() {
   const [anioFilter, setAnioFilter] = useState("");
   const [clienteFilter, setClienteFilter] = useState("");
   const [page, setPage] = useState(0);
+  const [rowsPerPage, setRowsPerPage] = useState(10);
   const [deleteTarget, setDeleteTarget] = useState(null);
 
   const [clientesOpciones, setClientesOpciones] = useState([]);
@@ -66,6 +70,7 @@ export default function CotizacionesPage() {
 
   const [dialogAbierto, setDialogAbierto] = useState(false);
   const [cotizacionEditando, setCotizacionEditando] = useState(null);
+  const [duplicarDesde, setDuplicarDesde] = useState(null);
 
   const debouncedSearch = useDebounce(search, 400);
 
@@ -106,7 +111,7 @@ export default function CotizacionesPage() {
           anio: anioFilter,
           clienteId: clienteFilter,
           page,
-          pageSize: 10,
+          pageSize: rowsPerPage,
         });
         if (cancelado) return;
         setRows(items.map((c) => ({ ...c, id: c._id })));
@@ -121,7 +126,7 @@ export default function CotizacionesPage() {
     return () => {
       cancelado = true;
     };
-  }, [debouncedSearch, statusFilter, mesFilter, anioFilter, clienteFilter, page, reloadKey]);
+  }, [debouncedSearch, statusFilter, mesFilter, anioFilter, clienteFilter, page, rowsPerPage, reloadKey]);
 
   const totalAprobado = rows
     .filter((c) => c.status === "aprobada" || c.status === "facturada")
@@ -140,24 +145,72 @@ export default function CotizacionesPage() {
 
   const abrirNueva = () => {
     setCotizacionEditando(null);
+    setDuplicarDesde(null);
     setDialogAbierto(true);
   };
 
   const abrirEditar = (row) => {
     setCotizacionEditando(row.id);
+    setDuplicarDesde(null);
     setDialogAbierto(true);
   };
 
-  const cerrarDialog = () => setDialogAbierto(false);
+  const abrirDuplicar = (row) => {
+    setCotizacionEditando(null);
+    setDuplicarDesde(row.id);
+    setDialogAbierto(true);
+  };
+
+  const cerrarDialog = () => { setDialogAbierto(false); setDuplicarDesde(null); };
+
+  const generarFactura = (row) => {
+    const params = new URLSearchParams({
+      cotizacion: row.id,
+      cliente: row.cliente,
+      monto: row.total,
+      folio: row.folio,
+    });
+    navigate(`/cobranza?${params.toString()}`);
+  };
 
   const alGuardar = () => {
     setDialogAbierto(false);
+    setDuplicarDesde(null);
     setReloadKey((k) => k + 1);
   };
 
   const columns = [
-    { field: "folio",       headerName: "Cotización" },
-    { field: "cliente",     headerName: "Cliente", renderCell: (row) => row.clienteInfo?.nombre || "—" },
+    {
+      field: "folio", headerName: "Cotización",
+      renderCell: (row) => (
+        <Tooltip title="Ver / Editar cotización">
+          <Chip
+            size="small" clickable label={row.folio} icon={<RequestQuoteOutlinedIcon sx={{ fontSize: 14 }} />}
+            onClick={() => abrirEditar(row)}
+            sx={{ fontWeight: 700, color: "secondary.main", borderColor: "secondary.main", "& .MuiChip-icon": { color: "secondary.main" } }}
+            variant="outlined"
+          />
+        </Tooltip>
+      ),
+    },
+    {
+      field: "cliente", headerName: "Cliente",
+      renderCell: (row) =>
+        row.cliente ? (
+          <Tooltip title="Abrir ficha del cliente">
+            <Box
+              component="button" type="button"
+              onClick={() => navigate(`/clientes/${row.cliente}/editar`)}
+              sx={{
+                border: "none", background: "none", p: 0, m: 0, cursor: "pointer", textAlign: "left",
+                color: "info.main", fontSize: 13, fontWeight: 600, "&:hover": { textDecoration: "underline" },
+              }}
+            >
+              {row.clienteInfo?.nombre || "—"}
+            </Box>
+          </Tooltip>
+        ) : (row.clienteInfo?.nombre || "—"),
+    },
     { field: "descripcion", headerName: "Descripción", renderCell: (row) => descripcionResumen(row.items) },
     { field: "total",       headerName: "Total", renderCell: (row) => (
       <Typography fontWeight={700} fontSize={13}>{formatCurrency(row.total)}</Typography>
@@ -183,12 +236,22 @@ export default function CotizacionesPage() {
               <VisibilityOutlinedIcon fontSize="small" sx={{ color: "secondary.main" }} />
             </IconButton>
           </Tooltip>
-          <Tooltip title="Descargar PDF (próximamente)">
+          <Tooltip title={row.status === "aprobada" ? "Generar factura" : "Solo disponible para cotizaciones aprobadas"}>
             <span>
-              <IconButton size="small" disabled>
-                <FileDownloadOutlinedIcon fontSize="small" />
+              <IconButton size="small" onClick={() => generarFactura(row)} disabled={row.status !== "aprobada"}>
+                <ReceiptLongOutlinedIcon fontSize="small" sx={{ color: row.status === "aprobada" ? "success.main" : undefined }} />
               </IconButton>
             </span>
+          </Tooltip>
+          <Tooltip title="Imprimir / Descargar PDF">
+            <IconButton size="small" onClick={() => window.open(`/informe/cotizacion/${row._id}`, "_blank")}>
+              <FileDownloadOutlinedIcon fontSize="small" sx={{ color: "error.main" }} />
+            </IconButton>
+          </Tooltip>
+          <Tooltip title="Duplicar cotización">
+            <IconButton size="small" onClick={() => abrirDuplicar(row)}>
+              <ContentCopyOutlinedIcon fontSize="small" sx={{ color: "primary.main" }} />
+            </IconButton>
           </Tooltip>
           <Tooltip title="Eliminar">
             <IconButton size="small" onClick={() => setDeleteTarget(row)}>
@@ -277,8 +340,9 @@ export default function CotizacionesPage() {
         loading={loading}
         totalCount={totalCount}
         page={page}
-        rowsPerPage={10}
+        rowsPerPage={rowsPerPage}
         onPageChange={setPage}
+        onRowsPerPageChange={(n) => { setRowsPerPage(n); setPage(0); }}
       />
 
       <ConfirmDialog
@@ -292,8 +356,11 @@ export default function CotizacionesPage() {
       <CotizacionDialog
         open={dialogAbierto}
         cotizacionId={cotizacionEditando}
+        duplicarDesdeId={duplicarDesde}
         onClose={cerrarDialog}
         onSaved={alGuardar}
+        onGenerarFactura={(cot) => { cerrarDialog(); generarFactura({ id: cot._id, cliente: cot.cliente?._id || cot.cliente, total: cot.total, folio: cot.folio }); }}
+        onDuplicar={(id) => { setCotizacionEditando(null); setDuplicarDesde(id); }}
       />
     </Box>
   );

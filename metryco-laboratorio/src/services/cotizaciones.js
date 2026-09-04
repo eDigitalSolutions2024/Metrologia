@@ -26,3 +26,27 @@ export async function eliminarCotizacion(id) {
   const { data } = await api.delete(`${ENDPOINTS.COTIZACIONES}/${id}`);
   return data;
 }
+
+export async function obtenerCotizacionParaImprimir(id) {
+  const { data } = await api.get(`${ENDPOINTS.COTIZACIONES}/${id}/imprimir`);
+  return data.data;
+}
+
+export async function subirAdjuntoCotizacion(id, archivo) {
+  const form = new FormData();
+  form.append("archivo", archivo);
+  const { data } = await api.post(`${ENDPOINTS.COTIZACIONES}/${id}/adjuntos`, form, {
+    headers: { "Content-Type": "multipart/form-data" },
+  });
+  return data.data;
+}
+
+export async function fetchAdjuntoCotizacionBlob(id, adjuntoId) {
+  const { data } = await api.get(`${ENDPOINTS.COTIZACIONES}/${id}/adjuntos/${adjuntoId}`, { responseType: "blob" });
+  return data;
+}
+
+export async function eliminarAdjuntoCotizacion(id, adjuntoId) {
+  const { data } = await api.delete(`${ENDPOINTS.COTIZACIONES}/${id}/adjuntos/${adjuntoId}`);
+  return data.data;
+}

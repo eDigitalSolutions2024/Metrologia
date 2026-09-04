@@ -25,6 +25,10 @@ export async function actualizarModelo(id, payload) {
   const { data } = await api.put(`${base}/modelos/${id}`, payload);
   return data.data;
 }
+export async function eliminarModelo(id) {
+  const { data } = await api.delete(`${base}/modelos/${id}`);
+  return data.data;
+}
 
 /* ---- Motor determinístico (preview en vivo, no persiste) ---- */
 export async function previewIncertidumbre(payload) {

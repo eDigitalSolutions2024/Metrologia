@@ -36,6 +36,19 @@ export async function adjuntarCertificadoPatron(id, file) {
   return data.data;
 }
 
+// Alias histórico
+export const subirCertificadoPatron = adjuntarCertificadoPatron;
+
+export async function fetchCertificadoPatronBlob(id) {
+  const { data } = await api.get(`${ENDPOINTS.PATRONES}/${id}/certificado`, { responseType: "blob" });
+  return data;
+}
+
+export async function fetchQrPatronBlob(id, tipo = "png") {
+  const { data } = await api.get(`${ENDPOINTS.PATRONES}/${id}/qr.${tipo}`, { responseType: "blob" });
+  return data;
+}
+
 export async function patronesPorVencer(dias = 30) {
   const { data } = await api.get(`${ENDPOINTS.PATRONES}/por-vencer`, { params: { dias } });
   return data.data;

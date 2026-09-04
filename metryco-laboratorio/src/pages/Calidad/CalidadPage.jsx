@@ -1,15 +1,15 @@
 import { useEffect, useMemo, useState } from "react";
 import {
-  Box, Typography, Button, MenuItem, Select, FormControl, InputLabel,
-  Dialog, DialogTitle, DialogContent, DialogActions, TextField, Chip, Tooltip, IconButton,
+  Box, Typography, MenuItem, Select, FormControl, InputLabel,
+  Dialog, DialogTitle, DialogContent, DialogActions, TextField, Chip, Tooltip, IconButton, Alert,
 } from "@mui/material";
 import CheckCircleOutlineIcon from "@mui/icons-material/CheckCircleOutlineOutlined";
 import CancelOutlinedIcon from "@mui/icons-material/CancelOutlined";
 import HistoryOutlinedIcon from "@mui/icons-material/HistoryOutlined";
-import DescriptionOutlinedIcon from "@mui/icons-material/DescriptionOutlined";
-import InsertChartOutlinedIcon from "@mui/icons-material/InsertChartOutlined";
-import EditOutlinedIcon from "@mui/icons-material/EditOutlined";
+import VisibilityOutlinedIcon from "@mui/icons-material/VisibilityOutlined";
 import FileDownloadOutlinedIcon from "@mui/icons-material/FileDownloadOutlined";
+import InsertChartOutlinedIcon from "@mui/icons-material/InsertChartOutlined";
+import HourglassEmptyOutlinedIcon from "@mui/icons-material/HourglassEmptyOutlined";
 
 import AppButton from "../../shared/components/AppButton";
 import AppTable from "../../shared/components/AppTable";
@@ -19,22 +19,26 @@ import { formatDate } from "../../shared/utils/formatDate";
 import { listarClientes } from "../../services/clientes";
 import { obtenerDirectorio } from "../../services/usuarios";
 import { exportCsv } from "../../shared/utils/exportCsv";
-import { MOCK } from "./mockData";
+import { listarCalidad, cambiarEstadoAsignacion, fetchGraficaAsignacionBlob } from "../../services/reportes";
+import { pedirRefrescoAlertas } from "../../shared/utils/alertasBus";
+import { useNavigate } from "react-router-dom";
 
 const MESES = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
   "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"];
 
+const EST_CERT_LABEL = { sin_generar: "Pendiente", en_revision: "Pendiente", rechazado: "Rechazado" };
+
 function RechazarDialog({ open, onClose, onConfirm }) {
   const [motivo, setMotivo] = useState("");
-
   const cerrar = () => { setMotivo(""); onClose(); };
 
   return (
     <Dialog open={open} onClose={cerrar} fullWidth maxWidth="xs">
-      <DialogTitle>Rechazar asignación</DialogTitle>
+      <DialogTitle>Rechazar certificado</DialogTitle>
       <DialogContent>
         <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5 }}>
-          Indica el motivo del rechazo. Quedará registrado en el historial.
+          Indica el motivo del rechazo. Quedará registrado en el historial y la calibración
+          regresará a "Pendiente" para que el técnico la rehaga.
         </Typography>
         <TextField
           autoFocus
@@ -65,15 +69,17 @@ function RechazarDialog({ open, onClose, onConfirm }) {
 function HistorialDialog({ open, onClose, asignacion }) {
   return (
     <Dialog open={open} onClose={onClose} fullWidth maxWidth="xs">
-      <DialogTitle>Historial de revisión — MET {asignacion?.id}</DialogTitle>
+      <DialogTitle>Historial de rechazos — {asignacion?.equipo?.idInterno}</DialogTitle>
       <DialogContent>
-        {(asignacion?.historial ?? []).length === 0 ? (
-          <Typography variant="body2" color="text.secondary">Sin comentarios registrados.</Typography>
+        {(asignacion?.historialRechazos ?? []).length === 0 ? (
+          <Typography variant="body2" color="text.secondary">Sin rechazos registrados.</Typography>
         ) : (
-          asignacion.historial.map((h, i) => (
-            <Box key={i} sx={{ mb: 1.5, pb: 1.5, borderBottom: i < asignacion.historial.length - 1 ? 1 : 0, borderColor: "divider" }}>
-              <Typography variant="caption" color="text.secondary">{formatDate(h.fecha)}</Typography>
-              <Typography variant="body2">{h.comentario}</Typography>
+          asignacion.historialRechazos.slice().reverse().map((h, i) => (
+            <Box key={i} sx={{ mb: 1.5, pb: 1.5, borderBottom: i < asignacion.historialRechazos.length - 1 ? 1 : 0, borderColor: "divider" }}>
+              <Typography variant="caption" color="text.secondary">
+                {formatDate(h.fecha)} · {h.usuario?.nombre || "—"}
+              </Typography>
+              <Typography variant="body2">{h.motivo}</Typography>
             </Box>
           ))
         )}
@@ -86,116 +92,124 @@ function HistorialDialog({ open, onClose, asignacion }) {
 }
 
 function ConsultarTab() {
+  const navigate = useNavigate();
   const [clientes, setClientes] = useState([]);
   const [clienteFiltro, setClienteFiltro] = useState("");
-  const [asignaciones, setAsignaciones] = useState(MOCK);
+  const [asignaciones, setAsignaciones] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
   const [rechazarTarget, setRechazarTarget] = useState(null);
   const [historialTarget, setHistorialTarget] = useState(null);
   const [page, setPage] = useState(0);
 
-  useEffect(() => {
-    listarClientes({ pageSize: 200 })
-      .then(({ items }) => setClientes(items))
-      .catch(() => setClientes([]));
-  }, []);
-
-  // Igual que el PHP: la cola de Calidad solo muestra pendientes (0) y rechazados (2);
-  // al autorizar, la fila sale de la lista.
-  const pendientes = useMemo(
-    () => asignaciones.filter((a) => a.statusCalidad === 0 || a.statusCalidad === 2),
-    [asignaciones]
-  );
-
-  const filtered = clienteFiltro
-    ? pendientes.filter((a) => String(a.clienteId) === String(clienteFiltro))
-    : pendientes;
-
-  const autorizar = (id) => {
-    setAsignaciones((prev) => prev.map((a) => (a.id === id ? { ...a, statusCalidad: 1 } : a)));
+  const cargar = () => {
+    setLoading(true);
+    listarCalidad({ clienteId: clienteFiltro })
+      .then(setAsignaciones)
+      .catch(() => setError("No se pudo cargar la cola de Calidad."))
+      .finally(() => setLoading(false));
   };
 
-  const confirmarRechazo = (motivo) => {
-    const fecha = new Date().toISOString().slice(0, 10);
-    setAsignaciones((prev) =>
-      prev.map((a) =>
-        a.id === rechazarTarget.id
-          ? { ...a, statusCalidad: 2, historial: [...a.historial, { fecha, comentario: motivo }] }
-          : a
-      )
-    );
-    setRechazarTarget(null);
+  useEffect(() => {
+    listarClientes({ pageSize: 200 }).then(({ items }) => setClientes(items)).catch(() => {});
+  }, []);
+  useEffect(() => { cargar(); setPage(0); }, [clienteFiltro]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const autorizar = async (a) => {
+    setError("");
+    try {
+      await cambiarEstadoAsignacion(a._id, { dominio: "certificado", valor: "autorizado" });
+      cargar();
+      pedirRefrescoAlertas();
+    } catch (e) {
+      setError(e?.response?.data?.message || "No se pudo autorizar.");
+    }
+  };
+
+  const descargarGrafica = async (a) => {
+    try {
+      const blob = await fetchGraficaAsignacionBlob(a._id);
+      const url = URL.createObjectURL(blob);
+      const el = document.createElement("a");
+      el.href = url; el.download = a.grafica?.nombreOriginal || "grafica";
+      el.click();
+      setTimeout(() => URL.revokeObjectURL(url), 60000);
+    } catch {
+      setError("No se pudo descargar la gráfica.");
+    }
+  };
+
+  const confirmarRechazo = async (motivo) => {
+    setError("");
+    try {
+      await cambiarEstadoAsignacion(rechazarTarget._id, { dominio: "certificado", valor: "rechazado", motivo });
+      setRechazarTarget(null);
+      cargar();
+      pedirRefrescoAlertas();
+    } catch (e) {
+      setError(e?.response?.data?.message || "No se pudo rechazar.");
+    }
   };
 
   const columns = [
-    { field: "id", headerName: "MET" },
-    { field: "cliente", headerName: "Cliente" },
-    { field: "fechaAsignacion", headerName: "Fecha Asignación", renderCell: (r) => formatDate(r.fechaAsignacion) },
-    { field: "fechaCaptura", headerName: "Fecha Captura", renderCell: (r) => (r.fechaCaptura ? formatDate(r.fechaCaptura) : "—") },
-    { field: "tecnico", headerName: "Técnico" },
-    { field: "idClienteInterno", headerName: "ID Cliente" },
-    {
-      field: "editarPortada",
-      headerName: "Editar Portada",
-      align: "center",
-      renderCell: (r) =>
-        r.statusAsignacion === 1 ? (
-          <Tooltip title="Editar portada">
-            <IconButton size="small"><EditOutlinedIcon fontSize="small" sx={{ color: "warning.main" }} /></IconButton>
-          </Tooltip>
-        ) : "N/A",
-    },
-    {
-      field: "portada",
-      headerName: "Portada",
-      align: "center",
-      renderCell: (r) =>
-        r.statusAsignacion === 1 ? (
-          <Tooltip title="Descargar portada">
-            <IconButton size="small"><DescriptionOutlinedIcon fontSize="small" sx={{ color: "secondary.main" }} /></IconButton>
-          </Tooltip>
-        ) : "En Proceso",
-    },
+    { field: "reporte", headerName: "Reporte", renderCell: (a) => a.reporte?.folio || "—" },
+    { field: "cliente", headerName: "Cliente", renderCell: (a) => a.reporte?.cliente?.nombre || "—" },
+    { field: "fechaAsignacion", headerName: "Fecha Asignación", renderCell: (a) => formatDate(a.createdAt) },
+    { field: "fechaCaptura", headerName: "Fecha Captura", renderCell: (a) => (a.fechaCalibracion ? formatDate(a.fechaCalibracion) : "—") },
+    { field: "tecnico", headerName: "Técnico", renderCell: (a) => a.tecnicoEjecutor?.nombre || a.tecnicoAsignado?.nombre || "—" },
+    { field: "idClienteInterno", headerName: "ID Cliente", renderCell: (a) => a.equipo?.idInterno || "—" },
     {
       field: "grafica",
       headerName: "Gráfica",
       align: "center",
-      renderCell: (r) =>
-        r.statusAsignacion === 1 ? (
+      renderCell: (a) =>
+        a.grafica?.nombreArchivo ? (
           <Tooltip title="Descargar gráfica">
-            <IconButton size="small"><InsertChartOutlinedIcon fontSize="small" sx={{ color: "info.main" }} /></IconButton>
+            <IconButton size="small" onClick={() => descargarGrafica(a)}>
+              <InsertChartOutlinedIcon fontSize="small" sx={{ color: "primary.main" }} />
+            </IconButton>
           </Tooltip>
-        ) : "En Proceso",
+        ) : (
+          <Tooltip title="El técnico todavía no la sube">
+            <Chip icon={<HourglassEmptyOutlinedIcon sx={{ fontSize: 14 }} />} label="En proceso" size="small" variant="outlined" />
+          </Tooltip>
+        ),
     },
     {
       field: "statusCalidad",
       headerName: "Estatus Calidad",
-      renderCell: (r) =>
-        r.statusCalidad === 2 ? (
+      renderCell: (a) =>
+        a.estados?.certificado === "rechazado" ? (
           <Box sx={{ display: "flex", alignItems: "center", gap: 0.75 }}>
             <Chip label="Rechazado" color="error" size="small" />
             <Tooltip title="Ver historial">
-              <IconButton size="small" onClick={() => setHistorialTarget(r)}>
+              <IconButton size="small" onClick={() => setHistorialTarget(a)}>
                 <HistoryOutlinedIcon fontSize="small" />
               </IconButton>
             </Tooltip>
           </Box>
         ) : (
-          <Chip label="Pendiente" color="warning" size="small" />
+          <Chip label={EST_CERT_LABEL[a.estados?.certificado] || "Pendiente"} color="warning" size="small" />
         ),
     },
     {
       field: "accion",
       headerName: "Acción",
       align: "center",
-      renderCell: (r) => (
+      renderCell: (a) => (
         <Box sx={{ display: "flex", gap: 0.5, justifyContent: "center" }}>
+          <Tooltip title="Ver reporte">
+            <IconButton size="small" onClick={() => navigate(`/reportes/${a.reporte?._id}`)}>
+              <VisibilityOutlinedIcon fontSize="small" sx={{ color: "secondary.main" }} />
+            </IconButton>
+          </Tooltip>
           <Tooltip title="Autorizar">
-            <IconButton size="small" onClick={() => autorizar(r.id)}>
+            <IconButton size="small" onClick={() => autorizar(a)}>
               <CheckCircleOutlineIcon fontSize="small" sx={{ color: "success.main" }} />
             </IconButton>
           </Tooltip>
           <Tooltip title="Rechazar">
-            <IconButton size="small" onClick={() => setRechazarTarget(r)}>
+            <IconButton size="small" onClick={() => setRechazarTarget(a)}>
               <CancelOutlinedIcon fontSize="small" sx={{ color: "error.main" }} />
             </IconButton>
           </Tooltip>
@@ -206,13 +220,14 @@ function ConsultarTab() {
 
   return (
     <Box>
+      {error && <Alert severity="error" sx={{ mb: 2, borderRadius: 2 }} onClose={() => setError("")}>{error}</Alert>}
       <Box sx={{ display: "flex", gap: 2, mb: 2, alignItems: "center", flexWrap: "wrap" }}>
         <FormControl size="small" sx={{ minWidth: 280 }}>
           <InputLabel>Filtrar búsqueda por cliente</InputLabel>
           <Select
             label="Filtrar búsqueda por cliente"
             value={clienteFiltro}
-            onChange={(e) => { setClienteFiltro(e.target.value); setPage(0); }}
+            onChange={(e) => setClienteFiltro(e.target.value)}
             sx={{ borderRadius: 2 }}
           >
             <MenuItem value="">Todos los clientes</MenuItem>
@@ -221,13 +236,13 @@ function ConsultarTab() {
             ))}
           </Select>
         </FormControl>
-        <Button variant="contained" onClick={() => setPage(0)} sx={{ borderRadius: 2 }}>Buscar</Button>
       </Box>
 
       <AppTable
         columns={columns}
-        rows={filtered.slice(page * 10, page * 10 + 10)}
-        totalCount={filtered.length}
+        rows={asignaciones.slice(page * 10, page * 10 + 10)}
+        loading={loading}
+        totalCount={asignaciones.length}
         page={page}
         rowsPerPage={10}
         onPageChange={setPage}
@@ -246,6 +261,7 @@ function ExportarDialog({ open, onClose }) {
   const [tecnico, setTecnico] = useState("");
   const [mes, setMes] = useState("");
   const [anio, setAnio] = useState("");
+  const [error, setError] = useState("");
 
   const anios = useMemo(() => {
     const actual = new Date().getFullYear();
@@ -260,28 +276,52 @@ function ExportarDialog({ open, onClose }) {
   }, [open]);
 
   const cerrar = () => {
-    setModo("tecnico"); setTecnico(""); setMes(""); setAnio("");
+    setModo("tecnico"); setTecnico(""); setMes(""); setAnio(""); setError("");
     onClose();
   };
 
-  const exportar = () => {
-    const filas = MOCK
-      .filter((a) => modo === "general" || !tecnico || tecnicos.find((t) => t._id === tecnico)?.nombre === a.tecnico)
-      .map((a) => ({
-        MET: a.id, Cliente: a.cliente, Tecnico: a.tecnico,
-        FechaAsignacion: a.fechaAsignacion, EstatusCalidad: a.statusCalidad,
-      }));
+  const exportar = async () => {
+    setError("");
+    try {
+      const todas = await listarCalidad({});
+      const filtradas = todas.filter((a) => {
+        if (modo === "tecnico" && tecnico) {
+          const nombreTec = tecnicos.find((t) => t._id === tecnico)?.nombre;
+          const tecAsig = a.tecnicoEjecutor?.nombre || a.tecnicoAsignado?.nombre;
+          if (tecAsig !== nombreTec) return false;
+        }
+        const fecha = a.fechaCalibracion ? new Date(a.fechaCalibracion) : new Date(a.createdAt);
+        if (anio && fecha.getFullYear() !== Number(anio)) return false;
+        if (modo === "tecnico" && mes && MESES[fecha.getMonth()] !== mes) return false;
+        return true;
+      });
 
-    exportCsv(filas, modo === "tecnico"
-      ? `calidad_certificados_${anio || "todos"}.csv`
-      : `calidad_certificados_general_${anio || "todos"}.csv`);
-    cerrar();
+      if (filtradas.length === 0) {
+        setError("No hay resultados para esos filtros.");
+        return;
+      }
+
+      exportCsv(
+        filtradas.map((a) => ({
+          Reporte: a.reporte?.folio || "",
+          Cliente: a.reporte?.cliente?.nombre || "",
+          Tecnico: a.tecnicoEjecutor?.nombre || a.tecnicoAsignado?.nombre || "",
+          FechaAsignacion: formatDate(a.createdAt),
+          EstatusCalidad: EST_CERT_LABEL[a.estados?.certificado] || a.estados?.certificado,
+        })),
+        modo === "tecnico" ? `calidad_certificados_${anio || "todos"}.csv` : `calidad_certificados_general_${anio || "todos"}.csv`
+      );
+      cerrar();
+    } catch {
+      setError("No se pudo exportar.");
+    }
   };
 
   return (
     <Dialog open={open} onClose={cerrar} fullWidth maxWidth="xs">
       <DialogTitle>Exportar certificados de Calidad</DialogTitle>
       <DialogContent>
+        {error && <Alert severity="warning" sx={{ mb: 2, borderRadius: 2 }}>{error}</Alert>}
         <FormControl size="small" fullWidth sx={{ mb: 2, mt: 0.5 }}>
           <InputLabel>Tipo de exportación</InputLabel>
           <Select label="Tipo de exportación" value={modo} onChange={(e) => setModo(e.target.value)} sx={{ borderRadius: 2 }}>
@@ -303,7 +343,7 @@ function ExportarDialog({ open, onClose }) {
               <InputLabel>Mes</InputLabel>
               <Select label="Mes" value={mes} onChange={(e) => setMes(e.target.value)} sx={{ borderRadius: 2 }}>
                 <MenuItem value="">Todos</MenuItem>
-                {MESES.map((m, i) => <MenuItem key={m} value={i + 1}>{m}</MenuItem>)}
+                {MESES.map((m) => <MenuItem key={m} value={m}>{m}</MenuItem>)}
               </Select>
             </FormControl>
           </Box>

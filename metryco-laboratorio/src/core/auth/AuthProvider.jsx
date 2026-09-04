@@ -46,6 +46,16 @@ export default function AuthProvider({ children }) {
     setUser(data.user);
   }, []);
 
+  // Fusiona cambios parciales al usuario en sesión (ej. tras subir foto/firma
+  // desde el menú de perfil) sin necesitar recargar ni volver a iniciar sesión.
+  const actualizarUsuario = useCallback((parcial) => {
+    setUser((prev) => {
+      const actualizado = { ...prev, ...parcial };
+      localStorage.setItem(USER_KEY, JSON.stringify(actualizado));
+      return actualizado;
+    });
+  }, []);
+
   const logout = useCallback(() => {
     api.post(ENDPOINTS.LOGOUT).catch(() => {});
     clearToken();
@@ -57,7 +67,7 @@ export default function AuthProvider({ children }) {
   if (booting) return <Loading height="100vh" />;
 
   return (
-    <AuthContext.Provider value={{ token, user, login, logout, isAuthenticated: !!token }}>
+    <AuthContext.Provider value={{ token, user, login, logout, actualizarUsuario, isAuthenticated: !!token }}>
       {children}
     </AuthContext.Provider>
   );

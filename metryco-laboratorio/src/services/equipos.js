@@ -22,3 +22,8 @@ export async function eliminarEquipo(id) {
   const { data } = await api.delete(`${ENDPOINTS.EQUIPOS}/${id}`);
   return data.data;
 }
+
+export async function fetchQrEquipoBlob(id, tipo = "png") {
+  const { data } = await api.get(`${ENDPOINTS.EQUIPOS}/${id}/qr.${tipo}`, { responseType: "blob" });
+  return data;
+}

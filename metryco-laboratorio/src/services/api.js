@@ -17,12 +17,17 @@ export const ENDPOINTS = {
   PATRONES: "/patrones",
   PERFORMANCE: "/performance",
   MAGNITUDES: "/magnitudes",
+  RAZONES_SOCIALES: "/razones-sociales",
   INCERTIDUMBRE: "/incertidumbre",
   PUBLICO: "/publico",
   CALIDAD: "/calidad",
   ACTIVIDADES: "/actividades",
   COBRANZA: "/cobranza",
   USUARIOS: "/usuarios",
+  CONFIGURACION: "/configuracion",
+  ALERTAS: "/alertas",
+  AUDITORIA: "/auditoria",
+  PERFIL: "/perfil",
 };
 
 // Solo se persiste el usuario (datos no sensibles) para mostrarlo mientras se

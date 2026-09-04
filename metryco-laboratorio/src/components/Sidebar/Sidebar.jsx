@@ -1,8 +1,11 @@
+import { useEffect, useState } from "react";
 import { Box, List, Typography } from "@mui/material";
 
-import menu from "./menuConfig";
+import menu, { menuKey } from "./menuConfig";
 import SidebarItem from "./SidebarItem";
 import { useAuth } from "../../core/auth/useAuth";
+import { obtenerMenuPermisos, obtenerLogo, logoUrl } from "../../services/configuracion";
+import { fotoUrl } from "../../services/perfil";
 
 const ROL_LABELS = {
   admin: "Administrador",
@@ -36,11 +39,50 @@ function BrandMark({ size = 30 }) {
   );
 }
 
+// Un ítem sin `roles` (tras aplicar overrides) se muestra a cualquier rol.
+// Un grupo (item con `children`) solo aparece si al menos un hijo es visible.
+// La sección "Sistema" (Administración) nunca toma overrides — siempre fija.
+function rolesEfectivos(item, seccion, overrides) {
+  if (seccion === "Sistema") return item.roles;
+  return overrides[menuKey(item)] || item.roles;
+}
+
+function visiblePara(rol, seccion, overrides) {
+  return (item) => {
+    const roles = rolesEfectivos(item, seccion, overrides);
+    return !roles || roles.includes(rol);
+  };
+}
+
+function filtrarMenu(menuBase, rol, overrides) {
+  return menuBase
+    .map((grupo) => ({
+      ...grupo,
+      items: grupo.items
+        .filter(visiblePara(rol, grupo.section, overrides))
+        .map((item) => (item.children ? { ...item, children: item.children.filter(visiblePara(rol, grupo.section, overrides)) } : item))
+        .filter((item) => !item.children || item.children.length > 0),
+    }))
+    .filter((grupo) => grupo.items.length > 0);
+}
+
 export default function Sidebar({ open = true }) {
   const { user } = useAuth();
   const nombre = user?.nombre || user?.usuario || "Usuario";
   const inicial = nombre.charAt(0).toUpperCase();
   const rolLabel = ROL_LABELS[user?.rol] || user?.rol || "";
+
+  const [overrides, setOverrides] = useState({});
+  useEffect(() => {
+    obtenerMenuPermisos().then(setOverrides).catch(() => setOverrides({}));
+  }, []);
+
+  const [logo, setLogo] = useState(null);
+  useEffect(() => {
+    obtenerLogo().then(setLogo).catch(() => setLogo(null));
+  }, []);
+
+  const menuVisible = filtrarMenu(menu, user?.rol, overrides);
 
   return (
     <Box
@@ -70,12 +112,18 @@ export default function Sidebar({ open = true }) {
       <Box sx={{ px: 2.5, pt: 3, pb: 2, display: "flex", alignItems: "center", gap: 1.5 }}>
         <Box
           sx={{
-            width: 40, height: 40, borderRadius: 2.5, display: "grid", placeItems: "center",
+            width: 40, height: 40, borderRadius: 2.5, display: "grid", placeItems: "center", flexShrink: 0,
             background: "linear-gradient(135deg, rgba(37,99,235,.25), rgba(37,99,235,.05))",
             border: "1px solid rgba(96,165,250,.25)",
+            overflow: "hidden",
           }}
         >
-          <BrandMark size={24} />
+          {logo ? (
+            <Box component="img" src={logoUrl(logo.nombreArchivo)} alt="Logo"
+              sx={{ width: "100%", height: "100%", objectFit: "contain" }} />
+          ) : (
+            <BrandMark size={24} />
+          )}
         </Box>
         <Box>
           <Typography sx={{ fontWeight: 800, fontSize: 15, letterSpacing: ".14em", lineHeight: 1 }}>
@@ -89,7 +137,7 @@ export default function Sidebar({ open = true }) {
 
       {/* Navegación por secciones */}
       <Box sx={{ flex: 1, px: 1.25, pb: 1 }}>
-        {menu.map((grupo) => (
+        {menuVisible.map((grupo) => (
           <Box key={grupo.section} sx={{ mb: 1.5 }}>
             <Typography
               sx={{
@@ -115,12 +163,14 @@ export default function Sidebar({ open = true }) {
           <Box
             sx={{
               width: 38, height: 38, borderRadius: 2.5, display: "grid", placeItems: "center",
-              fontWeight: 800, fontSize: 15, color: "#fff",
-              background: "linear-gradient(135deg, #2563EB, #1D4ED8)",
+              fontWeight: 800, fontSize: 15, color: "#fff", flexShrink: 0, overflow: "hidden",
+              background: user?.fotoUrl
+                ? `url(${fotoUrl(user.fotoUrl)}) center/cover`
+                : user?.avatarColor || "linear-gradient(135deg, var(--mui-palette-secondary-light), var(--mui-palette-secondary-dark))",
               boxShadow: "0 6px 16px rgba(37,99,235,.35)",
             }}
           >
-            {inicial}
+            {!user?.fotoUrl && inicial}
           </Box>
           <Box sx={{ minWidth: 0 }}>
             <Typography sx={{ fontWeight: 700, fontSize: 13.5, lineHeight: 1.2 }} noWrap>{nombre}</Typography>

@@ -1,6 +1,8 @@
 const { Router } = require("express");
 const auth = require("../middleware/auth");
 const requireRole = require("../middleware/requireRole");
+const validate = require("../middleware/validate");
+const { crearModeloSchema, actualizarModeloSchema } = require("../schemas/incertidumbre.schema");
 const c = require("../controllers/incertidumbre.controller");
 
 const router = Router();
@@ -9,8 +11,8 @@ router.use(auth);
 /* Plantillas / modelos de presupuesto de incertidumbre */
 router.get("/modelos", c.listarModelos);
 router.get("/modelos/:id", c.obtenerModelo);
-router.post("/modelos", c.crearModelo);
-router.put("/modelos/:id", c.actualizarModelo);
+router.post("/modelos", requireRole("admin", "coordinador"), validate(crearModeloSchema), c.crearModelo);
+router.put("/modelos/:id", requireRole("admin", "coordinador"), validate(actualizarModeloSchema), c.actualizarModelo);
 router.delete("/modelos/:id", requireRole("admin", "coordinador"), c.eliminarModelo);
 
 /* Cálculo determinístico en vivo (no persiste) */

@@ -13,10 +13,12 @@ import AppButton from "../../shared/components/AppButton";
 import AppTable from "../../shared/components/AppTable";
 import { listarClientes } from "../../services/clientes";
 import { exportCsv } from "../../shared/utils/exportCsv";
-import { EQUIPOS_MOCK, PATRONES_MOCK } from "./mockData";
+import { listarEquipos } from "../../services/equipos";
+import { listarPatrones } from "../../services/patrones";
 
 function VencimientoAutomaticoDialog({ open, onClose }) {
   const [confirmado, setConfirmado] = useState(false);
+  const [proximosAVencer, setProximosAVencer] = useState([]);
 
   const cerrar = () => { setConfirmado(false); onClose(); };
 
@@ -24,10 +26,20 @@ function VencimientoAutomaticoDialog({ open, onClose }) {
   // son los que el job de correos automáticos (automatic/due_date_certificate.php
   // en el legacy) notificaría. Aquí no hay backend de correo todavía, así que se
   // muestra la vista previa en vez de simular un envío que no ocurrió de verdad.
-  const proximosAVencer = PATRONES_MOCK.filter((p) => {
-    const dias = Math.ceil((new Date(p.fechaVencimiento) - new Date()) / 86400000);
-    return dias >= 0 && dias < 30;
-  });
+  const confirmar = () => {
+    setConfirmado(true);
+    listarPatrones({ pageSize: 500 })
+      .then(({ items }) => {
+        const dentroDeRango = items.filter((p) => {
+          const venc = p.calibracion?.vencimiento || p.ultimaCalibracion?.vencimiento;
+          if (!venc) return false;
+          const dias = Math.ceil((new Date(venc) - new Date()) / 86400000);
+          return dias >= 0 && dias < 30;
+        });
+        setProximosAVencer(dentroDeRango);
+      })
+      .catch(() => setProximosAVencer([]));
+  };
 
   return (
     <Dialog open={open} onClose={cerrar} fullWidth maxWidth="sm">
@@ -47,9 +59,9 @@ function VencimientoAutomaticoDialog({ open, onClose }) {
               <Typography variant="body2" color="text.secondary">No hay patrones por vencer en los próximos 30 días.</Typography>
             ) : (
               proximosAVencer.map((p) => (
-                <Box key={p.id} sx={{ display: "flex", justifyContent: "space-between", py: 0.75, borderBottom: 1, borderColor: "divider" }}>
-                  <Typography variant="body2">{p.idInterno} — {p.descripcion}</Typography>
-                  <Typography variant="body2" color="warning.main" fontWeight={600}>{p.fechaVencimiento}</Typography>
+                <Box key={p._id} sx={{ display: "flex", justifyContent: "space-between", py: 0.75, borderBottom: 1, borderColor: "divider" }}>
+                  <Typography variant="body2">{p.codigo} — {p.descripcion}</Typography>
+                  <Typography variant="body2" color="warning.main" fontWeight={600}>{p.calibracion?.vencimiento || p.ultimaCalibracion?.vencimiento}</Typography>
                 </Box>
               ))
             )}
@@ -59,7 +71,7 @@ function VencimientoAutomaticoDialog({ open, onClose }) {
       <DialogActions sx={{ px: 3, pb: 2 }}>
         <AppButton variant="outlined" onClick={cerrar} sx={{ borderRadius: 2 }}>Cerrar</AppButton>
         {!confirmado && (
-          <AppButton onClick={() => setConfirmado(true)} sx={{ borderRadius: 2 }}>Confirmar</AppButton>
+          <AppButton onClick={confirmar} sx={{ borderRadius: 2 }}>Confirmar</AppButton>
         )}
       </DialogActions>
     </Dialog>
@@ -72,8 +84,12 @@ export default function HistorialCertificadosPage() {
   const [clientes, setClientes] = useState([]);
   const [clienteFiltro, setClienteFiltro] = useState("");
   const [idPlanta, setIdPlanta] = useState("");
+  const [buscar, setBuscar] = useState("");
   const [page, setPage] = useState(0);
   const [vencimientoOpen, setVencimientoOpen] = useState(false);
+  const [items, setItems] = useState([]);
+  const [total, setTotal] = useState(0);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     listarClientes({ pageSize: 200 })
@@ -81,16 +97,17 @@ export default function HistorialCertificadosPage() {
       .catch(() => setClientes([]));
   }, []);
 
-  const filtered = EQUIPOS_MOCK.filter((e) => {
-    const matchCliente = !clienteFiltro || String(e.clienteId) === String(clienteFiltro);
-    const matchPlanta = !idPlanta || e.idInterno.toLowerCase().includes(idPlanta.toLowerCase());
-    return matchCliente && matchPlanta;
-  });
+  useEffect(() => {
+    setLoading(true);
+    listarEquipos({ search: buscar, clienteId: clienteFiltro, page, pageSize: 10 })
+      .then(({ items, total }) => { setItems(items); setTotal(total); })
+      .catch(() => { setItems([]); setTotal(0); })
+      .finally(() => setLoading(false));
+  }, [buscar, clienteFiltro, page]);
 
   const columns = [
-    { field: "id", headerName: "Equipo" },
-    { field: "clienteNombre", headerName: "Cliente" },
     { field: "idInterno", headerName: "ID Cliente" },
+    { field: "cliente", headerName: "Cliente", renderCell: (row) => row.cliente?.nombre || "—" },
     { field: "marca", headerName: "Marca" },
     { field: "modelo", headerName: "Modelo" },
     { field: "serie", headerName: "Serie" },
@@ -128,9 +145,8 @@ export default function HistorialCertificadosPage() {
 
   const exportarCertificados = () => {
     exportCsv(
-      filtered.map((e) => ({
-        Equipo: e.id, Cliente: e.clienteNombre, IDCliente: e.idInterno,
-        Marca: e.marca, Modelo: e.modelo, Serie: e.serie,
+      items.map((e) => ({
+        IDCliente: e.idInterno, Cliente: e.cliente?.nombre || "", Marca: e.marca, Modelo: e.modelo, Serie: e.serie,
       })),
       "historial_certificados.csv"
     );
@@ -142,7 +158,7 @@ export default function HistorialCertificadosPage() {
         <Box>
           <Typography variant="h5" fontWeight={700}>Historial de Certificados</Typography>
           <Typography variant="body2" color="text.secondary">
-            {filtered.length} equipos con certificados asociados
+            {total} equipos con certificados asociados
           </Typography>
         </Box>
         <Box sx={{ display: "flex", gap: 1.5 }}>
@@ -177,16 +193,18 @@ export default function HistorialCertificadosPage() {
           label="ID Cliente (Historial Certificados)"
           size="small"
           value={idPlanta}
-          onChange={(e) => { setIdPlanta(e.target.value); setPage(0); }}
+          onChange={(e) => setIdPlanta(e.target.value)}
+          onKeyDown={(e) => { if (e.key === "Enter") { setPage(0); setBuscar(idPlanta); } }}
           sx={{ width: 260, "& .MuiOutlinedInput-root": { borderRadius: 2 } }}
         />
-        <Button variant="contained" onClick={() => setPage(0)} sx={{ borderRadius: 2 }}>Buscar</Button>
+        <Button variant="contained" onClick={() => { setPage(0); setBuscar(idPlanta); }} sx={{ borderRadius: 2 }}>Buscar</Button>
       </Box>
 
       <AppTable
         columns={columns}
-        rows={filtered.slice(page * 10, page * 10 + 10)}
-        totalCount={filtered.length}
+        rows={items}
+        loading={loading}
+        totalCount={total}
         page={page}
         rowsPerPage={10}
         onPageChange={setPage}

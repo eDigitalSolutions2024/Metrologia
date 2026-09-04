@@ -37,4 +37,10 @@ const CATEGORIAS_EQUIPO = [
   "Volumen",
 ];
 
-module.exports = { eventoSchema, CATEGORIAS_EQUIPO };
+// Los formularios opcionales de categoría/moneda a veces mandan "" (nada
+// seleccionado) en vez de omitir el campo — sin este setter, el validador de
+// `enum` de Mongoose rechaza "" con un 400 confuso aunque el campo no sea
+// obligatorio. Se aplica en los `enum` opcionales de Equipo y Patrón.
+const vacioAUndefined = (v) => (v === "" ? undefined : v);
+
+module.exports = { eventoSchema, CATEGORIAS_EQUIPO, vacioAUndefined };

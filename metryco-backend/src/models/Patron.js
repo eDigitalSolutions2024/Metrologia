@@ -1,5 +1,5 @@
 const { Schema, model } = require("mongoose");
-const { CATEGORIAS_EQUIPO, eventoSchema } = require("./_shared");
+const { CATEGORIAS_EQUIPO, eventoSchema, vacioAUndefined } = require("./_shared");
 
 /**
  * Patrón de referencia del laboratorio (tabla `patrones` del legacy).
@@ -23,7 +23,7 @@ const patronSchema = new Schema(
     codigo: { type: String, required: true, unique: true, trim: true, uppercase: true }, // PAT-001
     nombre: { type: String, required: true, trim: true },
     descripcion: { type: String, trim: true },
-    categoria: { type: String, enum: CATEGORIAS_EQUIPO },
+    categoria: { type: String, enum: CATEGORIAS_EQUIPO, set: vacioAUndefined },
     magnitud: { type: String, trim: true, lowercase: true }, // clave del catálogo Magnitud
 
     marca: String,
@@ -34,6 +34,7 @@ const patronSchema = new Schema(
     unidad: String, // "mm", "bar", "°C"...
     intervaloMedicion: String, // rango, ej. "0–100 mm"
     resolucion: String,
+    comentarios: String,
 
     // --- Incertidumbre del certificado del patrón ---
     incertidumbre: {

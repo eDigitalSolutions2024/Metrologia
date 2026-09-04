@@ -1,8 +1,15 @@
 const fs = require("fs");
+const path = require("path");
 const Patron = require("../models/Patron");
 const AppError = require("../utils/AppError");
 const escapeRegex = require("../utils/escapeRegex");
 const { crearEvento } = require("../utils/historial");
+const { uploadsDir, publicWebUrl } = require("../config/env");
+const qr = require("../utils/qr");
+
+function urlInterna(id) {
+  return `${publicWebUrl.replace(/\/$/, "")}/equipos/patrones/${id}/editar`;
+}
 
 /** vencimiento = fecha de calibración + periodicidad (meses), si no viene explícito. */
 function calcularVencimiento(cal) {
@@ -130,6 +137,26 @@ async function adjuntarPdf(id, file, reqUser) {
   return conVigencia(patron);
 }
 
+function rutaArchivo(patron) {
+  const nombre = patron?.calibracion?.archivo?.nombreArchivo;
+  if (!nombre) return null;
+  return path.join(uploadsDir, "patrones", nombre);
+}
+
+// Alias histórico: el certificado del patrón se adjunta con `adjuntarPdf`
+// (modelo estructurado `calibracion.archivo`). Se mantiene el nombre para
+// las rutas que aún lo referencian.
+const adjuntarCertificado = adjuntarPdf;
+
+async function archivoStream(id) {
+  const patron = await Patron.findById(id);
+  if (!patron) throw new AppError("Patrón no encontrado", 404);
+  const ruta = rutaArchivo(patron);
+  if (!ruta || !fs.existsSync(ruta)) throw new AppError("El patrón no tiene certificado adjunto", 404);
+  const nombreOriginal = patron.calibracion?.archivo?.nombreOriginal;
+  return { ruta, nombre: nombreOriginal || `${patron.codigo}.pdf` };
+}
+
 /** Patrones cuyo vencimiento cae dentro de `dias` (default 30). */
 async function porVencer(dias = 30) {
   const limite = new Date(Date.now() + dias * 86400000);
@@ -140,4 +167,19 @@ async function porVencer(dias = 30) {
   return items.map(conVigencia);
 }
 
-module.exports = { listar, obtener, crear, actualizar, eliminar, adjuntarPdf, porVencer, calcularVencimiento };
+async function qrPng(id) {
+  const patron = await Patron.findById(id).select("_id");
+  if (!patron) throw new AppError("Patrón no encontrado", 404);
+  return qr.pngBuffer(urlInterna(patron._id));
+}
+
+async function qrSvg(id) {
+  const patron = await Patron.findById(id).select("_id");
+  if (!patron) throw new AppError("Patrón no encontrado", 404);
+  return qr.svg(urlInterna(patron._id));
+}
+
+module.exports = {
+  listar, obtener, crear, actualizar, eliminar, porVencer, calcularVencimiento,
+  adjuntarPdf, adjuntarCertificado, archivoStream, qrPng, qrSvg,
+};

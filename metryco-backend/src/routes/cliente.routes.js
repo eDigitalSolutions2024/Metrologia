@@ -1,17 +1,20 @@
 const { Router } = require("express");
 const auth = require("../middleware/auth");
 const requireRole = require("../middleware/requireRole");
+const validate = require("../middleware/validate");
+const { crearClienteSchema, actualizarClienteSchema } = require("../schemas/cliente.schema");
 const clienteController = require("../controllers/cliente.controller");
 const contactoRoutes = require("./contacto.routes");
 
 const router = Router();
 
-router.use(auth);
+// El técnico nunca ve "Clientes" en el sistema original (solo admin/coordinador/ventas).
+router.use(auth, requireRole("admin", "coordinador", "ventas"));
 
 router.get("/", clienteController.listar);
 router.get("/:id", clienteController.obtener);
-router.post("/", clienteController.crear);
-router.put("/:id", clienteController.actualizar);
+router.post("/", validate(crearClienteSchema), clienteController.crear);
+router.put("/:id", validate(actualizarClienteSchema), clienteController.actualizar);
 router.delete("/:id", requireRole("admin", "coordinador"), clienteController.eliminar);
 
 router.use("/:clienteId/contactos", contactoRoutes);

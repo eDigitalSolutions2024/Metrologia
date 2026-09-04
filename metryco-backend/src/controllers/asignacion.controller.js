@@ -2,11 +2,16 @@ const asyncHandler = require("../utils/asyncHandler");
 const service = require("../services/asignacion.service");
 
 const listar = asyncHandler(async (req, res) => {
-  const { reporteId = "", estadoCertificado = "", estadoCalibracion = "", page = 0, pageSize = 20 } = req.query;
+  const { reporteId = "", estadoCertificado = "", estadoCalibracion = "", tecnicoAsignado = "", page = 0, pageSize = 20 } = req.query;
   const { items, total } = await service.listar({
-    reporteId, estadoCertificado, estadoCalibracion, page: Number(page), pageSize: Number(pageSize),
+    reporteId, estadoCertificado, estadoCalibracion, tecnicoAsignado, page: Number(page), pageSize: Number(pageSize),
   });
   res.json({ success: true, data: items, total });
+});
+
+const calidad = asyncHandler(async (req, res) => {
+  const { clienteId = "" } = req.query;
+  res.json({ success: true, data: await service.listarParaCalidad({ clienteId }) });
 });
 
 const obtener = asyncHandler(async (req, res) => {
@@ -30,4 +35,13 @@ const eliminar = asyncHandler(async (req, res) => {
   res.json({ success: true, data: await service.eliminar(req.params.id) });
 });
 
-module.exports = { listar, obtener, crear, actualizar, cambiarEstado, eliminar };
+const subirGrafica = asyncHandler(async (req, res) => {
+  res.json({ success: true, data: await service.subirGrafica(req.params.id, req.file, req.user?.id) });
+});
+
+const descargarGrafica = asyncHandler(async (req, res) => {
+  const { ruta, nombre } = await service.archivoGraficaStream(req.params.id);
+  res.download(ruta, nombre);
+});
+
+module.exports = { listar, calidad, obtener, crear, actualizar, cambiarEstado, eliminar, subirGrafica, descargarGrafica };

@@ -1,24 +1,24 @@
+import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { useForm, useFieldArray } from "react-hook-form";
-import { Box, Typography, Grid, IconButton, Tooltip, Button, Divider } from "@mui/material";
+import { Box, Typography, Grid, IconButton, Tooltip, Button, Divider, Alert } from "@mui/material";
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
 import AddIcon from "@mui/icons-material/Add";
 import DeleteOutlineIcon from "@mui/icons-material/DeleteOutlined";
-import UploadFileOutlinedIcon from "@mui/icons-material/UploadFileOutlined";
 
 import AppButton from "../../shared/components/AppButton";
 import AppCard from "../../shared/components/AppCard";
 import AppInput from "../../shared/components/AppInput";
-import { MOCK } from "./mockData";
+import { obtenerPerformance, crearPerformance, actualizarPerformance } from "../../services/performance";
 
 const PUNTO_VACIO = {
   prueba: "", nominal: "", unidad: "", escala: "", rdg: "", fs: "", unidades: "", incertidumbre: "",
   minimo: "", minimoReal: "", maximo: "", maximoReal: "",
 };
 
-// Réplica de la fórmula de php/input_form.php (calcula_/calcula_real_):
-// tolerancia = nominal*rdg*0.01 + escala*fs*0.01 + unidades
-// minimo/maximo = nominal -/+ tolerancia; luego se ajustan con la incertidumbre.
+// Réplica de la fórmula de php/input_form.php (calcula_/calcula_real_), igual
+// a la que corre en el servidor (performance.service.js calcularPunto) —
+// aquí solo se usa para la vista previa en vivo mientras se captura.
 function calcularTolerancias(punto) {
   const nominal = parseFloat(punto.nominal);
   const escala = parseFloat(punto.escala);
@@ -42,19 +42,50 @@ function calcularTolerancias(punto) {
   };
 }
 
+// Backend <-> formulario: el modelo usa escalaTotal/porcentajeRdg/porcentajeFs.
+function puntoDesdeBackend(p) {
+  return {
+    prueba: p.prueba ?? "", nominal: p.nominal ?? "", unidad: p.unidad ?? "",
+    escala: p.escalaTotal ?? "", rdg: p.porcentajeRdg ?? "", fs: p.porcentajeFs ?? "",
+    unidades: p.unidades ?? "", incertidumbre: p.incertidumbre ?? "",
+    minimo: p.minimo ?? "", minimoReal: p.minimoReal ?? "", maximo: p.maximo ?? "", maximoReal: p.maximoReal ?? "",
+  };
+}
+
+function puntoAlBackend(p) {
+  return {
+    prueba: p.prueba, nominal: Number(p.nominal), unidad: p.unidad,
+    escalaTotal: Number(p.escala), porcentajeRdg: Number(p.rdg), porcentajeFs: Number(p.fs),
+    unidades: Number(p.unidades), incertidumbre: p.incertidumbre === "" ? undefined : Number(p.incertidumbre),
+  };
+}
+
 export default function PerformanceForm() {
   const { id } = useParams();
   const navigate = useNavigate();
   const isEdit = !!id;
-  const actual = isEdit ? MOCK.find((p) => String(p.id) === id) : null;
+  const [loading, setLoading] = useState(isEdit);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
 
-  const { register, control, handleSubmit, getValues, setValue, formState: { errors } } = useForm({
-    defaultValues: actual
-      ? { nombre: actual.nombre, comentarios: actual.comentarios, puntos: actual.puntos }
-      : { nombre: "", comentarios: "", puntos: [PUNTO_VACIO] },
+  const { register, control, handleSubmit, getValues, setValue, reset, formState: { errors } } = useForm({
+    defaultValues: { nombre: "", comentarios: "", puntos: [PUNTO_VACIO] },
   });
 
   const { fields, append, remove } = useFieldArray({ control, name: "puntos" });
+
+  useEffect(() => {
+    if (!isEdit) return;
+    obtenerPerformance(id)
+      .then((p) => {
+        reset({
+          nombre: p.nombre, comentarios: p.comentarios,
+          puntos: (p.puntos ?? []).map(puntoDesdeBackend),
+        });
+      })
+      .catch(() => setError("No se pudo cargar el performance."))
+      .finally(() => setLoading(false));
+  }, [id, isEdit, reset]);
 
   const recalcularFila = (index) => {
     const actual = getValues(`puntos.${index}`);
@@ -65,11 +96,24 @@ export default function PerformanceForm() {
     setValue(`puntos.${index}.maximoReal`, calculado.maximoReal);
   };
 
-  const onSubmit = (data) => {
-    // Sin backend de Performance todavía: se simula el guardado.
-    console.log(data);
-    navigate("/performance");
+  const onSubmit = async (data) => {
+    setSaving(true); setError("");
+    const payload = {
+      nombre: data.nombre, comentarios: data.comentarios,
+      puntos: data.puntos.map(puntoAlBackend),
+    };
+    try {
+      if (isEdit) await actualizarPerformance(id, payload);
+      else await crearPerformance(payload);
+      navigate("/performance");
+    } catch (err) {
+      setError(err?.response?.data?.message || "No se pudo guardar el performance.");
+    } finally {
+      setSaving(false);
+    }
   };
+
+  if (loading) return <Typography color="text.secondary">Cargando…</Typography>;
 
   return (
     <Box>
@@ -83,6 +127,8 @@ export default function PerformanceForm() {
         </Box>
       </Box>
 
+      {error && <Alert severity="error" sx={{ mb: 2, borderRadius: 2 }} onClose={() => setError("")}>{error}</Alert>}
+
       <Box component="form" onSubmit={handleSubmit(onSubmit)}>
         <AppCard title="Información General" sx={{ mb: 3 }}>
           <Grid container spacing={2}>
@@ -92,12 +138,6 @@ export default function PerformanceForm() {
             <Grid size={{ xs: 12, md: 7 }}>
               <AppInput label="Comentarios" {...register("comentarios")} />
             </Grid>
-            <Grid size={{ xs: 12 }}>
-              <Button component="label" variant="outlined" startIcon={<UploadFileOutlinedIcon />} sx={{ borderRadius: 2, height: 40 }}>
-                Importar imagen (PNG)
-                <input type="file" accept="image/png" hidden {...register("imagen")} />
-              </Button>
-            </Grid>
           </Grid>
         </AppCard>
 
@@ -105,7 +145,7 @@ export default function PerformanceForm() {
           {fields.map((field, index) => (
             <Box key={field.id}>
               {index > 0 && <Divider sx={{ my: 2 }} />}
-              <Grid container spacing={1.5} alignItems="flex-end">
+              <Grid container spacing={1.5} sx={{ alignItems: "flex-end" }}>
                 <Grid size={{ xs: 12, sm: 6, md: 2 }}>
                   <AppInput label="Prueba" size="small" {...register(`puntos.${index}.prueba`, { required: true })} />
                 </Grid>
@@ -166,7 +206,7 @@ export default function PerformanceForm() {
 
         <Box sx={{ display: "flex", gap: 2, justifyContent: "flex-end" }}>
           <AppButton variant="outlined" onClick={() => navigate("/performance")} sx={{ borderRadius: 2 }}>Cancelar</AppButton>
-          <AppButton type="submit" sx={{ borderRadius: 2 }}>{isEdit ? "Guardar cambios" : "Crear Performance"}</AppButton>
+          <AppButton type="submit" loading={saving} sx={{ borderRadius: 2 }}>{isEdit ? "Guardar cambios" : "Crear Performance"}</AppButton>
         </Box>
       </Box>
     </Box>
