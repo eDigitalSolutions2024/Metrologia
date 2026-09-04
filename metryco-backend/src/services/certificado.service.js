@@ -411,6 +411,16 @@ async function anular(id, motivo, reqUser) {
   };
   cert.historial.push(ev);
   await cert.save();
+
+  // Sin esto, la asignación se queda marcada "autorizado" apuntando a un
+  // certificado que ya no es válido — Calidad debe volver a decidir.
+  if (cert.asignacion) {
+    await Asignacion.updateOne(
+      { _id: cert.asignacion },
+      { $set: { "estados.certificado": "en_revision" } }
+    );
+  }
+
   return conEstadoVigente(cert);
 }
 

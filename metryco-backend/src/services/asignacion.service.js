@@ -210,6 +210,22 @@ async function cambiarEstado(id, { dominio, valor, motivo }, reqUser) {
     // Igual que en el sistema original: rechazar regresa la calibración a
     // "pendiente" — el técnico debe rehacer el trabajo, no solo corregir el papeleo.
     a.estados.calibracion = "pendiente";
+
+    // Si ya existía un Certificado formal (folio, QR público) para esta
+    // asignación, se anula: sin esto quedaba "vigente" y verificable por QR
+    // aunque Calidad acabara de rechazar la calibración que lo respalda.
+    const Certificado = require("../models/Certificado");
+    const cert = await Certificado.findOne({ asignacion: a._id, estado: { $ne: "anulado" } });
+    if (cert) {
+      cert.estado = "anulado";
+      cert.anulacion = {
+        motivo: `Rechazado por Calidad: ${motivo.trim()}`,
+        usuario: { id: evento.usuario?.id, nombre: evento.usuario?.nombre },
+        fecha: new Date(),
+      };
+      cert.historial.push(evento);
+      await cert.save();
+    }
   }
 
   a.historial.push(evento);
