@@ -18,14 +18,20 @@ export default function AppTable({
   return (
     <Paper
       elevation={0}
-      sx={{ border: 1, borderColor: "divider", borderRadius: 3.5, overflow: "hidden" }}
+      sx={{ border: 1, borderColor: "divider", borderRadius: 1.5, overflow: "hidden" }}
     >
-      <TableContainer sx={{ maxHeight }}>
+      {/* TableContainer trae su propio overflow-x:auto — anidar ese
+          scroll-container dentro del overflow:hidden+borderRadius del Paper
+          es un caso conocido en Chrome donde el recorte redondeado del padre
+          no se aplica al contenido del hijo, dejando ver la esquina cuadrada
+          del fondo del encabezado. Repetir el radio aquí (heredado del Paper)
+          hace que el propio contenedor con scroll recorte igual. */}
+      <TableContainer sx={{ maxHeight, borderRadius: "inherit" }}>
         <Table size="small" stickyHeader={!!maxHeight}>
           <TableHead>
             <TableRow>
               {columns.map((col) => (
-                <TableCell key={col.field} align={col.align || "left"} sx={{ py: 1.5 }}>
+                <TableCell key={col.field} align={col.align || "left"} sx={{ py: 1.75, px: 2.25 }}>
                   {col.headerName}
                 </TableCell>
               ))}
@@ -57,7 +63,7 @@ export default function AppTable({
                   }}
                 >
                   {columns.map((col) => (
-                    <TableCell key={col.field} align={col.align || "left"} sx={{ fontSize: 13, py: 1.35 }}>
+                    <TableCell key={col.field} align={col.align || "left"} sx={{ fontSize: 13, py: 1.35, px: 2.25 }}>
                       {col.renderCell ? col.renderCell(row) : row[col.field] ?? "—"}
                     </TableCell>
                   ))}

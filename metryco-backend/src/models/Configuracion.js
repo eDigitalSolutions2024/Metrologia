@@ -37,11 +37,13 @@ const configuracionSchema = new Schema(
 
     // Colores de marca de la interfaz — antes fijos en theme/theme.js.
     // primario = tono oscuro (sidebar, botones principales); secundario =
-    // acento (botones de acción, enlaces, focos). Se aplican en vivo vía
-    // ThemeProvider, sin rebuild.
+    // acento (botones de acción, enlaces, focos); acento = color "info"
+    // (chips/badges informativos, detalles secundarios). Se aplican en vivo
+    // vía ThemeProvider, sin rebuild.
     colores: {
       primario: String,
       secundario: String,
+      acento: String,
     },
   },
   { timestamps: true }

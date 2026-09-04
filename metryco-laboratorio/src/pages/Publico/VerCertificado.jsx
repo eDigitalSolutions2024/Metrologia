@@ -88,7 +88,7 @@ export default function VerCertificado() {
 
       <Paper
         elevation={0}
-        sx={{ width: "100%", maxWidth: 560, borderRadius: 4, border: 1, borderColor: "divider", overflow: "hidden" }}
+        sx={{ width: "100%", maxWidth: 560, borderRadius: 2, border: 1, borderColor: "divider", overflow: "hidden" }}
       >
         {estado === "cargando" && (
           <Box sx={{ py: 8, display: "flex", justifyContent: "center" }}>

@@ -43,15 +43,16 @@ export default function PatronesPage() {
   const [categoria, setCategoria] = useState("");
   const [vigencia, setVigencia] = useState("");
   const [page, setPage] = useState(0);
+  const [rowsPerPage, setRowsPerPage] = useState(10);
   const [etiquetaPatron, setEtiquetaPatron] = useState(null);
 
   const cargar = useCallback(() => {
     setLoading(true);
-    listarPatrones({ search, categoria, vigencia, page, pageSize: 10 })
+    listarPatrones({ search, categoria, vigencia, page, pageSize: rowsPerPage })
       .then(({ items, total }) => { setRows(items); setTotal(total); })
       .catch(() => { setRows([]); setTotal(0); })
       .finally(() => setLoading(false));
-  }, [search, categoria, vigencia, page]);
+  }, [search, categoria, vigencia, page, rowsPerPage]);
   useEffect(() => { cargar(); }, [cargar]);
 
   const cuenta = (v) => rows.filter((r) => r.vigencia === v).length;
@@ -173,9 +174,10 @@ export default function PatronesPage() {
         loading={loading}
         totalCount={total}
         page={page}
-        rowsPerPage={10}
+        rowsPerPage={rowsPerPage}
         onPageChange={setPage}
         emptyText="Sin patrones registrados"
+        onRowsPerPageChange={(n) => { setRowsPerPage(n); setPage(0); }}
       />
 
       <EtiquetaEquipoDialog

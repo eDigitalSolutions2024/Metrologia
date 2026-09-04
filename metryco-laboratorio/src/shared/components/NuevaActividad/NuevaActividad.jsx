@@ -216,7 +216,7 @@ export default function NuevaActividad({ open, onClose, onCreated, fechaSugerida
         </DialogContent>
 
         <DialogActions sx={{ px: 3, pb: 3, pt: 1 }}>
-          <AppButton variant="outlined" onClick={cerrar} sx={{ borderRadius: 2 }}>Cancelar</AppButton>
+          <AppButton type="button" variant="outlined" onClick={cerrar} sx={{ borderRadius: 2 }}>Cancelar</AppButton>
           <AppButton type="submit" loading={isSubmitting} sx={{ borderRadius: 2 }}>Guardar Actividad</AppButton>
         </DialogActions>
       </Box>

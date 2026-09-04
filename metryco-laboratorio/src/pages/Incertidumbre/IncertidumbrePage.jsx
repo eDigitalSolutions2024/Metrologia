@@ -258,7 +258,9 @@ export default function IncertidumbrePage() {
                 {reportes.map((r) => <MenuItem key={r._id} value={r._id}>{r.folio} · {r.cliente?.nombre}</MenuItem>)}
               </TextField>
               <TextField select size="small" label="Asignación (equipo)" value={asignacionId} disabled={!reporteId} onChange={(e) => { setAsignacionId(e.target.value); setCalc(null); }}>
-                {asignaciones.length === 0 && <MenuItem value="" disabled>Sin asignaciones en este reporte</MenuItem>}
+                {asignaciones.length === 0
+                  ? <MenuItem value="" disabled>Sin asignaciones en este reporte</MenuItem>
+                  : <MenuItem value="">— sin elegir —</MenuItem>}
                 {asignaciones.map((a) => <MenuItem key={a._id} value={a._id}>{a.equipo?.idInterno} — {a.equipo?.marca} {a.equipo?.modelo}</MenuItem>)}
               </TextField>
             </Box>
@@ -431,7 +433,12 @@ export default function IncertidumbrePage() {
         </Box>
 
         {/* ---- Asistente ---- */}
-        <Box sx={{ width: { xs: "100%", lg: 380 }, flexShrink: 0, position: { lg: "sticky" }, top: { lg: 96 } }}>
+        <Box
+          sx={{
+            width: { xs: "100%", lg: 380 }, flexShrink: 0, position: { lg: "sticky" }, top: { lg: 96 },
+            height: { xs: 520, lg: "calc(100vh - 120px)" }, maxHeight: { lg: "calc(100vh - 120px)" },
+          }}
+        >
           <AsistentePanel contexto={contexto} onAgregarComponente={agregarDesdeAsistente} />
         </Box>
       </Box>
@@ -446,7 +453,7 @@ function ResultadoHero({ R, motor, calc, onGuardar, onAccion }) {
   return (
     <Box
       sx={{
-        borderRadius: 3.5,
+        borderRadius: 2,
         overflow: "hidden",
         color: "#E6EDF6",
         background: "radial-gradient(900px 400px at 12% 0%, rgba(37,99,235,.35), transparent 60%), linear-gradient(150deg, #0B1220 0%, #0F172A 55%, #111E3A 100%)",

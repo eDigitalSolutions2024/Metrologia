@@ -2,13 +2,22 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useState } 
 import { ThemeProvider } from "@mui/material/styles";
 import CssBaseline from "@mui/material/CssBaseline";
 import { crearTheme, COLORES_MARCA_DEFAULT } from "./theme";
-import { obtenerColores } from "../services/configuracion";
+import { obtenerColores, obtenerLogo } from "../services/configuracion";
 
-const ColoresMarcaContext = createContext({ colores: COLORES_MARCA_DEFAULT, refrescarColores: () => {} });
+const MarcaContext = createContext({
+  colores: COLORES_MARCA_DEFAULT, refrescarColores: () => {},
+  logo: null, refrescarLogo: () => {},
+});
 
 /** Lo llama la pantalla de Administración → Colores tras guardar, para aplicar el cambio sin recargar. */
 export function useColoresMarca() {
-  return useContext(ColoresMarcaContext);
+  return useContext(MarcaContext);
+}
+
+/** Lo llama Administración → Datos del Laboratorio tras subir/quitar el logo,
+ * para que Sidebar/Login lo reflejen al instante sin recargar la página. */
+export function useLogoMarca() {
+  return useContext(MarcaContext);
 }
 
 /**
@@ -19,21 +28,25 @@ export function useColoresMarca() {
  */
 export default function AppThemeProvider({ children }) {
   const [colores, setColores] = useState(COLORES_MARCA_DEFAULT);
+  const [logo, setLogo] = useState(null);
 
   const refrescarColores = useCallback(() => {
     obtenerColores().then(setColores).catch(() => {});
   }, []);
+  const refrescarLogo = useCallback(() => {
+    obtenerLogo().then(setLogo).catch(() => setLogo(null));
+  }, []);
 
-  useEffect(() => { refrescarColores(); }, [refrescarColores]);
+  useEffect(() => { refrescarColores(); refrescarLogo(); }, [refrescarColores, refrescarLogo]);
 
   const theme = useMemo(() => crearTheme(colores), [colores]);
 
   return (
-    <ColoresMarcaContext.Provider value={{ colores, refrescarColores }}>
+    <MarcaContext.Provider value={{ colores, refrescarColores, logo, refrescarLogo }}>
       <ThemeProvider theme={theme}>
         <CssBaseline />
         {children}
       </ThemeProvider>
-    </ColoresMarcaContext.Provider>
+    </MarcaContext.Provider>
   );
 }

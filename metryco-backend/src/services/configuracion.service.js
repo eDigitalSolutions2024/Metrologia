@@ -85,7 +85,7 @@ async function eliminarLogo() {
   }
 }
 
-const COLORES_DEFAULT = { primario: "#0F172A", secundario: "#2563EB" };
+const COLORES_DEFAULT = { primario: "#0F172A", secundario: "#2563EB", acento: "#0891B2" };
 const HEX_VALIDO = /^#[0-9A-Fa-f]{6}$/;
 
 async function obtenerColores() {
@@ -93,17 +93,19 @@ async function obtenerColores() {
   return {
     primario: cfg.colores?.primario || COLORES_DEFAULT.primario,
     secundario: cfg.colores?.secundario || COLORES_DEFAULT.secundario,
+    acento: cfg.colores?.acento || COLORES_DEFAULT.acento,
   };
 }
 
 async function actualizarColores(datos) {
   const primario = datos?.primario || COLORES_DEFAULT.primario;
   const secundario = datos?.secundario || COLORES_DEFAULT.secundario;
-  if (!HEX_VALIDO.test(primario) || !HEX_VALIDO.test(secundario)) {
+  const acento = datos?.acento || COLORES_DEFAULT.acento;
+  if (!HEX_VALIDO.test(primario) || !HEX_VALIDO.test(secundario) || !HEX_VALIDO.test(acento)) {
     throw new AppError("Los colores deben ser códigos hexadecimales válidos (#RRGGBB)", 400);
   }
   const cfg = await obtenerDoc();
-  cfg.colores = { primario, secundario };
+  cfg.colores = { primario, secundario, acento };
   await cfg.save();
   return cfg.colores;
 }

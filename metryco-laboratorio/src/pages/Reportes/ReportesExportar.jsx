@@ -84,7 +84,7 @@ export default function ReportesExportar() {
 
       <Grid container spacing={3}>
         <Grid size={{ xs: 12, md: 7 }}>
-          <Paper elevation={0} sx={{ p: 3.5, borderRadius: 3, border: 1, borderColor: "divider" }}>
+          <Paper elevation={0} sx={{ p: 3.5, borderRadius: 2, border: 1, borderColor: "divider" }}>
             <Box sx={{ display: "flex", alignItems: "center", gap: 1.25, mb: 3 }}>
               <Box
                 sx={{
@@ -177,7 +177,7 @@ export default function ReportesExportar() {
           <Paper
             elevation={0}
             sx={{
-              p: 3.5, borderRadius: 3, border: 1, borderColor: "divider",
+              p: 3.5, borderRadius: 2, border: 1, borderColor: "divider",
               height: "100%", display: "flex", flexDirection: "column", justifyContent: "center", alignItems: "center", textAlign: "center", gap: 2,
             }}
           >

@@ -85,7 +85,10 @@ export default function ReportesPage() {
           <Chip
             size="small" clickable label={r.folio} icon={<OpenInNewOutlinedIcon sx={{ fontSize: 14 }} />}
             onClick={() => navigate(`/reportes/${r._id}`)}
-            sx={{ fontWeight: 700, color: "secondary.main", borderColor: "secondary.main", "& .MuiChip-icon": { color: "secondary.main" } }}
+            sx={{
+              fontWeight: 700, color: "secondary.main", borderColor: "secondary.main", borderRadius: "6px",
+              "& .MuiChip-icon": { color: "secondary.main" }, "& .MuiChip-label": { px: 1 },
+            }}
             variant="outlined"
           />
         </Tooltip>
@@ -118,7 +121,10 @@ export default function ReportesPage() {
             <Chip
               size="small" clickable label={r.cotizacion.folio} icon={<RequestQuoteOutlinedIcon sx={{ fontSize: 14 }} />}
               onClick={() => navigate(`/cotizaciones?editar=${r.cotizacion._id}`)}
-              sx={{ color: "info.main", borderColor: "info.main", "& .MuiChip-icon": { color: "info.main" } }}
+              sx={{
+                color: "info.main", borderColor: "info.main", borderRadius: "6px",
+                "& .MuiChip-icon": { color: "info.main" }, "& .MuiChip-label": { px: 1 },
+              }}
               variant="outlined"
             />
           </Tooltip>

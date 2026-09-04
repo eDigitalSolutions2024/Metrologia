@@ -187,7 +187,10 @@ export default function CotizacionesPage() {
           <Chip
             size="small" clickable label={row.folio} icon={<RequestQuoteOutlinedIcon sx={{ fontSize: 14 }} />}
             onClick={() => abrirEditar(row)}
-            sx={{ fontWeight: 700, color: "secondary.main", borderColor: "secondary.main", "& .MuiChip-icon": { color: "secondary.main" } }}
+            sx={{
+              fontWeight: 700, color: "secondary.main", borderColor: "secondary.main", borderRadius: "6px",
+              "& .MuiChip-icon": { color: "secondary.main" }, "& .MuiChip-label": { px: 1 },
+            }}
             variant="outlined"
           />
         </Tooltip>

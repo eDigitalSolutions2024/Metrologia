@@ -53,11 +53,11 @@ export default function AsistentePanel({ contexto, onAgregarComponente }) {
     <Paper
       elevation={0}
       sx={{
-        borderRadius: 4, border: 1, borderColor: "divider",
+        borderRadius: 2, border: 1, borderColor: "divider",
         display: "flex", flexDirection: "column", height: "100%", minHeight: 520, overflow: "hidden",
       }}
     >
-      <Box sx={{ p: 2, display: "flex", alignItems: "center", gap: 1.25, borderBottom: 1, borderColor: "divider", bgcolor: "background.default" }}>
+      <Box sx={{ p: 2.25, display: "flex", alignItems: "center", gap: 1.25, borderBottom: 1, borderColor: "divider", bgcolor: "background.default" }}>
         <Box sx={{ width: 34, height: 34, borderRadius: 2, display: "grid", placeItems: "center", bgcolor: "secondary.main", color: "#fff" }}>
           <SmartToyOutlinedIcon fontSize="small" />
         </Box>

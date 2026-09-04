@@ -4,8 +4,9 @@ import { Box, List, Typography } from "@mui/material";
 import menu, { menuKey } from "./menuConfig";
 import SidebarItem from "./SidebarItem";
 import { useAuth } from "../../core/auth/useAuth";
-import { obtenerMenuPermisos, obtenerLogo, logoUrl } from "../../services/configuracion";
+import { obtenerMenuPermisos, logoUrl } from "../../services/configuracion";
 import { fotoUrl } from "../../services/perfil";
+import { useLogoMarca } from "../../theme/AppThemeProvider";
 
 const ROL_LABELS = {
   admin: "Administrador",
@@ -77,10 +78,7 @@ export default function Sidebar({ open = true }) {
     obtenerMenuPermisos().then(setOverrides).catch(() => setOverrides({}));
   }, []);
 
-  const [logo, setLogo] = useState(null);
-  useEffect(() => {
-    obtenerLogo().then(setLogo).catch(() => setLogo(null));
-  }, []);
+  const { logo } = useLogoMarca();
 
   const menuVisible = filtrarMenu(menu, user?.rol, overrides);
 

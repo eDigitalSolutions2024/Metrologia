@@ -34,6 +34,7 @@ export default function ClientesPage() {
   const [search, setSearch] = useState("");
   const [sectorFilter, setSectorFilter] = useState("todos");
   const [page, setPage] = useState(0);
+  const [rowsPerPage, setRowsPerPage] = useState(10);
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [toggleTarget, setToggleTarget] = useState(null);
 
@@ -64,7 +65,7 @@ export default function ClientesPage() {
           search: debouncedSearch,
           sector: sectorFilter,
           page,
-          pageSize: 10,
+          pageSize: rowsPerPage,
         });
         if (cancelado) return;
         setRows(items.map((c) => ({ ...c, id: c._id })));
@@ -79,7 +80,7 @@ export default function ClientesPage() {
     return () => {
       cancelado = true;
     };
-  }, [debouncedSearch, sectorFilter, page, reloadKey]);
+  }, [debouncedSearch, sectorFilter, page, rowsPerPage, reloadKey]);
 
   const handleEliminar = async () => {
     const target = deleteTarget;
@@ -206,8 +207,9 @@ export default function ClientesPage() {
         loading={loading}
         totalCount={totalCount}
         page={page}
-        rowsPerPage={10}
+        rowsPerPage={rowsPerPage}
         onPageChange={setPage}
+        onRowsPerPageChange={(n) => { setRowsPerPage(n); setPage(0); }}
       />
 
       <ConfirmDialog

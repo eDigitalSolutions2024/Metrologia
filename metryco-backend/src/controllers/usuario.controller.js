@@ -38,6 +38,11 @@ const desactivar = asyncHandler(async (req, res) => {
   res.json({ success: true, data: usuario });
 });
 
+const reactivar = asyncHandler(async (req, res) => {
+  const usuario = await usuarioService.reactivar(req.params.id);
+  res.json({ success: true, data: usuario });
+});
+
 const eliminar = asyncHandler(async (req, res) => {
   if (req.params.id === req.user.id) {
     return res.status(400).json({ success: false, message: "No puedes eliminar tu propio usuario." });
@@ -61,6 +66,6 @@ const eliminarObservacion = asyncHandler(async (req, res) => {
 });
 
 module.exports = {
-  listar, obtener, crear, actualizar, desactivar, eliminar,
+  listar, obtener, crear, actualizar, desactivar, reactivar, eliminar,
   agregarObservacion, eliminarObservacion, directorio,
 };

@@ -69,6 +69,7 @@ export default function NuevoUsuario({ open, onClose, onCreated }) {
 
   const password = watch("password");
   const nombre = watch("nombre");
+  const usuario = watch("usuario");
   const { onChange: onChangeUsuarioRHF, ...usuarioReg } = register("usuario", { required: "Campo obligatorio" });
 
   // Mientras el usuario no haya escrito su propio login, se lo proponemos a
@@ -154,6 +155,7 @@ export default function NuevoUsuario({ open, onClose, onCreated }) {
                 helperText="Se sugiere solo a partir del nombre — puedes cambiarlo"
                 error={errors.usuario}
                 {...usuarioReg}
+                value={usuario}
                 onChange={(e) => { setUsuarioTocado(true); onChangeUsuarioRHF(e); }}
               />
             </Grid>
@@ -208,7 +210,7 @@ export default function NuevoUsuario({ open, onClose, onCreated }) {
           <SeccionTitulo>Contraseña temporal</SeccionTitulo>
           <Box
             sx={{
-              p: 2, borderRadius: 3, border: 1, borderColor: "divider",
+              p: 2, borderRadius: 2, border: 1, borderColor: "divider",
               bgcolor: "background.default", display: "flex", alignItems: "center", gap: 1.5,
             }}
           >
@@ -237,12 +239,12 @@ export default function NuevoUsuario({ open, onClose, onCreated }) {
                     endAdornment: (
                       <InputAdornment position="end">
                         <Tooltip title={copiado ? "¡Copiado!" : "Copiar"}>
-                          <IconButton size="small" onClick={copiarPassword} edge="end">
+                          <IconButton type="button" size="small" onClick={copiarPassword} edge="end">
                             <ContentCopyIcon fontSize="small" />
                           </IconButton>
                         </Tooltip>
                         <Tooltip title="Generar otra">
-                          <IconButton size="small" onClick={regenerarPassword} edge="end">
+                          <IconButton type="button" size="small" onClick={regenerarPassword} edge="end">
                             <RefreshIcon fontSize="small" />
                           </IconButton>
                         </Tooltip>
@@ -259,7 +261,7 @@ export default function NuevoUsuario({ open, onClose, onCreated }) {
         </DialogContent>
 
         <DialogActions sx={{ px: 3, pb: 3, pt: 1 }}>
-          <AppButton variant="outlined" onClick={cerrar} sx={{ borderRadius: 2 }}>Cancelar</AppButton>
+          <AppButton type="button" variant="outlined" onClick={cerrar} sx={{ borderRadius: 2 }}>Cancelar</AppButton>
           <AppButton type="submit" loading={isSubmitting} sx={{ borderRadius: 2 }}>Crear Usuario</AppButton>
         </DialogActions>
       </Box>

@@ -13,6 +13,7 @@ const hexColor = z.string().trim().regex(/^#[0-9A-Fa-f]{6}$/, "Debe ser un color
 const actualizarColoresSchema = z.object({
   primario: hexColor,
   secundario: hexColor,
+  acento: hexColor,
 });
 
 const ROLES = ["admin", "coordinador", "ventas", "tecnico"];

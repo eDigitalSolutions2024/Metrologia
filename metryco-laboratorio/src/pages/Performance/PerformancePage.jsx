@@ -17,17 +17,18 @@ export default function PerformancePage() {
   const [search, setSearch] = useState("");
   const [buscar, setBuscar] = useState("");
   const [page, setPage] = useState(0);
+  const [rowsPerPage, setRowsPerPage] = useState(10);
   const [items, setItems] = useState([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     setLoading(true);
-    listarPerformance({ search: buscar, page, pageSize: 10 })
+    listarPerformance({ search: buscar, page, pageSize: rowsPerPage })
       .then(({ items, total }) => { setItems(items); setTotal(total); })
       .catch(() => { setItems([]); setTotal(0); })
       .finally(() => setLoading(false));
-  }, [buscar, page]);
+  }, [buscar, page, rowsPerPage]);
 
   const columns = [
     { field: "nombre", headerName: "Nombre" },
@@ -89,8 +90,9 @@ export default function PerformancePage() {
         rows={items}
         totalCount={total}
         page={page}
-        rowsPerPage={10}
+        rowsPerPage={rowsPerPage}
         onPageChange={setPage}
+        onRowsPerPageChange={(n) => { setRowsPerPage(n); setPage(0); }}
         loading={loading}
       />
     </Box>

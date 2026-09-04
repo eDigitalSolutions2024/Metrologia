@@ -54,6 +54,7 @@ export default function CertificadosPage() {
   const [clienteId, setClienteId] = useState("");
   const [clientes, setClientes] = useState([]);
   const [page, setPage] = useState(0);
+  const [rowsPerPage, setRowsPerPage] = useState(10);
 
   const [qrCert, setQrCert] = useState(null);
   const [etiquetaCert, setEtiquetaCert] = useState(null);
@@ -62,11 +63,11 @@ export default function CertificadosPage() {
 
   const cargar = useCallback(() => {
     setLoading(true);
-    listarCertificados({ search, estado, clienteId, page, pageSize: 10 })
+    listarCertificados({ search, estado, clienteId, page, pageSize: rowsPerPage })
       .then(({ items, total }) => { setRows(items); setTotal(total); })
       .catch(() => { setRows([]); setTotal(0); })
       .finally(() => setLoading(false));
-  }, [search, estado, clienteId, page]);
+  }, [search, estado, clienteId, page, rowsPerPage]);
 
   useEffect(() => { cargar(); }, [cargar]);
   useEffect(() => {
@@ -217,8 +218,9 @@ export default function CertificadosPage() {
         loading={loading}
         totalCount={total}
         page={page}
-        rowsPerPage={10}
+        rowsPerPage={rowsPerPage}
         onPageChange={setPage}
+        onRowsPerPageChange={(n) => { setRowsPerPage(n); setPage(0); }}
         emptyText="Sin certificados"
       />
 

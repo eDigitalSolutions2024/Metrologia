@@ -1,12 +1,14 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Dialog, DialogTitle, DialogContent, DialogActions, Box, Typography,
-  Button, MenuItem, TextField, CircularProgress,
+  Button, MenuItem, TextField,
 } from "@mui/material";
 import PrintOutlinedIcon from "@mui/icons-material/PrintOutlined";
 import DownloadOutlinedIcon from "@mui/icons-material/DownloadOutlined";
 import { fetchQrBlob } from "../../services/certificados";
 import { formatDateShort } from "../../shared/utils/formatDate";
+import { construirEtiquetaSVG as construirEtiquetaSVGBase } from "../../shared/utils/etiquetaSvg";
+import EtiquetaVistaPrevia from "../../shared/components/EtiquetaVistaPrevia";
 
 const TAMANOS = [
   { id: "50x30", label: "50 × 30 mm (estándar)", w: 50, h: 30 },
@@ -15,43 +17,22 @@ const TAMANOS = [
   { id: "100x50", label: "100 × 50 mm (ancha)", w: 100, h: 50 },
 ];
 
-const trunc = (s, n) => (s && s.length > n ? s.slice(0, n - 1) + "…" : s || "");
-const esc = (s) =>
-  String(s ?? "").replace(/[<>&]/g, (c) => ({ "<": "&lt;", ">": "&gt;", "&": "&amp;" }[c]));
-
-/** SVG de la etiqueta en unidades mm (viewBox = mm), lista para imprimir a escala 1:1. */
 function construirEtiquetaSVG({ cert, qrDataUrl, w, h }) {
-  const pad = w >= 60 ? 3 : 2;
-  const qr = h - pad * 2;
-  const qrX = w - qr - pad;
-  const textW = qrX - pad - 1.5;
   const host = (() => {
     try { return new URL(cert.urlPublica).host; } catch { return ""; }
   })();
-  const base = w >= 60 ? 2.9 : 2.4;
 
-  const lineas = [
-    { y: pad + base, size: base * 0.72, weight: 700, fill: "#334155", text: trunc(cert.laboratorio?.nombre || "Laboratorio de Metrología", Math.floor(textW / (base * 0.42))) },
-    { y: pad + base * 2.7, size: base * 1.15, weight: 800, fill: "#0F172A", text: cert.folio },
-    { y: pad + base * 4.2, size: base * 0.92, weight: 600, fill: "#0F172A", text: "ID: " + trunc(cert.equipoSnapshot?.idInterno || "", 22) },
-    { y: pad + base * 5.5, size: base * 0.8, weight: 400, fill: "#475569", text: trunc(cert.equipoSnapshot?.descripcion || "", Math.floor(textW / (base * 0.4))) },
-    { y: pad + base * 6.9, size: base * 0.78, weight: 600, fill: "#475569", text: `Cal ${formatDateShort(cert.fechaCalibracion)}${cert.vigencia ? "   Próx " + formatDateShort(cert.vigencia) : ""}` },
-    { y: h - pad + base * 0.1, size: base * 0.62, weight: 400, fill: "#64748B", text: host ? `Verifica: ${host}` : "" },
-  ];
-
-  const textos = lineas
-    .filter((l) => l.text)
-    .map(
-      (l) =>
-        `<text x="${pad}" y="${l.y.toFixed(2)}" font-family="Inter, Arial, sans-serif" font-size="${l.size.toFixed(2)}" font-weight="${l.weight}" fill="${l.fill}">${esc(l.text)}</text>`
-    )
-    .join("");
-
-  return `<svg xmlns="http://www.w3.org/2000/svg" width="${w}mm" height="${h}mm" viewBox="0 0 ${w} ${h}">
-  <rect x="0.15" y="0.15" width="${w - 0.3}" height="${h - 0.3}" rx="1.4" fill="#ffffff" stroke="#CBD5E1" stroke-width="0.3"/>
-  ${textos}
-  <image x="${qrX.toFixed(2)}" y="${pad}" width="${qr.toFixed(2)}" height="${qr.toFixed(2)}" href="${qrDataUrl}" />
-</svg>`;
+  return construirEtiquetaSVGBase({
+    w, h, qrDataUrl,
+    encabezado: { texto: cert.laboratorio?.nombre || "Laboratorio de Metrología", weight: 700, fill: "#334155" },
+    filas: [
+      { texto: cert.folio, peso: 1.05, weight: 800, fill: "#0F172A" },
+      { texto: "ID: " + (cert.equipoSnapshot?.idInterno || "—"), peso: 0.8, weight: 600, fill: "#0F172A" },
+      { texto: cert.equipoSnapshot?.descripcion || "", peso: 0.68, weight: 400, fill: "#475569" },
+      { texto: `Cal ${formatDateShort(cert.fechaCalibracion)}${cert.vigencia ? "   Próx " + formatDateShort(cert.vigencia) : ""}`, peso: 0.66, weight: 600, fill: "#475569" },
+    ],
+    pie: host ? { texto: `Verifica: ${host}` } : undefined,
+  });
 }
 
 async function blobToDataUrl(blob) {
@@ -122,7 +103,7 @@ export default function EtiquetaDialog({ open, onClose, certificado }) {
     <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth>
       <DialogTitle sx={{ fontWeight: 700 }}>Etiqueta — {certificado?.folio}</DialogTitle>
       <DialogContent>
-        <Box sx={{ display: "flex", gap: 2, mb: 2.5, flexWrap: "wrap" }}>
+        <Box sx={{ display: "flex", gap: 2, mt: 2, mb: 2.5, flexWrap: "wrap" }}>
           <TextField
             select label="Tamaño" size="small" value={tamano}
             onChange={(e) => setTamano(e.target.value)} sx={{ minWidth: 220 }}
@@ -137,31 +118,10 @@ export default function EtiquetaDialog({ open, onClose, certificado }) {
           />
         </Box>
 
-        <Typography variant="caption" color="text.secondary">Vista previa (a escala)</Typography>
-        <Box
-          sx={{
-            mt: 1, p: 3, display: "flex", justifyContent: "center", alignItems: "center",
-            bgcolor: "background.default", borderRadius: 3, border: 1, borderColor: "divider",
-            minHeight: 200,
-          }}
-        >
-          {cargando || !svg ? (
-            <CircularProgress />
-          ) : (
-            <Box
-              sx={{
-                width: size.w * 3.6, height: size.h * 3.6,
-                boxShadow: "0 6px 20px rgba(0,0,0,.12)", borderRadius: 1, overflow: "hidden",
-                "& svg": { width: "100%", height: "100%" },
-              }}
-              dangerouslySetInnerHTML={{ __html: svg }}
-            />
-          )}
-        </Box>
-        <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: "block" }}>
+        <EtiquetaVistaPrevia svg={svg} cargando={cargando} w={size.w} h={size.h}>
           Al imprimir, cada etiqueta sale a tamaño físico real ({size.w} × {size.h} mm). Configura la
           impresora al mismo tamaño de papel/rollo.
-        </Typography>
+        </EtiquetaVistaPrevia>
 
         <iframe ref={iframeRef} title="print" style={{ display: "none" }} />
       </DialogContent>

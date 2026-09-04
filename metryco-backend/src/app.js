@@ -34,8 +34,13 @@ const corsCrossOrigin = (req, res, next) => { res.set("Cross-Origin-Resource-Pol
 app.use("/uploads/fotos-perfil", corsCrossOrigin, express.static(destinoFotos));
 app.use("/uploads/firmas", corsCrossOrigin, express.static(destinoFirmas));
 
-app.use("/api/auth/login", authLimiter);
-app.use("/api/auth/verificar-admin", authLimiter);
+// Comentado temporalmente (2026-09): en dev, todo el tráfico comparte la
+// misma IP (localhost) — pruebas repetidas por API agotan rápido la ventana
+// de 100 intentos/15min y terminan bloqueando también al login real del
+// navegador ("Demasiados intentos" tras recargar sin haber fallado antes).
+// Reactivar antes de producción, e idealmente contar por usuario+IP, no solo IP.
+// app.use("/api/auth/login", authLimiter);
+// app.use("/api/auth/verificar-admin", authLimiter);
 app.use("/api", apiLimiter, routes);
 
 app.use(notFound);

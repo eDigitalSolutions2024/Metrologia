@@ -27,6 +27,7 @@ export default function General() {
   const [directorio, setDirectorio] = useState([]);
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(0);
+  const [rowsPerPage, setRowsPerPage] = useState(10);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
@@ -65,7 +66,7 @@ export default function General() {
   });
 
   const rows = filtrado
-    .slice(page * 10, page * 10 + 10)
+    .slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage)
     .map((u) => ({ ...u, id: u._id }));
 
   const columns = [
@@ -142,8 +143,9 @@ export default function General() {
         loading={loading}
         totalCount={filtrado.length}
         page={page}
-        rowsPerPage={10}
+        rowsPerPage={rowsPerPage}
         onPageChange={setPage}
+        onRowsPerPageChange={(n) => { setRowsPerPage(n); setPage(0); }}
       />
     </Box>
   );

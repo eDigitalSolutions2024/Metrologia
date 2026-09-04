@@ -3,16 +3,16 @@ import { createTheme, lighten, darken } from "@mui/material/styles";
 /* ------------------------------------------------------------------ *
  *  Paleta — parametrizable por marca (Administración → Colores)       *
  * ------------------------------------------------------------------ */
-export const COLORES_MARCA_DEFAULT = { primario: "#0F172A", secundario: "#2563EB" };
+export const COLORES_MARCA_DEFAULT = { primario: "#0F172A", secundario: "#2563EB", acento: "#0891B2" };
 
-function construirPaleta({ primario, secundario } = COLORES_MARCA_DEFAULT) {
+function construirPaleta({ primario, secundario, acento } = COLORES_MARCA_DEFAULT) {
   const light = {
     primary:   { main: primario, light: lighten(primario, 0.28), dark: darken(primario, 0.35), contrastText: "#fff" },
     secondary: { main: secundario, light: lighten(secundario, 0.18), dark: darken(secundario, 0.18), contrastText: "#fff" },
     success:   { main: "#16A34A", light: "#22C55E", dark: "#15803D" },
     warning:   { main: "#D97706", light: "#F59E0B", dark: "#B45309" },
     error:     { main: "#DC2626", light: "#EF4444", dark: "#B91C1C" },
-    info:      { main: "#0891B2", light: "#06B6D4", dark: "#0E7490" },
+    info:      { main: acento, light: lighten(acento, 0.22), dark: darken(acento, 0.2) },
     background:{ default: "#F6F8FC", paper: "#FFFFFF" },
     text:      { primary: "#0F172A", secondary: "#5B6B7C" },
     divider:   "#E4E9F2",
@@ -24,7 +24,7 @@ function construirPaleta({ primario, secundario } = COLORES_MARCA_DEFAULT) {
     success:   { main: "#22C55E" },
     warning:   { main: "#F59E0B" },
     error:     { main: "#F87171" },
-    info:      { main: "#22D3EE" },
+    info:      { main: lighten(acento, 0.35) },
     background:{ default: "#080D16", paper: "#0F1826" },
     text:      { primary: "#E6EDF6", secondary: "#93A4B7" },
     divider:   "#1E2A3C",
@@ -57,7 +57,8 @@ export function hexToRgb(hex) {
 export function crearTheme(coloresMarca = COLORES_MARCA_DEFAULT) {
   const primario = coloresMarca.primario || COLORES_MARCA_DEFAULT.primario;
   const secundario = coloresMarca.secundario || COLORES_MARCA_DEFAULT.secundario;
-  const { light, dark } = construirPaleta({ primario, secundario });
+  const acento = coloresMarca.acento || COLORES_MARCA_DEFAULT.acento;
+  const { light, dark } = construirPaleta({ primario, secundario, acento });
   const rgbSecundario = hexToRgb(secundario);
   const primarioOscuro = darken(primario, 0.55);
   const primarioClaro = lighten(primario, 0.15);
@@ -135,7 +136,11 @@ export function crearTheme(coloresMarca = COLORES_MARCA_DEFAULT) {
     MuiOutlinedInput: {
       styleOverrides: {
         root: {
-          borderRadius: 10,
+          // "!important" a propósito (mismo caso que MuiChip más abajo): el
+          // radio base de MUI le gana a este override en tiempo de ejecución
+          // si no se fuerza, y el campo sale mucho más redondeado de lo que
+          // se define aquí.
+          borderRadius: "10px !important",
           transition: "box-shadow .15s ease, border-color .15s ease",
           "& .MuiOutlinedInput-notchedOutline": { borderColor: "var(--mui-palette-divider)" },
           "&:hover .MuiOutlinedInput-notchedOutline": { borderColor: "var(--mui-palette-text-disabled)" },
@@ -146,7 +151,10 @@ export function crearTheme(coloresMarca = COLORES_MARCA_DEFAULT) {
 
     MuiChip: {
       styleOverrides: {
-        root: { borderRadius: 8, fontWeight: 600 },
+        // "!important" a propósito: el estilo base de MUI para Chip fija su
+        // propio radio (prácticamente una píldora) con más especificidad que
+        // este override en algunos casos — sin esto, se ignora en runtime.
+        root: { borderRadius: "6px !important", fontWeight: 600 },
         outlined: { borderColor: "var(--mui-palette-divider)" },
       },
     },
