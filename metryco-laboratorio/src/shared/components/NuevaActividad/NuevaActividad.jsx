@@ -59,7 +59,7 @@ export default function NuevaActividad({ open, onClose, onCreated, fechaSugerida
       .then((lista) => setTecnicos(lista.filter((u) => u.rol === "tecnico")))
       .catch(() => setTecnicos([]));
     listarReportes({ pageSize: 200 })
-      .then(({ items }) => setReportes(items))
+      .then(({ items }) => setReportes(items.filter((r) => ["recepcion", "en_proceso"].includes(r.status))))
       .catch(() => setReportes([]));
     reset({ ...defaultValues, fechaActividad: fechaSugerida || "", fechaLimite: fechaSugerida || "" });
     setSubmitError("");
