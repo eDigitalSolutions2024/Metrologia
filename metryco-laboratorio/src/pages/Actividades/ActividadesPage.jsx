@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import {
-  Box, Typography, Paper, Grid, Button, Tooltip, Chip, Avatar,
+  Box, Typography, Paper, Grid, Button, Tooltip, Chip, Avatar, Link,
 } from "@mui/material";
 import ChevronLeftIcon from "@mui/icons-material/ChevronLeft";
 import ChevronRightIcon from "@mui/icons-material/ChevronRight";
@@ -39,6 +40,7 @@ function toFecha(year, month, day) {
 }
 
 export default function ActividadesPage() {
+  const navigate = useNavigate();
   const now = new Date();
   const [year, setYear] = useState(now.getFullYear());
   const [month, setMonth] = useState(now.getMonth());
@@ -204,6 +206,7 @@ export default function ActividadesPage() {
                   <Typography variant="body2" fontWeight={600} noWrap>{act.actividad}</Typography>
                   <Typography variant="caption" color="text.secondary">
                     {act.tecnico?.nombre || "Sin técnico"} · {formatDate(act.fechaActividad)} · {act.horaInicio}–{act.horaFin}
+                    {act.reporte?.folio ? ` · ${act.reporte.folio}` : ""}
                   </Typography>
                 </Box>
                 <Chip size="small" label={STATUS_LABEL[act.status] || act.status} color={STATUS_CHIP_COLOR[act.status] || "default"} />
@@ -226,6 +229,20 @@ export default function ActividadesPage() {
             <Typography variant="body2" color="text.secondary">
               {actividadSeleccionada.comentarios || "Sin comentarios adicionales."}
             </Typography>
+            {actividadSeleccionada.reporte && (
+              <Typography variant="body2" sx={{ mt: 1 }}>
+                Reporte:{" "}
+                <Link
+                  component="button"
+                  type="button"
+                  onClick={() => navigate(`/reportes/${actividadSeleccionada.reporte._id}`)}
+                  sx={{ fontWeight: 600 }}
+                >
+                  {actividadSeleccionada.reporte.folio}
+                  {actividadSeleccionada.reporte.cliente?.nombre ? ` — ${actividadSeleccionada.reporte.cliente.nombre}` : ""}
+                </Link>
+              </Typography>
+            )}
           </Box>
         )}
       </AppCard>

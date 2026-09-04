@@ -7,7 +7,7 @@ const actividadSchema = new Schema(
     fechaActividad: { type: Date, required: true },
     fechaLimite: { type: Date, required: true },
     tecnico: { type: Schema.Types.ObjectId, ref: "Usuario", required: true },
-    reporteServicio: { type: String, trim: true },
+    reporte: { type: Schema.Types.ObjectId, ref: "Reporte" },
     horaInicio: { type: String, required: true },
     horaFin: { type: String, required: true },
     actividad: { type: String, required: true, trim: true },

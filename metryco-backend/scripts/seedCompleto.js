@@ -327,7 +327,6 @@ async function run() {
   // Actividades (calendario) — variedad de estados/técnicos/fechas
   // ------------------------------------------------------------------
   const hoy = new Date();
-  const foliosReportes = reportesDemo.map((r) => r.folio);
   const ACTIVIDADES = [
     { diasOffset: -3, horaInicio: "08:00", horaFin: "12:00", status: "completada", actividad: "Calibración en sitio de básculas industriales", comentarios: "Servicio realizado sin incidencias, cliente conforme." },
     { diasOffset: -1, horaInicio: "09:00", horaFin: "11:00", status: "completada", actividad: "Entrega de certificados y factura", comentarios: "Se entregó carpeta física y copia digital por correo." },
@@ -350,7 +349,7 @@ async function run() {
         fechaActividad: fecha,
         fechaLimite: fecha,
         tecnico: tecnico._id,
-        reporteServicio: foliosReportes[i % Math.max(foliosReportes.length, 1)] || "",
+        reporte: reportesDemo.length ? reportesDemo[i % reportesDemo.length]._id : undefined,
         horaInicio: a.horaInicio,
         horaFin: a.horaFin,
         actividad: a.actividad,

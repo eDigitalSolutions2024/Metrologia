@@ -5,7 +5,12 @@ const base = {
   fechaActividad: z.coerce.date({ error: "Fecha de actividad inválida" }),
   fechaLimite: z.coerce.date({ error: "Fecha límite inválida" }),
   tecnico: objectId,
-  reporteServicio: z.string().trim().optional(),
+  reporte: z
+    .string()
+    .regex(/^[0-9a-fA-F]{24}$/, "Reporte inválido")
+    .optional()
+    .or(z.literal(""))
+    .transform((v) => (v ? v : undefined)),
   horaInicio: z.string().trim().min(1, "La hora de inicio es obligatoria"),
   horaFin: z.string().trim().min(1, "La hora de fin es obligatoria"),
   actividad: z.string().trim().min(1, "La actividad es obligatoria"),
