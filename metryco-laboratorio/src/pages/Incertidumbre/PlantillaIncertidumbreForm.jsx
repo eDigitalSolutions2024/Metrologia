@@ -234,7 +234,7 @@ export default function PlantillaIncertidumbreForm() {
           title="Contribuciones"
           sx={{ mb: 3 }}
           action={
-            <AppButton size="small" variant="outlined" startIcon={<AddIcon />} onClick={() => append(contribucionVacia())} sx={{ borderRadius: 2 }}>
+            <AppButton type="button" size="small" variant="outlined" startIcon={<AddIcon />} onClick={() => append(contribucionVacia())} sx={{ borderRadius: 2 }}>
               Agregar contribución
             </AppButton>
           }
@@ -273,7 +273,7 @@ export default function PlantillaIncertidumbreForm() {
                   </FormControl>
                 </Grid>
                 <Grid size={{ xs: 6, md: 0.5 }} sx={{ display: "flex", justifyContent: "flex-end" }}>
-                  <IconButton size="small" onClick={() => remove(i)} disabled={fields.length === 1}>
+                  <IconButton type="button" size="small" onClick={() => remove(i)} disabled={fields.length === 1}>
                     <DeleteOutlineIcon fontSize="small" sx={{ color: "error.main" }} />
                   </IconButton>
                 </Grid>
@@ -321,7 +321,7 @@ export default function PlantillaIncertidumbreForm() {
         </AppCard>
 
         <Box sx={{ display: "flex", gap: 2, justifyContent: "flex-end" }}>
-          <AppButton variant="outlined" onClick={() => navigate("/incertidumbre/plantillas")} sx={{ borderRadius: 2 }}>Cancelar</AppButton>
+          <AppButton type="button" variant="outlined" onClick={() => navigate("/incertidumbre/plantillas")} sx={{ borderRadius: 2 }}>Cancelar</AppButton>
           <AppButton type="submit" loading={saving} sx={{ borderRadius: 2 }}>{isEdit ? "Guardar cambios" : "Crear Plantilla"}</AppButton>
         </Box>
       </Box>

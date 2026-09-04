@@ -192,6 +192,7 @@ export default function PatronForm() {
               </Button>
               {patronActual?.ultimaCalibracion?.archivoUrl && (
                 <AppButton
+                  type="button"
                   variant="text"
                   startIcon={<DescriptionOutlinedIcon />}
                   sx={{ ml: 2 }}
@@ -229,7 +230,7 @@ export default function PatronForm() {
         </AppCard>
 
         <Box sx={{ display: "flex", gap: 2, justifyContent: "flex-end" }}>
-          <AppButton variant="outlined" onClick={() => navigate("/equipos/patrones")} sx={{ borderRadius: 2 }}>Cancelar</AppButton>
+          <AppButton type="button" variant="outlined" onClick={() => navigate("/equipos/patrones")} sx={{ borderRadius: 2 }}>Cancelar</AppButton>
           <AppButton type="submit" loading={saving} sx={{ borderRadius: 2 }}>{isEdit ? "Guardar cambios" : "Crear Patrón"}</AppButton>
         </Box>
       </Box>

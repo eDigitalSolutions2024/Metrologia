@@ -141,13 +141,13 @@ export default function EditarUsuario({ open, onClose, usuario, onSaved }) {
                       <InputAdornment position="end">
                         <Tooltip title={copiado ? "¡Copiado!" : "Copiar"}>
                           <span>
-                            <IconButton size="small" onClick={copiarPassword} edge="end" disabled={!password}>
+                            <IconButton type="button" size="small" onClick={copiarPassword} edge="end" disabled={!password}>
                               <ContentCopyIcon fontSize="small" />
                             </IconButton>
                           </span>
                         </Tooltip>
                         <Tooltip title="Generar nueva contraseña">
-                          <IconButton size="small" onClick={generarNuevaPassword} edge="end">
+                          <IconButton type="button" size="small" onClick={generarNuevaPassword} edge="end">
                             <RefreshIcon fontSize="small" />
                           </IconButton>
                         </Tooltip>
@@ -209,7 +209,7 @@ export default function EditarUsuario({ open, onClose, usuario, onSaved }) {
         </DialogContent>
 
         <DialogActions sx={{ px: 3, pb: 2 }}>
-          <AppButton variant="outlined" onClick={cerrar}>Cancelar</AppButton>
+          <AppButton type="button" variant="outlined" onClick={cerrar}>Cancelar</AppButton>
           <AppButton type="submit" loading={isSubmitting}>Guardar Cambios</AppButton>
         </DialogActions>
       </Box>

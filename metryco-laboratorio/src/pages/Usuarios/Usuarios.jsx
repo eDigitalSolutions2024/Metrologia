@@ -40,7 +40,7 @@ import PasswordConfirmDialog from "../../shared/components/PasswordConfirmDialog
 import NuevoUsuario from "../../shared/components/NuevoUsuario/NuevoUsuario";
 import EditarUsuario from "../../shared/components/EditarUsuario/EditarUsuario";
 import ObservacionesUsuario from "../../shared/components/ObservacionesUsuario/ObservacionesUsuario";
-import { listarUsuarios, desactivarUsuario, eliminarUsuario } from "../../services/usuarios";
+import { listarUsuarios, desactivarUsuario, reactivarUsuario, eliminarUsuario } from "../../services/usuarios";
 import { useDebounce } from "../../shared/hooks/useDebounce";
 
 const ROL_MAP = {
@@ -63,6 +63,7 @@ export default function Usuarios() {
 
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(0);
+  const [rowsPerPage, setRowsPerPage] = useState(5);
 
   const [rows, setRows] = useState([]);
   const [totalCount, setTotalCount] = useState(0);
@@ -88,7 +89,7 @@ export default function Usuarios() {
         const { items, total } = await listarUsuarios({
           search: debouncedSearch,
           page,
-          pageSize: 5,
+          pageSize: rowsPerPage,
         });
         if (cancelado) return;
         setRows(items.map((u) => ({ ...u, id: u._id })));
@@ -103,7 +104,7 @@ export default function Usuarios() {
     return () => {
       cancelado = true;
     };
-  }, [debouncedSearch, page, reloadKey]);
+  }, [debouncedSearch, page, rowsPerPage, reloadKey]);
 
   useEffect(() => {
     let cancelado = false;
@@ -159,6 +160,16 @@ export default function Usuarios() {
       recargar();
     } catch {
       setError("No se pudo desactivar el usuario. Intenta de nuevo.");
+    }
+  };
+
+  const handleReactivar = async (row) => {
+    setError("");
+    try {
+      await reactivarUsuario(row.id);
+      recargar();
+    } catch {
+      setError("No se pudo reactivar el usuario. Intenta de nuevo.");
     }
   };
 
@@ -290,8 +301,9 @@ export default function Usuarios() {
         loading={loading}
         totalCount={totalCount}
         page={page}
-        rowsPerPage={5}
+        rowsPerPage={rowsPerPage}
         onPageChange={setPage}
+        onRowsPerPageChange={(n) => { setRowsPerPage(n); setPage(0); }}
       />
 
       <NuevoUsuario
@@ -336,18 +348,31 @@ export default function Usuarios() {
         onClose={cerrarMenu}
         slotProps={{ paper: { sx: { borderRadius: 2, minWidth: 200 } } }}
       >
-        <MenuItem
-          disabled={menuRow?.status === "inactivo"}
-          onClick={() => {
-            setDeactivateTarget(menuRow);
-            cerrarMenu();
-          }}
-        >
-          <ListItemIcon>
-            <BlockOutlinedIcon fontSize="small" sx={{ color: "error.main" }} />
-          </ListItemIcon>
-          <ListItemText>Desactivar</ListItemText>
-        </MenuItem>
+        {menuRow?.status === "inactivo" ? (
+          <MenuItem
+            onClick={() => {
+              handleReactivar(menuRow);
+              cerrarMenu();
+            }}
+          >
+            <ListItemIcon>
+              <CheckCircleOutlineIcon fontSize="small" sx={{ color: "success.main" }} />
+            </ListItemIcon>
+            <ListItemText>Activar</ListItemText>
+          </MenuItem>
+        ) : (
+          <MenuItem
+            onClick={() => {
+              setDeactivateTarget(menuRow);
+              cerrarMenu();
+            }}
+          >
+            <ListItemIcon>
+              <BlockOutlinedIcon fontSize="small" sx={{ color: "error.main" }} />
+            </ListItemIcon>
+            <ListItemText>Desactivar</ListItemText>
+          </MenuItem>
+        )}
         <MenuItem
           onClick={() => {
             setDeleteTarget(menuRow);

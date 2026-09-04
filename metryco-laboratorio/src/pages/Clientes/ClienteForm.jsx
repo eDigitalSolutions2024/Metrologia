@@ -382,29 +382,6 @@ export default function ClienteForm() {
           <Box sx={{ display: "flex", flexDirection: "row", flexWrap: "nowrap", alignItems: "center", gap: 1.25, mb: 2 }}>
             <Box sx={{ width: 4, height: 20, borderRadius: 1, bgcolor: "secondary.main", flexShrink: 0 }} />
             <Typography variant="h6" fontWeight={700}>
-              Contacto
-            </Typography>
-          </Box>
-          <Grid container spacing={2}>
-            <Grid size={{ xs: 12, sm: 6, md: 4 }}>
-              <AppInput label="Nombre del Contacto" {...register("contacto.nombre")} />
-            </Grid>
-            <Grid size={{ xs: 12, sm: 6, md: 4 }}>
-              <AppInput label="Teléfono" {...register("contacto.telefono")} />
-            </Grid>
-            <Grid size={{ xs: 12, sm: 6, md: 4 }}>
-              <AppInput label="Email Cotizaciones" {...register("contacto.emailCotizaciones")} />
-            </Grid>
-            <Grid size={{ xs: 12, sm: 6, md: 4 }}>
-              <AppInput label="Email Facturacion" {...register("contacto.emailFacturacion")} />
-            </Grid>
-          </Grid>
-
-          <Divider sx={{ my: 3 }} />
-
-          <Box sx={{ display: "flex", flexDirection: "row", flexWrap: "nowrap", alignItems: "center", gap: 1.25, mb: 2 }}>
-            <Box sx={{ width: 4, height: 20, borderRadius: 1, bgcolor: "secondary.main", flexShrink: 0 }} />
-            <Typography variant="h6" fontWeight={700}>
               Facturacion
             </Typography>
           </Box>
@@ -550,12 +527,15 @@ export default function ClienteForm() {
 
         {isEdit && (
           <AppCard sx={{ mb: 3 }}>
-            <Box sx={{ display: "flex", flexDirection: "row", flexWrap: "nowrap", alignItems: "center", gap: 1.25, mb: 2 }}>
+            <Box sx={{ display: "flex", flexDirection: "row", flexWrap: "nowrap", alignItems: "center", gap: 1.25, mb: 0.5 }}>
               <Box sx={{ width: 4, height: 20, borderRadius: 1, bgcolor: "secondary.main", flexShrink: 0 }} />
               <Typography variant="h6" fontWeight={700}>
-                Contacto
+                Contactos
               </Typography>
             </Box>
+            <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+              Puedes registrar varios — se eligen al generar una cotización.
+            </Typography>
 
             {errorContactos && (
               <Alert severity="error" sx={{ mb: 2, borderRadius: 2 }}>
@@ -584,10 +564,11 @@ export default function ClienteForm() {
               </Grid>
               <Grid size={{ xs: 12, sm: 6, md: 8 }}>
                 <Box sx={{ display: "flex", gap: 1.5 }}>
-                  <AppButton variant="outlined" onClick={abrirNuevoContacto} sx={{ borderRadius: 2 }}>
+                  <AppButton type="button" variant="outlined" onClick={abrirNuevoContacto} sx={{ borderRadius: 2 }}>
                     Agregar
                   </AppButton>
                   <AppButton
+                    type="button"
                     variant="outlined"
                     onClick={abrirEditarContacto}
                     disabled={!contactoActual}
@@ -596,6 +577,7 @@ export default function ClienteForm() {
                     Editar
                   </AppButton>
                   <AppButton
+                    type="button"
                     variant="outlined"
                     color="error"
                     onClick={borrarContactoActual}
@@ -612,6 +594,7 @@ export default function ClienteForm() {
 
         <Box sx={{ display: "flex", gap: 2, justifyContent: "flex-end" }}>
           <AppButton
+            type="button"
             variant="outlined"
             onClick={() => navigate("/clientes")}
             sx={{ borderRadius: 2 }}

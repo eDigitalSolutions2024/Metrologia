@@ -154,7 +154,7 @@ function NuevoRegistroDialog({ open, onClose, onCreated, prefill }) {
           </AppCard>
         </DialogContent>
         <DialogActions sx={{ px: 3, pb: 2 }}>
-          <AppButton variant="outlined" onClick={cerrar} sx={{ borderRadius: 2 }}>Cancelar</AppButton>
+          <AppButton type="button" variant="outlined" onClick={cerrar} sx={{ borderRadius: 2 }}>Cancelar</AppButton>
           <AppButton type="submit" loading={guardando} sx={{ borderRadius: 2 }}>Guardar</AppButton>
         </DialogActions>
       </Box>
@@ -192,6 +192,7 @@ export default function CobranzaPage() {
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState(0);
   const [page, setPage] = useState(0);
+  const [rowsPerPage, setRowsPerPage] = useState(10);
   const [nuevoOpen, setNuevoOpen] = useState(false);
   const [aplicarTarget, setAplicarTarget] = useState(null);
   const [error, setError] = useState("");
@@ -357,11 +358,12 @@ export default function CobranzaPage() {
 
       <AppTable
         columns={columns}
-        rows={rowsActuales.slice(page * 10, page * 10 + 10)}
+        rows={rowsActuales.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage)}
         totalCount={rowsActuales.length}
         page={page}
-        rowsPerPage={10}
+        rowsPerPage={rowsPerPage}
         onPageChange={setPage}
+        onRowsPerPageChange={(n) => { setRowsPerPage(n); setPage(0); }}
         loading={loading}
         emptyText="Sin registros en esta pestaña"
       />

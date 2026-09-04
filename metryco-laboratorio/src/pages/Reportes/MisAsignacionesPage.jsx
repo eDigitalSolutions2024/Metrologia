@@ -25,13 +25,14 @@ export default function MisAsignacionesPage() {
   const [loading, setLoading] = useState(true);
   const [filtro, setFiltro] = useState("pendientes"); // pendientes | todas
   const [page, setPage] = useState(0);
+  const [rowsPerPage, setRowsPerPage] = useState(20);
 
   const cargar = useCallback(() => {
     if (!userId) return;
     setLoading(true);
     // El filtro "pendientes" (no-terminada) se aplica en cliente porque el
     // backend no tiene un operador "distinto de" para estadoCalibracion.
-    listarAsignaciones({ tecnicoAsignado: userId, page, pageSize: 20 })
+    listarAsignaciones({ tecnicoAsignado: userId, page, pageSize: rowsPerPage })
       .then(({ items, total }) => {
         const filtrados = filtro === "pendientes"
           ? items.filter((a) => a.estados?.calibracion !== "terminada")
@@ -41,7 +42,7 @@ export default function MisAsignacionesPage() {
       })
       .catch(() => { setRows([]); setTotal(0); })
       .finally(() => setLoading(false));
-  }, [userId, filtro, page]);
+  }, [userId, filtro, page, rowsPerPage]);
   useEffect(() => { cargar(); }, [cargar]);
 
   const columns = [
@@ -95,7 +96,8 @@ export default function MisAsignacionesPage() {
 
       <AppTable
         columns={columns} rows={rows} loading={loading}
-        totalCount={total} page={page} rowsPerPage={20} onPageChange={setPage}
+        totalCount={total} page={page} rowsPerPage={rowsPerPage} onPageChange={setPage}
+        onRowsPerPageChange={(n) => { setRowsPerPage(n); setPage(0); }}
         emptyText={filtro === "pendientes" ? "No tienes asignaciones pendientes." : "Todavía no tienes asignaciones."}
       />
 

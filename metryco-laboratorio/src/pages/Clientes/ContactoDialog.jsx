@@ -12,16 +12,21 @@ export default function ContactoDialog({ open, contacto, onClose, onSave, loadin
     handleSubmit,
     reset,
     formState: { errors },
-  } = useForm({ defaultValues: { nombre: "", telefono: "", correo: "" } });
+  } = useForm({ defaultValues: { nombre: "", telefono: "", correo: "", emailCotizaciones: "", emailFacturacion: "" } });
 
   useEffect(() => {
     if (open) {
-      reset(contacto ? { nombre: contacto.nombre, telefono: contacto.telefono, correo: contacto.correo } : { nombre: "", telefono: "", correo: "" });
+      reset(contacto
+        ? {
+            nombre: contacto.nombre, telefono: contacto.telefono, correo: contacto.correo,
+            emailCotizaciones: contacto.emailCotizaciones || "", emailFacturacion: contacto.emailFacturacion || "",
+          }
+        : { nombre: "", telefono: "", correo: "", emailCotizaciones: "", emailFacturacion: "" });
     }
   }, [open, contacto, reset]);
 
   return (
-    <Dialog open={open} onClose={onClose} maxWidth="xs" fullWidth>
+    <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth>
       <DialogTitle sx={{ fontWeight: 700 }}>{isEdit ? "Editar Contacto" : "Agregar Contacto"}</DialogTitle>
       <Box component="form" onSubmit={handleSubmit(onSave)}>
         <DialogContent sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
@@ -32,9 +37,11 @@ export default function ContactoDialog({ open, contacto, onClose, onSave, loadin
           />
           <AppInput label="Teléfono" {...register("telefono")} />
           <AppInput label="Correo" {...register("correo")} />
+          <AppInput label="Email Cotizaciones" {...register("emailCotizaciones")} />
+          <AppInput label="Email Facturación" {...register("emailFacturacion")} />
         </DialogContent>
         <DialogActions sx={{ px: 3, pb: 2 }}>
-          <Button onClick={onClose} disabled={loading}>Cancelar</Button>
+          <Button type="button" onClick={onClose} disabled={loading}>Cancelar</Button>
           <Button type="submit" variant="contained" disabled={loading}>Guardar</Button>
         </DialogActions>
       </Box>

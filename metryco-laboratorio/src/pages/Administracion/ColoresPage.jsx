@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Box, Alert, Paper, Grid, Typography, Stack } from "@mui/material";
+import { Box, Alert, Paper, Grid, Typography, Stack, Chip } from "@mui/material";
 import PaletteOutlinedIcon from "@mui/icons-material/PaletteOutlined";
 import RestartAltOutlinedIcon from "@mui/icons-material/RestartAltOutlined";
 
@@ -11,7 +11,8 @@ import { useColoresMarca } from "../../theme/AppThemeProvider";
 
 const CAMPOS = [
   { key: "primario", label: "Color primario", ayuda: "Sidebar y botones principales." },
-  { key: "secundario", label: "Color de acento", ayuda: "Botones de acción, enlaces y foco de campos." },
+  { key: "secundario", label: "Color de acción", ayuda: "Botones de acción, enlaces y foco de campos." },
+  { key: "acento", label: "Color informativo", ayuda: "Chips y detalles informativos (estado, etiquetas)." },
 ];
 
 function SelectorColor({ label, ayuda, value, onChange }) {
@@ -95,21 +96,22 @@ export default function ColoresPage() {
       {loading ? (
         <Typography variant="body2" color="text.secondary">Cargando…</Typography>
       ) : (
-        <Grid container spacing={2.5} sx={{ maxWidth: 720 }}>
+        <Grid container spacing={2.5} sx={{ maxWidth: 1000 }}>
           {CAMPOS.map((c) => (
-            <Grid key={c.key} size={{ xs: 12, sm: 6 }}>
+            <Grid key={c.key} size={{ xs: 12, sm: 6, md: 4 }}>
               <SelectorColor label={c.label} ayuda={c.ayuda} value={colores[c.key] || COLORES_MARCA_DEFAULT[c.key]} onChange={(v) => cambiar(c.key, v)} />
             </Grid>
           ))}
         </Grid>
       )}
 
-      <Paper variant="outlined" sx={{ p: 3, borderRadius: "12px", maxWidth: 720, mt: 2.5 }}>
+      <Paper variant="outlined" sx={{ p: 3, borderRadius: "12px", maxWidth: 1000, mt: 2.5 }}>
         <Typography variant="subtitle2" fontWeight={700} sx={{ mb: 1.5 }}>Vista previa</Typography>
-        <Stack direction="row" spacing={1.5} useFlexGap sx={{ flexWrap: "wrap" }}>
+        <Stack direction="row" spacing={1.5} useFlexGap sx={{ flexWrap: "wrap", alignItems: "center" }}>
           <AppButton variant="contained" color="primary" sx={{ borderRadius: "10px" }}>Botón primario</AppButton>
           <AppButton variant="contained" color="secondary" sx={{ borderRadius: "10px" }}>Botón de acción</AppButton>
           <AppButton variant="outlined" sx={{ borderRadius: "10px" }}>Botón secundario</AppButton>
+          <Chip label="Estado informativo" color="info" />
         </Stack>
       </Paper>
     </Box>

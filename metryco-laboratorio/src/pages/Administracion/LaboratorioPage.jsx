@@ -11,6 +11,7 @@ import {
   obtenerLaboratorio, actualizarLaboratorio,
   obtenerLogo, subirLogo, eliminarLogo, logoUrl,
 } from "../../services/configuracion";
+import { useLogoMarca } from "../../theme/AppThemeProvider";
 
 const CAMPOS = [
   { key: "nombre", label: "Nombre del laboratorio", placeholder: "Ej. Laboratorio de Metrología y Consultoría", md: 12 },
@@ -27,6 +28,7 @@ function LogoCard({ setError }) {
   const [loading, setLoading] = useState(true);
   const [subiendo, setSubiendo] = useState(false);
   const inputRef = useRef(null);
+  const { refrescarLogo } = useLogoMarca();
 
   const cargar = () => {
     obtenerLogo().then(setLogo).catch(() => {}).finally(() => setLoading(false));
@@ -43,6 +45,7 @@ function LogoCard({ setError }) {
     try {
       await subirLogo(archivo);
       cargar();
+      refrescarLogo(); // refleja el cambio en Sidebar/Login al instante, sin recargar
     } catch (err) {
       setError(err?.response?.data?.message || "No se pudo subir el logo.");
     } finally {
@@ -55,6 +58,7 @@ function LogoCard({ setError }) {
     try {
       await eliminarLogo();
       setLogo(null);
+      refrescarLogo();
     } catch {
       setError("No se pudo quitar el logo.");
     } finally {

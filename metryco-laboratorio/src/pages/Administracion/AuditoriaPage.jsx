@@ -36,6 +36,7 @@ export default function AuditoriaPage() {
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(0);
+  const [rowsPerPage, setRowsPerPage] = useState(25);
   const [accion, setAccion] = useState("");
   const [usuario, setUsuario] = useState("");
   const [buscarUsuario, setBuscarUsuario] = useState("");
@@ -43,11 +44,11 @@ export default function AuditoriaPage() {
 
   useEffect(() => {
     setLoading(true);
-    listarAuditoria({ accion, usuario: buscarUsuario, exito, page, pageSize: 25 })
+    listarAuditoria({ accion, usuario: buscarUsuario, exito, page, pageSize: rowsPerPage })
       .then(({ items, total }) => { setItems(items); setTotal(total); })
       .catch(() => { setItems([]); setTotal(0); })
       .finally(() => setLoading(false));
-  }, [accion, buscarUsuario, exito, page]);
+  }, [accion, buscarUsuario, exito, page, rowsPerPage]);
 
   const columns = [
     { field: "fecha", headerName: "Fecha", renderCell: (r) => formatFecha(r.fecha) },
@@ -103,8 +104,9 @@ export default function AuditoriaPage() {
         rows={items}
         totalCount={total}
         page={page}
-        rowsPerPage={25}
+        rowsPerPage={rowsPerPage}
         onPageChange={setPage}
+        onRowsPerPageChange={(n) => { setRowsPerPage(n); setPage(0); }}
         loading={loading}
         emptyText="Sin eventos para este filtro"
       />

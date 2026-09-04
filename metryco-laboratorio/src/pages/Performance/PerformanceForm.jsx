@@ -173,7 +173,7 @@ export default function PerformanceForm() {
                 <Grid size={{ xs: 5, sm: 2.5, md: 0.9 }}>
                   <Tooltip title="Quitar punto">
                     <span>
-                      <IconButton size="small" onClick={() => remove(index)} disabled={fields.length === 1}>
+                      <IconButton type="button" size="small" onClick={() => remove(index)} disabled={fields.length === 1}>
                         <DeleteOutlineIcon fontSize="small" sx={{ color: "error.main" }} />
                       </IconButton>
                     </span>
@@ -196,6 +196,7 @@ export default function PerformanceForm() {
           ))}
 
           <Button
+            type="button"
             startIcon={<AddIcon />}
             onClick={() => append(PUNTO_VACIO)}
             sx={{ mt: 2, borderRadius: 2 }}
@@ -205,7 +206,7 @@ export default function PerformanceForm() {
         </AppCard>
 
         <Box sx={{ display: "flex", gap: 2, justifyContent: "flex-end" }}>
-          <AppButton variant="outlined" onClick={() => navigate("/performance")} sx={{ borderRadius: 2 }}>Cancelar</AppButton>
+          <AppButton type="button" variant="outlined" onClick={() => navigate("/performance")} sx={{ borderRadius: 2 }}>Cancelar</AppButton>
           <AppButton type="submit" loading={saving} sx={{ borderRadius: 2 }}>{isEdit ? "Guardar cambios" : "Crear Performance"}</AppButton>
         </Box>
       </Box>

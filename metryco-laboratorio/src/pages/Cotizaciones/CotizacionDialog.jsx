@@ -266,6 +266,7 @@ export default function CotizacionDialog({ open, cotizacionId, duplicarDesdeId, 
                   </Grid>
                   <Grid size={{ xs: 12, md: 4 }}>
                     <AppButton
+                      type="button"
                       fullWidth
                       disabled={!getValues("cliente") && !clienteSeleccionado}
                       onClick={() => {
@@ -293,23 +294,23 @@ export default function CotizacionDialog({ open, cotizacionId, duplicarDesdeId, 
                   >
                     <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap" }}>
                       {cotizacionData.reporte && (
-                        <AppButton size="small" variant="outlined" startIcon={<FactCheckOutlinedIcon />}
+                        <AppButton type="button" size="small" variant="outlined" startIcon={<FactCheckOutlinedIcon />}
                           onClick={() => { onClose(); navigate(`/reportes/${cotizacionData.reporte._id}`); }}
                           sx={{ borderRadius: 2 }}>
                           Reporte: {cotizacionData.reporte.folio}
                         </AppButton>
                       )}
                       {cotizacionData.status === "aprobada" && onGenerarFactura && (
-                        <AppButton size="small" startIcon={<ReceiptLongOutlinedIcon />} onClick={() => onGenerarFactura(cotizacionData)} sx={{ borderRadius: 2 }}>
+                        <AppButton type="button" size="small" startIcon={<ReceiptLongOutlinedIcon />} onClick={() => onGenerarFactura(cotizacionData)} sx={{ borderRadius: 2 }}>
                           Generar Factura
                         </AppButton>
                       )}
                       {onDuplicar && (
-                        <AppButton size="small" variant="outlined" startIcon={<ContentCopyOutlinedIcon />} onClick={() => onDuplicar(cotizacionId)} sx={{ borderRadius: 2 }}>
+                        <AppButton type="button" size="small" variant="outlined" startIcon={<ContentCopyOutlinedIcon />} onClick={() => onDuplicar(cotizacionId)} sx={{ borderRadius: 2 }}>
                           Duplicar
                         </AppButton>
                       )}
-                      <AppButton size="small" variant="outlined" startIcon={<PrintOutlinedIcon />}
+                      <AppButton type="button" size="small" variant="outlined" startIcon={<PrintOutlinedIcon />}
                         onClick={() => window.open(`/informe/cotizacion/${cotizacionId}`, "_blank")} sx={{ borderRadius: 2 }}>
                         Imprimir
                       </AppButton>
@@ -323,7 +324,7 @@ export default function CotizacionDialog({ open, cotizacionId, duplicarDesdeId, 
                   sx={{ mb: 2.5 }}
                   action={
                     !isEdit && (
-                      <AppButton variant="text" size="small" onClick={() => setPasoClienteConfirmado(false)}>
+                      <AppButton type="button" variant="text" size="small" onClick={() => setPasoClienteConfirmado(false)}>
                         Cambiar cliente
                       </AppButton>
                     )
@@ -458,7 +459,7 @@ export default function CotizacionDialog({ open, cotizacionId, duplicarDesdeId, 
                             </Typography>
                           </TableCell>
                           <TableCell>
-                            <IconButton size="small" onClick={() => remove(idx)} disabled={fields.length === 1}>
+                            <IconButton type="button" size="small" onClick={() => remove(idx)} disabled={fields.length === 1}>
                               <DeleteOutlineIcon fontSize="small" sx={{ color: "error.main" }} />
                             </IconButton>
                           </TableCell>
@@ -470,6 +471,7 @@ export default function CotizacionDialog({ open, cotizacionId, duplicarDesdeId, 
 
                 <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 3 }}>
                   <AppButton
+                    type="button"
                     variant="outlined"
                     startIcon={<AddCircleOutlineIcon />}
                     onClick={() => append({ descripcion: "", cantidad: 1, precioUnitario: 0 })}
@@ -508,10 +510,10 @@ export default function CotizacionDialog({ open, cotizacionId, duplicarDesdeId, 
                             <InsertDriveFileOutlinedIcon fontSize="small" sx={{ color: "text.secondary" }} />
                             <Typography variant="body2" sx={{ flex: 1, minWidth: 0 }} noWrap>{a.nombreOriginal}</Typography>
                             <Typography variant="caption" color="text.secondary">{tamanoLegible(a.tamano)}</Typography>
-                            <IconButton size="small" onClick={() => descargarAdjunto(a)}>
+                            <IconButton type="button" size="small" onClick={() => descargarAdjunto(a)}>
                               <DownloadOutlinedIcon fontSize="small" sx={{ color: "secondary.main" }} />
                             </IconButton>
-                            <IconButton size="small" onClick={() => quitarAdjunto(a)}>
+                            <IconButton type="button" size="small" onClick={() => quitarAdjunto(a)}>
                               <DeleteOutlineIcon fontSize="small" sx={{ color: "error.main" }} />
                             </IconButton>
                           </Box>

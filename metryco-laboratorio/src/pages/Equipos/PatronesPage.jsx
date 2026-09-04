@@ -40,6 +40,7 @@ export default function PatronesPage() {
   const puedeEditar = user?.rol !== "tecnico";
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(0);
+  const [rowsPerPage, setRowsPerPage] = useState(10);
   const [items, setItems] = useState([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -47,11 +48,11 @@ export default function PatronesPage() {
 
   useEffect(() => {
     setLoading(true);
-    listarPatrones({ search, page, pageSize: 10 })
+    listarPatrones({ search, page, pageSize: rowsPerPage })
       .then(({ items, total }) => { setItems(items); setTotal(total); })
       .catch(() => { setItems([]); setTotal(0); })
       .finally(() => setLoading(false));
-  }, [search, page]);
+  }, [search, page, rowsPerPage]);
 
   const columns = [
     { field: "codigo", headerName: "Id Interno" },
@@ -171,8 +172,9 @@ export default function PatronesPage() {
         rows={items}
         totalCount={total}
         page={page}
-        rowsPerPage={10}
+        rowsPerPage={rowsPerPage}
         onPageChange={setPage}
+        onRowsPerPageChange={(n) => { setRowsPerPage(n); setPage(0); }}
         loading={loading}
       />
 

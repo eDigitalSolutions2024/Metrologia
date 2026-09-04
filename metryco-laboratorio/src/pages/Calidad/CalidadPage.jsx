@@ -101,6 +101,7 @@ function ConsultarTab() {
   const [rechazarTarget, setRechazarTarget] = useState(null);
   const [historialTarget, setHistorialTarget] = useState(null);
   const [page, setPage] = useState(0);
+  const [rowsPerPage, setRowsPerPage] = useState(10);
 
   const cargar = () => {
     setLoading(true);
@@ -243,12 +244,13 @@ function ConsultarTab() {
 
       <AppTable
         columns={columns}
-        rows={asignaciones.slice(page * 10, page * 10 + 10)}
+        rows={asignaciones.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage)}
         loading={loading}
         totalCount={asignaciones.length}
         page={page}
-        rowsPerPage={10}
+        rowsPerPage={rowsPerPage}
         onPageChange={setPage}
+        onRowsPerPageChange={(n) => { setRowsPerPage(n); setPage(0); }}
         emptyText="No hay certificados pendientes de aprobar"
       />
 

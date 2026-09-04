@@ -17,6 +17,7 @@ router.get("/:id", usuarioController.obtener);
 router.post("/", validate(crearUsuarioSchema), auditar("usuario_creado", "Usuario"), usuarioController.crear);
 router.put("/:id", validate(actualizarUsuarioSchema), auditar("usuario_editado", "Usuario"), usuarioController.actualizar);
 router.delete("/:id", auditar("usuario_desactivado", "Usuario"), usuarioController.desactivar);
+router.patch("/:id/reactivar", auditar("usuario_reactivado", "Usuario"), usuarioController.reactivar);
 router.delete("/:id/permanente", auditar("usuario_eliminado", "Usuario"), usuarioController.eliminar);
 router.post("/:id/observaciones", usuarioController.agregarObservacion);
 router.delete("/:id/observaciones/:obsId", usuarioController.eliminarObservacion);

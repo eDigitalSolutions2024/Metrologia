@@ -25,7 +25,8 @@ import DarkModeOutlinedIcon from "@mui/icons-material/DarkModeOutlined";
 import LightModeOutlinedIcon from "@mui/icons-material/LightModeOutlined";
 import { useAuth } from "../../core/auth/useAuth";
 import ROUTES from "../../shared/constants/routes";
-import { obtenerLogo, logoUrl } from "../../services/configuracion";
+import { logoUrl } from "../../services/configuracion";
+import { useLogoMarca } from "../../theme/AppThemeProvider";
 import { useColoresMarca } from "../../theme/AppThemeProvider";
 import { hexToRgb } from "../../theme/theme";
 
@@ -101,11 +102,7 @@ export default function Login() {
   const [showPass, setShowPass] = useState(false);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
-  const [logo, setLogo] = useState(null);
-
-  useEffect(() => {
-    obtenerLogo().then(setLogo).catch(() => setLogo(null));
-  }, []);
+  const { logo } = useLogoMarca();
 
   const {
     register,
@@ -358,6 +355,7 @@ export default function Login() {
                   endAdornment: (
                     <InputAdornment position="end">
                       <IconButton
+                        type="button"
                         size="small"
                         edge="end"
                         aria-label={showPass ? "Ocultar contraseña" : "Mostrar contraseña"}

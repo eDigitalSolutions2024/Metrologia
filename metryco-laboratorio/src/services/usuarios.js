@@ -32,6 +32,11 @@ export async function desactivarUsuario(id) {
   return data.data;
 }
 
+export async function reactivarUsuario(id) {
+  const { data } = await api.patch(`${ENDPOINTS.USUARIOS}/${id}/reactivar`);
+  return data.data;
+}
+
 export async function eliminarUsuario(id) {
   const { data } = await api.delete(`${ENDPOINTS.USUARIOS}/${id}/permanente`);
   return data.data;
