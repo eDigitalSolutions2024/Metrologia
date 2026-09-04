@@ -111,7 +111,7 @@ export default function Dashboard() {
         </Box>
         <Button
           component="a"
-          href="/Manual-Metryco.pdf"
+          href="/Manual-Metrologia.pdf"
           target="_blank"
           rel="noopener"
           variant="outlined"
