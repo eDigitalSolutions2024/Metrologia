@@ -2,6 +2,7 @@ const mongoose = require("mongoose");
 const Factura = require("../models/Factura");
 const Cliente = require("../models/Cliente");
 const Cotizacion = require("../models/Cotizacion");
+const Reporte = require("../models/Reporte");
 const AppError = require("../utils/AppError");
 
 const oid = (v) => (mongoose.isValidObjectId(v) ? new mongoose.Types.ObjectId(v) : null);
@@ -42,8 +43,12 @@ async function crear(datos, usuarioId) {
 
   // Si la factura viene de una cotización aprobada, se marca como facturada
   // — así queda claro que ya no está "solo aprobada esperando facturarse".
+  // También se refleja en el Reporte que nació de esa cotización (campo de
+  // texto libre que se ve en el detalle del reporte) — sin esto, Cobranza y
+  // Reportes quedaban con la factura desconectada entre sí.
   if (datos.cotizacion && oid(datos.cotizacion)) {
     await Cotizacion.updateOne({ _id: datos.cotizacion }, { status: "facturada" });
+    await Reporte.updateOne({ cotizacion: datos.cotizacion }, { factura: datos.folio });
   }
 
   return factura.populate("cliente", "nombre");
