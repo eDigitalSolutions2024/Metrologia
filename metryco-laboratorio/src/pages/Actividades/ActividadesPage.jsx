@@ -45,6 +45,7 @@ export default function ActividadesPage() {
   const [actividades, setActividades] = useState([]);
   const [modalOpen, setModalOpen] = useState(false);
   const [fechaSugerida, setFechaSugerida] = useState("");
+  const [actividadSeleccionada, setActividadSeleccionada] = useState(null);
 
   const daysInMonth = getDaysInMonth(year, month);
   const firstDay = getFirstDay(year, month);
@@ -99,44 +100,7 @@ export default function ActividadesPage() {
         }
       />
 
-      <AppCard
-        dense
-        title="Actividades a realizar"
-        subtitle={`${pendientes.length} pendiente(s) / en proceso este mes`}
-        icon={<EventAvailableOutlinedIcon fontSize="small" />}
-        sx={{ mb: 2.5 }}
-      >
-        {pendientes.length === 0 ? (
-          <Typography variant="body2" color="text.secondary">Sin actividades pendientes este mes.</Typography>
-        ) : (
-          <Box sx={{ display: "flex", flexDirection: "column", gap: 1 }}>
-            {pendientes.map((act) => (
-              <Box
-                key={act._id}
-                onClick={() => abrirNueva((act.fechaActividad || "").slice(0, 10))}
-                sx={{
-                  display: "flex", alignItems: "center", gap: 1.5, p: 1.25, borderRadius: 2,
-                  border: 1, borderColor: "divider", cursor: "pointer",
-                  "&:hover": { bgcolor: "action.hover" },
-                }}
-              >
-                <Avatar sx={{ width: 30, height: 30, fontSize: 12, bgcolor: "secondary.main" }}>
-                  {act.tecnico?.nombre?.charAt(0) || "?"}
-                </Avatar>
-                <Box sx={{ flex: 1, minWidth: 0 }}>
-                  <Typography variant="body2" fontWeight={600} noWrap>{act.actividad}</Typography>
-                  <Typography variant="caption" color="text.secondary">
-                    {act.tecnico?.nombre || "Sin técnico"} · {formatDate(act.fechaActividad)} · {act.horaInicio}–{act.horaFin}
-                  </Typography>
-                </Box>
-                <Chip size="small" label={STATUS_LABEL[act.status] || act.status} color={STATUS_CHIP_COLOR[act.status] || "default"} />
-              </Box>
-            ))}
-          </Box>
-        )}
-      </AppCard>
-
-      <Paper elevation={0} sx={{ border: 1, borderColor: "divider", borderRadius: 2, overflow: "hidden" }}>
+      <Paper elevation={0} sx={{ border: 1, borderColor: "divider", borderRadius: 2, overflow: "hidden", mb: 2.5 }}>
         <Box sx={{ borderBottom: 1, display: "flex", alignItems: "center", justifyContent: "space-between", px: 3, py: 2, borderColor: "divider" }}>
           <Button onClick={prevMonth} size="small" sx={{ minWidth: 36 }}><ChevronLeftIcon /></Button>
           <Typography variant="h6" fontWeight={700}>
@@ -209,6 +173,62 @@ export default function ActividadesPage() {
           })}
         </Grid>
       </Paper>
+
+      <AppCard
+        dense
+        title="Actividades a realizar"
+        subtitle={`${pendientes.length} pendiente(s) / en proceso este mes`}
+        icon={<EventAvailableOutlinedIcon fontSize="small" />}
+        sx={{ mb: 2.5 }}
+      >
+        {pendientes.length === 0 ? (
+          <Typography variant="body2" color="text.secondary">Sin actividades pendientes este mes.</Typography>
+        ) : (
+          <Box sx={{ display: "flex", flexDirection: "column", gap: 1 }}>
+            {pendientes.map((act) => (
+              <Box
+                key={act._id}
+                onClick={() => setActividadSeleccionada((prev) => (prev?._id === act._id ? null : act))}
+                sx={{
+                  display: "flex", alignItems: "center", gap: 1.5, p: 1.25, borderRadius: 2,
+                  border: 1,
+                  borderColor: actividadSeleccionada?._id === act._id ? "secondary.main" : "divider",
+                  cursor: "pointer",
+                  "&:hover": { bgcolor: "action.hover" },
+                }}
+              >
+                <Avatar sx={{ width: 30, height: 30, fontSize: 12, bgcolor: "secondary.main" }}>
+                  {act.tecnico?.nombre?.charAt(0) || "?"}
+                </Avatar>
+                <Box sx={{ flex: 1, minWidth: 0 }}>
+                  <Typography variant="body2" fontWeight={600} noWrap>{act.actividad}</Typography>
+                  <Typography variant="caption" color="text.secondary">
+                    {act.tecnico?.nombre || "Sin técnico"} · {formatDate(act.fechaActividad)} · {act.horaInicio}–{act.horaFin}
+                  </Typography>
+                </Box>
+                <Chip size="small" label={STATUS_LABEL[act.status] || act.status} color={STATUS_CHIP_COLOR[act.status] || "default"} />
+              </Box>
+            ))}
+          </Box>
+        )}
+
+        {actividadSeleccionada && (
+          <Box
+            sx={{
+              mt: 1.5, p: 1.5, borderRadius: 2, border: 1, borderColor: "divider",
+              bgcolor: "background.default",
+            }}
+          >
+            <Typography variant="subtitle2" fontWeight={700}>{actividadSeleccionada.actividad}</Typography>
+            <Typography variant="caption" color="text.secondary" sx={{ display: "block", mb: 1 }}>
+              {actividadSeleccionada.tecnico?.nombre || "Sin técnico"} · {formatDate(actividadSeleccionada.fechaActividad)} · {actividadSeleccionada.horaInicio}–{actividadSeleccionada.horaFin}
+            </Typography>
+            <Typography variant="body2" color="text.secondary">
+              {actividadSeleccionada.comentarios || "Sin comentarios adicionales."}
+            </Typography>
+          </Box>
+        )}
+      </AppCard>
 
       <Box sx={{ display: "flex", gap: 2, mt: 2, flexWrap: "wrap" }}>
         {Object.entries(STATUS_COLOR).map(([status, color]) => (
