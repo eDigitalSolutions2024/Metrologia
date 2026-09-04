@@ -51,7 +51,7 @@ async function run() {
   });
   console.log("· Cliente demo:", cliente.nombre);
 
-  const patron = await patronSvc.crear(
+  const patron = await Patron.findOne({ codigo: "PAT-DEMO-01" }) || await patronSvc.crear(
     {
       codigo: "PAT-DEMO-01",
       nombre: "Juego de bloques patrón grado 1",
@@ -170,6 +170,13 @@ async function run() {
     }
     console.log(`· ${NOMINALES.length * 2} cálculos de incertidumbre (encontrado+dejado) → U ≈ ${calculo.resultado.incertidumbreExpandida.toExponential(1)} mm`);
   }
+
+  await asignacionSvc.cambiarEstado(
+    asignacion._id.toString(),
+    { dominio: "certificado", valor: "autorizado" },
+    reqUser
+  );
+  console.log("· Asignación autorizada por Calidad");
 
   // Sin `resultado` explícito: el certificado lo arma con los puntos aprobados.
   const cert = await certificadoSvc.emitir(
