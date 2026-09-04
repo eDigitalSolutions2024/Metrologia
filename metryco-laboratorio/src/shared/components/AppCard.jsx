@@ -19,7 +19,7 @@ export default function AppCard({
       elevation={0}
       sx={{
         position: "relative",
-        borderRadius: 3.5,
+        borderRadius: 2,
         border: 1,
         borderColor: "divider",
         p: dense ? 2.25 : 3,

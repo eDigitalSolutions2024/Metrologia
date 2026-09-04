@@ -405,7 +405,7 @@ function ResultadoHero({ R, motor, calc, onGuardar, onAccion }) {
   return (
     <Box
       sx={{
-        borderRadius: 3.5,
+        borderRadius: 2,
         overflow: "hidden",
         color: "#E6EDF6",
         background: "radial-gradient(900px 400px at 12% 0%, rgba(37,99,235,.35), transparent 60%), linear-gradient(150deg, #0B1220 0%, #0F172A 55%, #111E3A 100%)",

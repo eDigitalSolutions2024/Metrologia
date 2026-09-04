@@ -429,8 +429,8 @@ export default function CotizacionDialog({ open, cotizacionId, duplicarDesdeId, 
                 <Typography variant="subtitle2" fontWeight={700} sx={{ mb: 1.5 }}>
                   Servicios / Partidas
                 </Typography>
-                <Paper elevation={0} sx={{ border: 1, borderColor: "divider", borderRadius: 2, overflow: "hidden", mb: 2 }}>
-                  <Table size="small">
+                <Paper elevation={0} sx={{ border: 1, borderColor: "divider", borderRadius: 1.5, overflow: "hidden", mb: 2 }}>
+                  <Table size="small" sx={{ "& .MuiTableCell-root": { py: 1.5, px: 2.25 } }}>
                     <TableHead>
                       <TableRow sx={{ bgcolor: "background.default" }}>
                         <TableCell sx={{ fontWeight: 700 }}>Descripción del servicio</TableCell>

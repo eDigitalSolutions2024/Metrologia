@@ -1,6 +1,9 @@
+import { useEffect, useState } from "react";
 import { Box, Typography } from "@mui/material";
 import { formatDate } from "../../shared/utils/formatDate";
 import { firmaUrl } from "../../services/perfil";
+import { logoUrl } from "../../services/configuracion";
+import { fetchQrBlob } from "../../services/certificados";
 
 /* ---------- formateo ---------- */
 function sci(x, dp = 1) {
@@ -105,6 +108,22 @@ function GraficaCalibracion({ titulo, filas }) {
 /** Una hoja de certificado, sin la barra de acciones — reutilizable en la
  * vista de un solo certificado y en el PDF combinado por reporte. */
 export default function HojaCertificado({ cert, ultima = true }) {
+  const [qrDataUrl, setQrDataUrl] = useState("");
+
+  useEffect(() => {
+    let cancelado = false;
+    if (!cert?._id) return;
+    fetchQrBlob(cert._id, "png")
+      .then((blob) => {
+        if (cancelado) return;
+        const r = new FileReader();
+        r.onload = () => !cancelado && setQrDataUrl(r.result);
+        r.readAsDataURL(blob);
+      })
+      .catch(() => {});
+    return () => { cancelado = true; };
+  }, [cert?._id]);
+
   const eq = cert.equipoSnapshot || {};
   const cli = cert.clienteSnapshot || {};
   const dec = decimalesDe(eq.divisionMinima);
@@ -126,8 +145,16 @@ export default function HojaCertificado({ cert, ultima = true }) {
     <Box sx={{ maxWidth: 900, mx: "auto", px: 4, py: 4, fontFamily: "Arial, Helvetica, sans-serif", breakAfter: ultima ? "auto" : "page" }}>
 
       {/* ---------- Encabezado ---------- */}
-      <Box sx={{ display: "grid", gridTemplateColumns: "1fr auto", alignItems: "center", borderBottom: "2px solid #10265c", pb: 1, mb: 0.5 }}>
-        <Box>
+      <Box sx={{ display: "flex", alignItems: "center", gap: 1.5, borderBottom: "2px solid #10265c", pb: 1, mb: 0.5 }}>
+        {cert.laboratorio?.logo?.nombreArchivo && (
+          <Box
+            component="img"
+            src={logoUrl(cert.laboratorio.logo.nombreArchivo)}
+            alt="Logo"
+            sx={{ width: 42, height: 42, objectFit: "contain", flexShrink: 0 }}
+          />
+        )}
+        <Box sx={{ flex: 1, minWidth: 0 }}>
           <Typography sx={{ fontWeight: 800, fontSize: 17, color: "#10265c" }}>
             {cert.laboratorio?.nombre || "Laboratorio de Metrología"}
           </Typography>
@@ -135,7 +162,13 @@ export default function HojaCertificado({ cert, ultima = true }) {
             <Typography sx={{ fontSize: 10, color: "#555" }}>Acreditación {cert.laboratorio.acreditacion}</Typography>
           )}
         </Box>
-        <Box sx={{ textAlign: "right" }}>
+        {qrDataUrl && (
+          <Box sx={{ textAlign: "center", flexShrink: 0 }}>
+            <Box component="img" src={qrDataUrl} alt="QR de verificación" sx={{ width: 52, height: 52, display: "block" }} />
+            <Typography sx={{ fontSize: 7, color: "#888", mt: 0.2 }}>Verificar</Typography>
+          </Box>
+        )}
+        <Box sx={{ textAlign: "right", flexShrink: 0 }}>
           <Typography sx={{ fontWeight: 800, fontSize: 15, color: "#10265c", letterSpacing: ".03em" }}>CERTIFICADO DE CALIBRACIÓN</Typography>
           <Typography sx={{ fontSize: 10.5, color: "#666", fontStyle: "italic" }}>Calibration Certificate</Typography>
         </Box>

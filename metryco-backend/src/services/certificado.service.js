@@ -92,6 +92,15 @@ async function exportar({ clienteId = "", mes = "", anio = "", factura = "todos"
   return items;
 }
 
+// El logo NO se guarda en el snapshot del certificado (a diferencia de
+// nombre/acreditación): es puramente branding, no un dato que deba quedar
+// congelado en el tiempo — se toma el vigente, igual que en Reportes/Cotización.
+async function conLogo(obj) {
+  const logo = await configuracionService.obtenerLogo();
+  if (logo && obj.laboratorio) obj.laboratorio.logo = logo;
+  return obj;
+}
+
 async function obtener(id) {
   const cert = await Certificado.findById(id)
     .populate("cliente", "nombre rfc")
@@ -103,7 +112,7 @@ async function obtener(id) {
     .populate("autorizadoPor.id", "firmaUrl")
     .populate("historial.usuario.id", "nombre usuario");
   if (!cert) throw new AppError("Certificado no encontrado", 404);
-  return conEstadoVigente(cert);
+  return conLogo(conEstadoVigente(cert));
 }
 
 /** Todos los certificados emitidos de un reporte — para el PDF combinado. */
@@ -116,7 +125,11 @@ async function porReporte(reporteId) {
     .populate("revisadoPor.id", "firmaUrl")
     .populate("autorizadoPor.id", "firmaUrl")
     .sort({ createdAt: 1 });
-  return certs.map(conEstadoVigente);
+  const logo = await configuracionService.obtenerLogo();
+  return certs.map(conEstadoVigente).map((obj) => {
+    if (logo && obj.laboratorio) obj.laboratorio.logo = logo;
+    return obj;
+  });
 }
 
 /**

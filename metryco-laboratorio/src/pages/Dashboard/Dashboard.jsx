@@ -96,7 +96,7 @@ export default function Dashboard() {
           <Grid key={s.label} size={{ xs: 12, sm: 6, md: 3 }}>
             <Box onClick={s.onClick} sx={{ cursor: "pointer", height: "100%" }}>
               {cargando ? (
-                <Skeleton variant="rounded" height={128} sx={{ borderRadius: 3.5 }} />
+                <Skeleton variant="rounded" height={128} sx={{ borderRadius: 2 }} />
               ) : (
                 <StatCard label={s.label} value={s.value} icon={s.icon} color={s.color} hint={s.hint} />
               )}

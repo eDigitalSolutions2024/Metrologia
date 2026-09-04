@@ -134,7 +134,11 @@ export function crearTheme(coloresMarca = COLORES_MARCA_DEFAULT) {
     MuiOutlinedInput: {
       styleOverrides: {
         root: {
-          borderRadius: 10,
+          // "!important" a propósito (mismo caso que MuiChip más abajo): el
+          // radio base de MUI le gana a este override en tiempo de ejecución
+          // si no se fuerza, y el campo sale mucho más redondeado de lo que
+          // se define aquí.
+          borderRadius: "10px !important",
           transition: "box-shadow .15s ease, border-color .15s ease",
           "& .MuiOutlinedInput-notchedOutline": { borderColor: "var(--mui-palette-divider)" },
           "&:hover .MuiOutlinedInput-notchedOutline": { borderColor: "var(--mui-palette-text-disabled)" },
@@ -145,7 +149,10 @@ export function crearTheme(coloresMarca = COLORES_MARCA_DEFAULT) {
 
     MuiChip: {
       styleOverrides: {
-        root: { borderRadius: 8, fontWeight: 600 },
+        // "!important" a propósito: el estilo base de MUI para Chip fija su
+        // propio radio (prácticamente una píldora) con más especificidad que
+        // este override en algunos casos — sin esto, se ignora en runtime.
+        root: { borderRadius: "6px !important", fontWeight: 600 },
         outlined: { borderColor: "var(--mui-palette-divider)" },
       },
     },

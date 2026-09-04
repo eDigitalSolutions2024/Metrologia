@@ -171,7 +171,10 @@ function ConsultarTab() {
           </Tooltip>
         ) : (
           <Tooltip title="El técnico todavía no la sube">
-            <Chip icon={<HourglassEmptyOutlinedIcon sx={{ fontSize: 14 }} />} label="En proceso" size="small" variant="outlined" />
+            <Chip
+              icon={<HourglassEmptyOutlinedIcon sx={{ fontSize: 14 }} />} label="En proceso" size="small" variant="outlined"
+              sx={{ borderRadius: "6px", "& .MuiChip-label": { px: 1 } }}
+            />
           </Tooltip>
         ),
     },

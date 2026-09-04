@@ -208,7 +208,7 @@ export default function NuevoUsuario({ open, onClose, onCreated }) {
           <SeccionTitulo>Contraseña temporal</SeccionTitulo>
           <Box
             sx={{
-              p: 2, borderRadius: 3, border: 1, borderColor: "divider",
+              p: 2, borderRadius: 2, border: 1, borderColor: "divider",
               bgcolor: "background.default", display: "flex", alignItems: "center", gap: 1.5,
             }}
           >

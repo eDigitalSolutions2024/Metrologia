@@ -37,7 +37,7 @@ export default function StatCard({ label, value, icon, color = "#2563EB", hint, 
       sx={{
         position: "relative",
         p: 2.75,
-        borderRadius: 3.5,
+        borderRadius: 2,
         border: 1,
         borderColor: "divider",
         overflow: "hidden",

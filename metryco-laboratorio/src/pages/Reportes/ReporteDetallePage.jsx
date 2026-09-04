@@ -254,7 +254,7 @@ export default function ReporteDetallePage() {
       {error && <Alert severity="error" sx={{ mb: 2, borderRadius: 2 }} onClose={() => setError("")}>{error}</Alert>}
 
       {/* Datos del cliente / reporte */}
-      <Paper variant="outlined" sx={{ p: 2.5, borderRadius: 3, mb: 2.5 }}>
+      <Paper variant="outlined" sx={{ p: 2.5, borderRadius: 2, mb: 2.5 }}>
         <Box sx={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 4 }}>
           <Box>
             <Campo label="Cliente" value={cliente.nombre} />
@@ -285,7 +285,7 @@ export default function ReporteDetallePage() {
       </Paper>
 
       {/* Barra de estatus + PDFs */}
-      <Paper variant="outlined" sx={{ p: 2, borderRadius: 3, mb: 2.5, display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 1.5 }}>
+      <Paper variant="outlined" sx={{ p: 2, borderRadius: 2, mb: 2.5, display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 1.5 }}>
         <Box sx={{ display: "flex", alignItems: "center", gap: 1.5 }}>
           <Typography variant="body2" color="text.secondary">
             Creado el {formatDate(reporte.createdAt)}
@@ -321,18 +321,21 @@ export default function ReporteDetallePage() {
 
       {/* Recolección de equipos */}
       <Typography variant="subtitle2" fontWeight={700} sx={{ mb: 1 }}>Recolección de equipos</Typography>
-      <Paper variant="outlined" sx={{ borderRadius: 3, mb: 2.5, overflow: "auto" }}>
+      <Paper variant="outlined" sx={{ borderRadius: 1.5, mb: 2.5, overflow: "auto" }}>
         <Box component="table" sx={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
           <Box component="thead" sx={{ bgcolor: "background.default" }}>
             <Box component="tr">
               {["Marca", "Modelo", "Descripción", "En Sitio", "En Laboratorio", "Ubicación", "Recolectado", "Info. Recolección"].map((h) => (
-                <Box component="th" key={h} sx={{ p: 1, textAlign: "left", borderBottom: 1, borderColor: "divider", fontSize: 11, fontWeight: 700, color: "text.secondary" }}>{h}</Box>
+                <Box
+                  component="th" key={h}
+                  sx={{ px: 2, py: 1.5, textAlign: "left", borderBottom: 1, borderColor: "divider", fontSize: 11, fontWeight: 700, color: "text.secondary" }}
+                >{h}</Box>
               ))}
             </Box>
           </Box>
           <Box component="tbody">
             {asignaciones.map((a) => (
-              <Box component="tr" key={a._id} sx={{ "& td": { p: 1, borderBottom: 1, borderColor: "divider" } }}>
+              <Box component="tr" key={a._id} sx={{ "& td": { px: 2, py: 1.25, borderBottom: 1, borderColor: "divider" } }}>
                 <Box component="td">{a.equipo?.marca || "—"}</Box>
                 <Box component="td">{a.equipo?.modelo || "—"}</Box>
                 <Box component="td">{a.equipo?.descripcion || "—"}</Box>
@@ -378,7 +381,7 @@ export default function ReporteDetallePage() {
       {/* Asignaciones */}
       <Typography variant="subtitle2" fontWeight={700} sx={{ mt: 3, mb: 1 }}>Asignaciones ({asignaciones.length})</Typography>
       {asignaciones.length === 0 && (
-        <Box sx={{ py: 4, textAlign: "center", border: "1px dashed", borderColor: "divider", borderRadius: 3, mb: 2.5 }}>
+        <Box sx={{ py: 4, textAlign: "center", border: "1px dashed", borderColor: "divider", borderRadius: 2, mb: 2.5 }}>
           <Typography variant="body2" color="text.secondary">Sin asignaciones todavía.</Typography>
         </Box>
       )}
@@ -386,7 +389,7 @@ export default function ReporteDetallePage() {
         {asignaciones.map((a) => {
           const tecnico = a.tecnicoEjecutor || a.tecnicoAsignado;
           return (
-            <Paper key={a._id} elevation={0} sx={{ p: 2, borderRadius: 3, border: 1, borderColor: "divider" }}>
+            <Paper key={a._id} elevation={0} sx={{ p: 2, borderRadius: 2, border: 1, borderColor: "divider" }}>
               <Box sx={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 1.5, flexWrap: "wrap" }}>
                 <Box sx={{ minWidth: 0 }}>
                   <Typography variant="body2" fontWeight={700}>
@@ -473,7 +476,7 @@ export default function ReporteDetallePage() {
 
       {/* Comentarios */}
       <Typography variant="subtitle2" fontWeight={700} sx={{ mb: 1 }}>Comentarios</Typography>
-      <Paper variant="outlined" sx={{ p: 2, borderRadius: 3, mb: 2.5 }}>
+      <Paper variant="outlined" sx={{ p: 2, borderRadius: 2, mb: 2.5 }}>
         {(reporte.comentarios || []).map((c, i) => (
           <Box key={i} sx={{ mb: 1, pb: 1, borderBottom: 1, borderColor: "divider" }}>
             <Typography variant="caption" color="text.secondary">
@@ -493,7 +496,7 @@ export default function ReporteDetallePage() {
       {reporte.historial?.length > 0 && (
         <>
           <Typography variant="subtitle2" fontWeight={700} sx={{ mb: 1 }}>Historial</Typography>
-          <Paper variant="outlined" sx={{ p: 2.5, borderRadius: 3, mb: 2.5 }}>
+          <Paper variant="outlined" sx={{ p: 2.5, borderRadius: 2, mb: 2.5 }}>
             <Box sx={{ position: "relative", pl: 2.5 }}>
               <Box sx={{ position: "absolute", left: 4, top: 4, bottom: 4, width: 2, bgcolor: "divider" }} />
               {reporte.historial.slice().reverse().map((h, i) => (
@@ -575,7 +578,7 @@ function AsignarForm({ clienteId, reporteId, onDone }) {
   };
 
   return (
-    <Paper variant="outlined" sx={{ p: 2, borderRadius: 3, mb: 2.5 }}>
+    <Paper variant="outlined" sx={{ p: 2, borderRadius: 2, mb: 2.5 }}>
       {error && <Alert severity="error" sx={{ mb: 1.5, borderRadius: 2 }}>{error}</Alert>}
       <Box sx={{ display: "flex", gap: 1.5, flexWrap: "wrap", alignItems: "flex-start" }}>
         <FormControl size="small" sx={{ minWidth: 130 }}>
