@@ -30,6 +30,7 @@ import { listarEquipos } from "../../services/equipos";
 import { obtenerDirectorio } from "../../services/usuarios";
 import { listarPatrones } from "../../services/patrones";
 import { listarPerformance } from "../../services/performance";
+import { listarCertificadosPorReporte } from "../../services/certificados";
 import { direccionCliente } from "./imprimir/shared";
 import { useAuth } from "../../core/auth/useAuth";
 
@@ -123,6 +124,7 @@ export default function ReporteDetallePage() {
   const [factura, setFactura] = useState("");
   const [comentario, setComentario] = useState("");
   const [rechazoTarget, setRechazoTarget] = useState(null);
+  const [certificadoPorAsignacion, setCertificadoPorAsignacion] = useState({});
 
   const cargar = useCallback(() => {
     setLoading(true);
@@ -130,6 +132,13 @@ export default function ReporteDetallePage() {
       .then((d) => { setData(d); setFactura(d.reporte.factura || ""); })
       .catch(() => setError("No se pudo cargar el reporte."))
       .finally(() => setLoading(false));
+    listarCertificadosPorReporte(id)
+      .then((certs) => {
+        const mapa = {};
+        certs.forEach((c) => { if (c.asignacion) mapa[c.asignacion] = c._id; });
+        setCertificadoPorAsignacion(mapa);
+      })
+      .catch(() => setCertificadoPorAsignacion({}));
   }, [id]);
   useEffect(() => { cargar(); }, [cargar]);
 
@@ -434,12 +443,21 @@ export default function ReporteDetallePage() {
                   </Select>
                 </FormControl>
                 <Box>
-                  <FormControl size="small" sx={{ minWidth: 140 }} disabled={!puedeCertificado}>
-                    <InputLabel>Certificado</InputLabel>
-                    <Select label="Certificado" value={a.estados?.certificado} onChange={(e) => onCambiarEstado(a._id, "certificado", e.target.value)}>
-                      {Object.entries(EST_CERTIFICADO).map(([k, v]) => <MenuItem key={k} value={k}>{v}</MenuItem>)}
-                    </Select>
-                  </FormControl>
+                  <Box sx={{ display: "flex", gap: 0.5, alignItems: "center" }}>
+                    <FormControl size="small" sx={{ minWidth: 140 }} disabled={!puedeCertificado}>
+                      <InputLabel>Certificado</InputLabel>
+                      <Select label="Certificado" value={a.estados?.certificado} onChange={(e) => onCambiarEstado(a._id, "certificado", e.target.value)}>
+                        {Object.entries(EST_CERTIFICADO).map(([k, v]) => <MenuItem key={k} value={k}>{v}</MenuItem>)}
+                      </Select>
+                    </FormControl>
+                    {certificadoPorAsignacion[a._id] && (
+                      <Tooltip title="Descargar certificado de este equipo (PDF separado)">
+                        <IconButton size="small" onClick={() => window.open(`/informe/certificado/${certificadoPorAsignacion[a._id]}`, "_blank")}>
+                          <PictureAsPdfOutlinedIcon fontSize="small" sx={{ color: "error.main" }} />
+                        </IconButton>
+                      </Tooltip>
+                    )}
+                  </Box>
                   {a.motivoRechazo && (
                     <Typography variant="caption" color="error.main" sx={{ display: "block", mt: 0.5, maxWidth: 200 }}>
                       {a.motivoRechazo}
