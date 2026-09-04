@@ -1,15 +1,16 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { useForm, useFieldArray } from "react-hook-form";
 import { Box, Typography, Grid, IconButton, Tooltip, Button, Divider, Alert } from "@mui/material";
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
 import AddIcon from "@mui/icons-material/Add";
 import DeleteOutlineIcon from "@mui/icons-material/DeleteOutlined";
+import UploadFileIcon from "@mui/icons-material/UploadFileOutlined";
 
 import AppButton from "../../shared/components/AppButton";
 import AppCard from "../../shared/components/AppCard";
 import AppInput from "../../shared/components/AppInput";
-import { obtenerPerformance, crearPerformance, actualizarPerformance } from "../../services/performance";
+import { obtenerPerformance, crearPerformance, actualizarPerformance, importarPuntosPerformance } from "../../services/performance";
 
 const PUNTO_VACIO = {
   prueba: "", nominal: "", unidad: "", escala: "", rdg: "", fs: "", unidades: "", incertidumbre: "",
@@ -67,12 +68,31 @@ export default function PerformanceForm() {
   const [loading, setLoading] = useState(isEdit);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+  const [importando, setImportando] = useState(false);
+  const [importInfo, setImportInfo] = useState("");
+  const fileInputRef = useRef(null);
 
   const { register, control, handleSubmit, getValues, setValue, reset, formState: { errors } } = useForm({
     defaultValues: { nombre: "", comentarios: "", puntos: [PUNTO_VACIO] },
   });
 
-  const { fields, append, remove } = useFieldArray({ control, name: "puntos" });
+  const { fields, append, remove, replace } = useFieldArray({ control, name: "puntos" });
+
+  const onArchivoSeleccionado = async (e) => {
+    const archivo = e.target.files?.[0];
+    e.target.value = ""; // permite volver a elegir el mismo archivo después
+    if (!archivo) return;
+    setImportando(true); setError(""); setImportInfo("");
+    try {
+      const puntosImportados = await importarPuntosPerformance(archivo);
+      replace(puntosImportados.map(puntoDesdeBackend));
+      setImportInfo(`${puntosImportados.length} punto(s) importado(s) de "${archivo.name}". Revísalos antes de guardar.`);
+    } catch (err) {
+      setError(err?.response?.data?.message || "No se pudo importar el archivo.");
+    } finally {
+      setImportando(false);
+    }
+  };
 
   useEffect(() => {
     if (!isEdit) return;
@@ -141,7 +161,39 @@ export default function PerformanceForm() {
           </Grid>
         </AppCard>
 
-        <AppCard title="Puntos de Prueba" sx={{ mb: 3 }}>
+        <AppCard
+          title="Puntos de Prueba"
+          action={
+            <>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept=".csv,.xls,.xlsx"
+                hidden
+                onChange={onArchivoSeleccionado}
+              />
+              <Button
+                type="button"
+                size="small"
+                startIcon={<UploadFileIcon />}
+                onClick={() => fileInputRef.current?.click()}
+                disabled={importando}
+                sx={{ borderRadius: 2 }}
+              >
+                {importando ? "Importando…" : "Importar Excel/CSV"}
+              </Button>
+            </>
+          }
+          sx={{ mb: 3 }}
+        >
+          {importInfo && (
+            <Alert severity="success" sx={{ mb: 2, borderRadius: 2 }} onClose={() => setImportInfo("")}>
+              {importInfo}
+            </Alert>
+          )}
+          <Typography variant="caption" color="text.secondary" sx={{ display: "block", mb: 2 }}>
+            Columnas esperadas: Prueba, Nominal, Unidad, Escala Total, %RDG, %FS, Unidades, Incertidumbre.
+          </Typography>
           {fields.map((field, index) => (
             <Box key={field.id}>
               {index > 0 && <Divider sx={{ my: 2 }} />}

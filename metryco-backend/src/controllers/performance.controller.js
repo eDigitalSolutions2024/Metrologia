@@ -1,5 +1,6 @@
 const asyncHandler = require("../utils/asyncHandler");
 const service = require("../services/performance.service");
+const AppError = require("../utils/AppError");
 
 const listar = asyncHandler(async (req, res) => {
   const { search = "", magnitud = "", page = 0, pageSize = 10 } = req.query;
@@ -30,4 +31,12 @@ const calcularPunto = asyncHandler(async (req, res) => {
   res.json({ success: true, data: service.calcularPunto(req.body) });
 });
 
-module.exports = { listar, obtener, crear, actualizar, eliminar, calcularPunto };
+// Parsea el Excel/CSV y devuelve los puntos ya calculados, SIN guardar —
+// el técnico los revisa en el formulario antes de confirmar.
+const importar = asyncHandler(async (req, res) => {
+  if (!req.file) throw new AppError("No se recibió ningún archivo", 400);
+  const puntos = await service.importarArchivo(req.file.buffer, req.file.originalname);
+  res.json({ success: true, data: puntos });
+});
+
+module.exports = { listar, obtener, crear, actualizar, eliminar, calcularPunto, importar };

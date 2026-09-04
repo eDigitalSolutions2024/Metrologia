@@ -131,6 +131,41 @@ function crearSubidaArchivo(carpeta, maxMB) {
 
 const { middleware: adjuntoCotizacion, destino: destinoAdjuntosCotizacion } = crearSubidaArchivo("adjuntos-cotizacion", 15);
 
+// --- Importación de puntos de Performance desde Excel/CSV ---
+// No se guarda en disco: se procesa en memoria y se descarta (no es un
+// archivo que el sistema deba conservar, solo un medio para capturar datos).
+const MIME_HOJA_CALCULO = [
+  "text/csv",
+  "application/csv",
+  "application/vnd.ms-excel",
+  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+];
+
+function soloHojaCalculo(_req, file, cb) {
+  const ext = path.extname(file.originalname).toLowerCase();
+  if (MIME_HOJA_CALCULO.includes(file.mimetype) || [".csv", ".xls", ".xlsx"].includes(ext)) {
+    return cb(null, true);
+  }
+  cb(new AppError("Solo se permiten archivos Excel (.xlsx, .xls) o CSV", 400));
+}
+
+const subirHojaCalculo = multer({
+  storage: multer.memoryStorage(),
+  fileFilter: soloHojaCalculo,
+  limits: { fileSize: 5 * 1024 * 1024, files: 1 },
+}).single("archivo");
+
+const importarPerformance = (req, res, next) => {
+  subirHojaCalculo(req, res, (err) => {
+    if (err instanceof multer.MulterError) {
+      const msg = err.code === "LIMIT_FILE_SIZE" ? "El archivo supera el tamaño máximo (5 MB)" : err.message;
+      return next(new AppError(msg, 400));
+    }
+    if (err) return next(err);
+    next();
+  });
+};
+
 module.exports = {
   pdfCertificado,
   pdfPatron,
@@ -141,4 +176,5 @@ module.exports = {
   firma, destinoFirmas,
   grafica, destinoGraficas,
   adjuntoCotizacion, destinoAdjuntosCotizacion,
+  importarPerformance,
 };

@@ -26,3 +26,12 @@ export async function eliminarPerformance(id) {
   const { data } = await api.delete(`${ENDPOINTS.PERFORMANCE}/${id}`);
   return data.data;
 }
+
+export async function importarPuntosPerformance(archivo) {
+  const form = new FormData();
+  form.append("archivo", archivo);
+  const { data } = await api.post(`${ENDPOINTS.PERFORMANCE}/importar`, form, {
+    headers: { "Content-Type": "multipart/form-data" },
+  });
+  return data.data;
+}
