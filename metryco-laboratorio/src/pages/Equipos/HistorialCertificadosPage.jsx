@@ -31,7 +31,7 @@ function VencimientoAutomaticoDialog({ open, onClose }) {
     listarPatrones({ pageSize: 500 })
       .then(({ items }) => {
         const dentroDeRango = items.filter((p) => {
-          const venc = p.ultimaCalibracion?.vencimiento;
+          const venc = p.calibracion?.vencimiento || p.ultimaCalibracion?.vencimiento;
           if (!venc) return false;
           const dias = Math.ceil((new Date(venc) - new Date()) / 86400000);
           return dias >= 0 && dias < 30;
@@ -61,7 +61,7 @@ function VencimientoAutomaticoDialog({ open, onClose }) {
               proximosAVencer.map((p) => (
                 <Box key={p._id} sx={{ display: "flex", justifyContent: "space-between", py: 0.75, borderBottom: 1, borderColor: "divider" }}>
                   <Typography variant="body2">{p.codigo} — {p.descripcion}</Typography>
-                  <Typography variant="body2" color="warning.main" fontWeight={600}>{p.ultimaCalibracion?.vencimiento}</Typography>
+                  <Typography variant="body2" color="warning.main" fontWeight={600}>{p.calibracion?.vencimiento || p.ultimaCalibracion?.vencimiento}</Typography>
                 </Box>
               ))
             )}

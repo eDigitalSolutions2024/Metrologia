@@ -56,8 +56,16 @@ const certificadoSchema = new Schema(
     clienteSnapshot: { nombre: String, direccion: String },
     patronesSnapshot: [
       {
-        codigo: String, nombre: String, modelo: String, trazabilidad: String,
-        certificadoNo: String, vencimiento: Date, incertidumbre: String,
+        codigo: String,
+        nombre: String,
+        modelo: String,
+        trazabilidad: String,
+        numeroCertificado: String,
+        certificadoNo: String,
+        laboratorio: String,
+        vencimiento: Date,
+        incertidumbre: String,
+        _id: false,
       },
     ],
 

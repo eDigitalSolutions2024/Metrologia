@@ -18,6 +18,7 @@ const contribucionSchema = new Schema(
   {
     fuente: { type: String, required: true },
     simbolo: String,
+    origen: { type: String, default: "manual" }, // manual | plantilla | patron | repetibilidad
     tipo: { type: String, enum: ["A", "B"], default: "B" },
     modo: { type: String, default: "semiamplitud" },
     distribucion: { type: String, default: "rectangular" },
@@ -86,6 +87,7 @@ const calculoIncertidumbreSchema = new Schema(
 
     contribuciones: [contribucionSchema],
     resultado: resultadoSchema,
+    advertencias: [String], // p. ej. "El patrón PAT-003 estaba vencido"
 
     motor: {
       nombre: { type: String, default: "gum-deterministico" },

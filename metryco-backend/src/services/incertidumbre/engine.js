@@ -189,6 +189,7 @@ function calcular({ contribuciones = [], y, nivelConfianza } = {}) {
   const contribucionesOut = detalladas.map((d) => ({
     fuente: d.fuente,
     simbolo: d.simbolo,
+    origen: d.origen || "manual",
     tipo: d.tipo || "B",
     modo: d.modo || "semiamplitud",
     distribucion: d.distribucion,

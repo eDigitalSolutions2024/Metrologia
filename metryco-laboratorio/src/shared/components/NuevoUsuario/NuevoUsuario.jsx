@@ -128,7 +128,7 @@ export default function NuevoUsuario({ open, onClose, onCreated }) {
             <PersonAddAltOutlinedIcon />
           </Box>
           <Box>
-            <Typography variant="h6" fontWeight={700} lineHeight={1.2}>Nuevo Usuario</Typography>
+            <Typography variant="h6" fontWeight={700} sx={{ lineHeight: 1.2 }}>Nuevo Usuario</Typography>
             <Typography variant="body2" color="text.secondary">Registra un nuevo usuario en el sistema</Typography>
           </Box>
         </Box>

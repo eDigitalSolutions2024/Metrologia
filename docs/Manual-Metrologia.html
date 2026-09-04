@@ -1,0 +1,784 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>Manual del Sistema — Metrología</title>
+<style>
+  :root{
+    --azul:#10265c; --azul2:#2563EB; --tinta:#0f172a; --gris:#475569;
+    --linea:#cbd5e1; --suave:#f1f5f9; --ok:#16A34A; --warn:#D97706; --err:#DC2626;
+  }
+  *{box-sizing:border-box}
+  html{-webkit-print-color-adjust:exact; print-color-adjust:exact}
+  body{
+    font-family:"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    color:var(--tinta); font-size:11pt; line-height:1.5; margin:0;
+  }
+  @page{ size:A4; margin:18mm 16mm 20mm; }
+  @page:first{ margin:0; }
+
+  h1,h2,h3,h4{ color:var(--azul); line-height:1.25; margin:0 0 .4em; }
+  h1{ font-size:22pt; }
+  h2{ font-size:17pt; border-bottom:3px solid var(--azul); padding-bottom:4px; margin-top:0; }
+  h3{ font-size:13pt; margin-top:1.2em; }
+  h4{ font-size:11.5pt; color:var(--gris); margin-top:1em; }
+  p{ margin:.5em 0; }
+  ul,ol{ margin:.4em 0 .8em; padding-left:1.4em; }
+  li{ margin:.28em 0; }
+  strong{ color:var(--tinta); }
+  code{ background:var(--suave); padding:1px 5px; border-radius:4px; font-size:.92em; }
+  a{ color:var(--azul2); text-decoration:none; }
+
+  /* ---------- Portada ---------- */
+  .cover{
+    height:297mm; padding:38mm 24mm 24mm; color:#fff;
+    background:linear-gradient(150deg,#10265c 0%,#1e3a8a 55%,#2563EB 100%);
+    display:flex; flex-direction:column; justify-content:space-between;
+    page-break-after:always;
+  }
+  .cover .brand{ font-size:13pt; letter-spacing:.28em; opacity:.85; text-transform:uppercase; }
+  .cover h1{ color:#fff; font-size:40pt; margin:.2em 0 0; line-height:1.1; }
+  .cover .sub{ font-size:15pt; opacity:.9; margin-top:10px; max-width:130mm; }
+  .cover .meta{ font-size:10.5pt; opacity:.8; line-height:1.9; }
+  .cover .ring{ width:70px; height:70px; border:3px solid rgba(255,255,255,.5); border-radius:50%; position:relative; }
+  .cover .ring::after{ content:""; position:absolute; width:30px; height:3px; background:#fff; top:32px; left:33px; transform:rotate(-40deg); transform-origin:left; border-radius:2px; }
+  .cover .ring::before{ content:""; position:absolute; width:12px;height:12px;background:#fff;border-radius:50%; top:29px;left:29px; }
+
+  /* ---------- Índice ---------- */
+  .toc{ page-break-after:always; }
+  .toc ol{ list-style:none; padding:0; counter-reset:s; }
+  .toc > ol > li{ counter-increment:s; margin:.5em 0; font-weight:600; font-size:12pt; }
+  .toc > ol > li::before{ content:counter(s) ".  "; color:var(--azul2); font-weight:700; }
+  .toc ul{ list-style:none; padding-left:1.6em; margin:.2em 0 .6em; }
+  .toc ul li{ font-weight:400; font-size:10.5pt; color:var(--gris); margin:.15em 0; }
+  .toc ul li::before{ content:"– "; color:var(--linea); }
+
+  /* ---------- Secciones ---------- */
+  section{ page-break-before:always; }
+  .lead{ font-size:11.5pt; color:var(--gris); margin:.2em 0 1em; }
+
+  .fig{ margin:1em 0 1.2em; page-break-inside:avoid; }
+  .fig .frame{
+    border:1px solid var(--linea); border-radius:8px; overflow:hidden;
+    background:#f8fafc; box-shadow:0 1px 3px rgba(15,23,42,.08);
+  }
+  .fig .frame.crop{ max-height:135mm; }
+  .fig .frame img{ display:block; width:100%; }
+  .fig .frame.crop img{ object-fit:cover; object-position:top; height:135mm; }
+  .fig figcaption{ font-size:9.5pt; color:var(--gris); margin-top:6px; }
+  .fig figcaption b{ color:var(--azul); }
+
+  .steps{ counter-reset:p; list-style:none; padding:0; }
+  .steps > li{
+    counter-increment:p; position:relative; padding-left:34px; margin:.55em 0;
+    page-break-inside:avoid;
+  }
+  .steps > li::before{
+    content:counter(p); position:absolute; left:0; top:-1px;
+    width:23px; height:23px; background:var(--azul2); color:#fff;
+    border-radius:50%; font-size:10pt; font-weight:700;
+    display:flex; align-items:center; justify-content:center;
+  }
+
+  .box{ border-radius:8px; padding:10px 14px 10px 40px; margin:.9em 0; font-size:10.5pt; position:relative; page-break-inside:avoid; }
+  .box::before{ position:absolute; left:12px; top:9px; font-size:14pt; }
+  .box.tip{ background:#ecfdf5; border:1px solid #a7f3d0; }
+  .box.tip::before{ content:"\1F4A1"; }
+  .box.warn{ background:#fffbeb; border:1px solid #fde68a; }
+  .box.warn::before{ content:"\26A0\FE0F"; }
+  .box.info{ background:#eff6ff; border:1px solid #bfdbfe; }
+  .box.info::before{ content:"\2139\FE0F"; }
+
+  table{ border-collapse:collapse; width:100%; font-size:10pt; margin:.8em 0; page-break-inside:avoid; }
+  th,td{ border:1px solid var(--linea); padding:6px 9px; text-align:left; vertical-align:top; }
+  th{ background:var(--azul); color:#fff; font-weight:600; }
+  tr:nth-child(even) td{ background:var(--suave); }
+
+  .legend{ font-size:10pt; margin:.4em 0 0; padding-left:0; list-style:none; }
+  .legend li{ margin:.2em 0; padding-left:26px; position:relative; }
+  .legend li b{ position:absolute; left:0; top:0; width:18px; height:18px; background:var(--tinta); color:#fff; border-radius:50%; font-size:9pt; display:flex; align-items:center; justify-content:center; }
+
+  .kbd{ display:inline-block; border:1px solid var(--linea); border-bottom-width:2px; border-radius:4px; padding:0 5px; font-size:.85em; background:#fff; }
+  .role{ display:inline-block; font-size:8.5pt; font-weight:700; padding:1px 7px; border-radius:999px; background:var(--suave); border:1px solid var(--linea); color:var(--gris); }
+  .footer-note{ margin-top:2em; padding-top:8px; border-top:1px solid var(--linea); font-size:9pt; color:var(--gris); }
+</style>
+</head>
+<body>
+
+<!-- ============ PORTADA ============ -->
+<div class="cover">
+  <div>
+    <div class="ring"></div>
+    <div class="brand" style="margin-top:26px">Metrología · Sistema ERP</div>
+    <h1>Manual del<br>Sistema</h1>
+    <div class="sub">Guía paso a paso de todos los módulos. Escrita para que cualquier persona del laboratorio pueda usar el sistema sin ayuda.</div>
+  </div>
+  <div class="meta">
+    Versión del documento: 1.0 &nbsp;·&nbsp; Septiembre 2026<br>
+    Aplica a: Metrología (frontend) + API de Metrología (backend)<br>
+    Uso interno del laboratorio
+  </div>
+</div>
+
+<!-- ============ ÍNDICE ============ -->
+<div class="toc">
+  <h2>Índice</h2>
+  <ol>
+    <li><a href="#s1">Antes de empezar</a>
+      <ul><li>Qué es el sistema</li><li>Requisitos</li><li>Roles y qué puede ver cada uno</li></ul>
+    </li>
+    <li><a href="#s2">Entrar y salir del sistema</a>
+      <ul><li>Iniciar sesión</li><li>Cerrar sesión</li><li>Cambiar mi contraseña, foto y firma</li></ul>
+    </li>
+    <li><a href="#s3">Cómo moverse por el sistema</a>
+      <ul><li>Las 3 zonas de la pantalla</li><li>Menú lateral</li><li>Búsqueda global</li><li>Modo oscuro</li></ul>
+    </li>
+    <li><a href="#s4">Panel general (Dashboard)</a></li>
+    <li><a href="#s5">Clientes</a></li>
+    <li><a href="#s6">Cotizaciones</a></li>
+    <li><a href="#s7">Reportes de Servicio</a>
+      <ul><li>Crear un reporte</li><li>Asignar equipos</li><li>Seguimiento de estados</li><li>Mis Asignaciones</li><li>Exportar</li></ul>
+    </li>
+    <li><a href="#s8">Equipos</a>
+      <ul><li>Alta de equipo</li><li>Consultar y etiqueta QR</li><li>Historial de certificados</li></ul>
+    </li>
+    <li><a href="#s9">Patrones</a>
+      <ul><li>Alta de patrón</li><li>Incertidumbre, deriva y calibración</li><li>Certificado del patrón</li></ul>
+    </li>
+    <li><a href="#s10">Performance</a></li>
+    <li><a href="#s11">Incertidumbre</a>
+      <ul><li>Análisis de incertidumbre (GUM)</li><li>Plantillas de incertidumbre</li></ul>
+    </li>
+    <li><a href="#s12">Certificados de Calibración</a>
+      <ul><li>Emitir un certificado</li><li>Informe imprimible</li><li>Verificación pública por QR</li></ul>
+    </li>
+    <li><a href="#s13">Calidad</a></li>
+    <li><a href="#s14">Cuentas por Cobrar</a></li>
+    <li><a href="#s15">Actividades</a></li>
+    <li><a href="#s16">Administración</a>
+      <ul><li>Usuarios</li><li>Datos del Laboratorio</li><li>Razones Sociales</li><li>Colores</li><li>Roles del Menú</li><li>Auditoría</li></ul>
+    </li>
+    <li><a href="#s17">Preguntas frecuentes y problemas comunes</a></li>
+    <li><a href="#s18">Glosario</a></li>
+  </ol>
+</div>
+
+<!-- ============ 1. ANTES DE EMPEZAR ============ -->
+<section id="s1">
+  <h2>1 · Antes de empezar</h2>
+  <p class="lead">Lee esta página una sola vez. Te ahorra la mayoría de las dudas.</p>
+
+  <h3>¿Qué es el sistema?</h3>
+  <p>Es el sistema con el que el laboratorio lleva <strong>todo el ciclo de un servicio de calibración</strong>, desde que el cliente pide una cotización hasta que se entrega el certificado y se cobra la factura. Reemplaza hojas de Excel sueltas y el sistema anterior en PHP.</p>
+  <p>El flujo normal es este:</p>
+  <p style="text-align:center; font-size:10.5pt; background:var(--suave); border:1px solid var(--linea); border-radius:8px; padding:12px">
+    <strong>Cliente</strong> &nbsp;→&nbsp; <strong>Cotización</strong> &nbsp;→&nbsp; <strong>Reporte de Servicio</strong> &nbsp;→&nbsp; <strong>Asignación</strong> de equipo a un técnico
+    &nbsp;→&nbsp; <strong>Calibración</strong> + <strong>Incertidumbre</strong> &nbsp;→&nbsp; <strong>Certificado</strong> &nbsp;→&nbsp; <strong>Entrega</strong> &nbsp;→&nbsp; <strong>Cobranza</strong>
+  </p>
+
+  <h3>Requisitos</h3>
+  <ul>
+    <li>Una computadora con <strong>Google Chrome</strong> o <strong>Microsoft Edge</strong> actualizado. También funciona en tablet.</li>
+    <li>La <strong>dirección del sistema</strong> (URL) que te dé el administrador, y tu <strong>usuario y contraseña</strong>.</li>
+    <li>Conexión a internet. Si se cae la conexión, el sistema avisa; espera y vuelve a intentar.</li>
+  </ul>
+
+  <h3>Roles: qué puede hacer cada quien</h3>
+  <p>Tu <strong>rol</strong> decide qué opciones del menú ves. Si no ves una opción que este manual menciona, es porque tu rol no la tiene: pídesela al administrador.</p>
+  <table>
+    <tr><th>Rol</th><th>Para quién</th><th>Qué ve, a grandes rasgos</th></tr>
+    <tr><td><span class="role">Admin</span></td><td>Responsable del sistema</td><td>Todo, incluyendo <strong>Administración</strong> (usuarios, colores, permisos, auditoría).</td></tr>
+    <tr><td><span class="role">Coordinador</span></td><td>Jefe de laboratorio</td><td>Todo lo operativo y comercial. <strong>No</strong> ve Administración.</td></tr>
+    <tr><td><span class="role">Ventas</span></td><td>Área comercial</td><td>Clientes, Cotizaciones, Cuentas por Cobrar y consulta de Reportes/Equipos.</td></tr>
+    <tr><td><span class="role">Técnico</span></td><td>Quien calibra</td><td>Reportes y sus asignaciones, Equipos, Patrones (consulta), Performance e Incertidumbre.</td></tr>
+  </table>
+  <div class="box info">El administrador puede cambiar en vivo qué rol ve cada opción desde <strong>Administración → Roles del Menú</strong>. Por eso dos laboratorios pueden tener el menú distinto.</div>
+</section>
+
+<!-- ============ 2. ENTRAR Y SALIR ============ -->
+<section id="s2">
+  <h2>2 · Entrar y salir del sistema</h2>
+
+  <h3>2.1 Iniciar sesión</h3>
+  <figure class="fig">
+    <div class="frame"><img src="manual-assets/login.png" alt="Pantalla de inicio de sesión"></div>
+    <figcaption><b>Pantalla de inicio de sesión.</b> Es lo primero que aparece si todavía no has entrado.</figcaption>
+  </figure>
+  <ol class="steps">
+    <li>Abre el navegador y escribe la <strong>dirección del sistema</strong> que te dieron.</li>
+    <li>En <strong>Usuario</strong> escribe tu nombre de usuario (sin espacios, normalmente en minúsculas).</li>
+    <li>En <strong>Contraseña</strong> escribe tu contraseña. El icono del ojo <span class="kbd">👁</span> te deja verla para revisar que no haya errores.</li>
+    <li>Haz clic en <strong>Iniciar sesión</strong>. Si los datos son correctos, entras al <strong>Panel general</strong>.</li>
+  </ol>
+  <div class="box warn">Si te equivocas de contraseña varias veces seguidas, el sistema te bloquea unos minutos por seguridad. Espera y vuelve a intentar; no sigas probando.</div>
+  <div class="box tip">¿Olvidaste tu contraseña? El sistema no tiene "recuperar contraseña" por correo. Pídele al <strong>administrador</strong> que te ponga una nueva desde <em>Administración → Usuarios</em>.</div>
+
+  <h3>2.2 Cerrar sesión</h3>
+  <p>Arriba a la derecha, haz clic en <strong>Cerrar sesión</strong> (texto rojo). Hazlo siempre si usas una computadora compartida.</p>
+
+  <h3>2.3 Cambiar mi contraseña, mi foto y mi firma</h3>
+  <figure class="fig">
+    <div class="frame"><img src="manual-assets/menu-perfil.png" alt="Menú de configuración de la cuenta"></div>
+    <figcaption><b>Menú de mi cuenta.</b> Se abre con el icono de <b>engrane ⚙</b> de la barra superior.</figcaption>
+  </figure>
+  <ol class="steps">
+    <li>Haz clic en el <strong>engrane ⚙</strong> arriba a la derecha.</li>
+    <li>Elige la opción que necesites:
+      <ul>
+        <li><strong>Cambiar contraseña</strong> — pide la actual y la nueva (dos veces).</li>
+        <li><strong>Foto de perfil</strong> — sube una imagen; aparece como tu avatar.</li>
+        <li><strong>Firma digital</strong> — sube la imagen de tu firma. <strong>Importante:</strong> esta firma es la que sale en los certificados que tú revisas o autorizas.</li>
+        <li><strong>Mis últimos inicios de sesión</strong> — para revisar si alguien más usó tu cuenta.</li>
+      </ul>
+    </li>
+  </ol>
+  <div class="box info">La contraseña nueva debe cumplir la política mínima (longitud y complejidad). Si el sistema la rechaza, usa una más larga con mayúsculas, números y un símbolo.</div>
+</section>
+
+<!-- ============ 3. CÓMO MOVERSE ============ -->
+<section id="s3">
+  <h2>3 · Cómo moverse por el sistema</h2>
+  <p class="lead">Todas las pantallas tienen la misma estructura. Si entiendes esta, entiendes todas.</p>
+
+  <figure class="fig">
+    <div class="frame"><img src="manual-assets/dashboard.png" alt="Estructura general de la pantalla"></div>
+    <figcaption><b>Las tres zonas de la pantalla.</b></figcaption>
+  </figure>
+  <ul class="legend">
+    <li><b>1</b><strong>Menú lateral</strong> (izquierda, oscuro): todos los módulos, agrupados por sección. El módulo abierto se resalta en azul.</li>
+    <li><b>2</b><strong>Barra superior</strong>: botón para ocultar el menú (☰), <strong>búsqueda global</strong>, <strong>modo oscuro</strong> (🌙), <strong>engrane</strong> de mi cuenta ⚙, mi nombre y <strong>Cerrar sesión</strong>.</li>
+    <li><b>3</b><strong>Área de trabajo</strong>: el contenido del módulo. Arriba lleva el <strong>título</strong> y, a la derecha, los <strong>botones de acción</strong> (por ejemplo "Nuevo", "Exportar").</li>
+  </ul>
+
+  <h3>3.1 Menú lateral</h3>
+  <ul>
+    <li>Los módulos con una <strong>flecha ›</strong> tienen submenú: haz clic para desplegarlo.</li>
+    <li>El botón <strong>☰</strong> de la barra superior <strong>oculta o muestra</strong> el menú para tener más espacio.</li>
+  </ul>
+
+  <h3>3.2 Búsqueda global</h3>
+  <figure class="fig">
+    <div class="frame"><img src="manual-assets/busqueda-global.png" alt="Búsqueda global"></div>
+    <figcaption><b>Buscar en todo el sistema.</b> Escribe un folio, un cliente, un equipo… y salta directo al resultado.</figcaption>
+  </figure>
+  <ol class="steps">
+    <li>Haz clic en la barra <strong>"Buscar en todo el sistema…"</strong> (o pulsa <span class="kbd">Ctrl</span>+<span class="kbd">K</span>).</li>
+    <li>Escribe lo que buscas: un folio de reporte, el nombre de un cliente, el ID de un equipo, etc.</li>
+    <li>Haz clic en un resultado para ir a esa ficha.</li>
+  </ol>
+
+  <h3>3.3 Modo oscuro</h3>
+  <p>El icono de <strong>luna/sol</strong> en la barra superior cambia entre tema claro y oscuro. Es una preferencia personal y se recuerda en tu navegador.</p>
+  <figure class="fig">
+    <div class="frame"><img src="manual-assets/dashboard-oscuro.png" alt="Dashboard en modo oscuro"></div>
+    <figcaption>El mismo Panel general en <b>modo oscuro</b>.</figcaption>
+  </figure>
+
+  <div class="box tip">Las tablas se pueden <strong>ordenar</strong> haciendo clic en el encabezado de una columna, y casi todas tienen <strong>buscador</strong> y <strong>filtros</strong> arriba, además de <strong>paginación</strong> ("Filas: 10", "1–10 de 34") abajo a la derecha.</div>
+</section>
+
+<!-- ============ 4. DASHBOARD ============ -->
+<section id="s4">
+  <h2>4 · Panel general (Dashboard)</h2>
+  <p class="lead">Es la pantalla de inicio. Da un vistazo rápido del laboratorio.</p>
+  <figure class="fig">
+    <div class="frame"><img src="manual-assets/dashboard.png" alt="Panel general"></div>
+    <figcaption><b>Panel general.</b></figcaption>
+  </figure>
+  <ul>
+    <li><strong>Tarjetas de arriba</strong>: totales de Clientes, Cotizaciones, Reportes de servicio y Certificados. Haz clic en una para ir a ese módulo.</li>
+    <li><strong>Cotizaciones recientes</strong>: las últimas registradas; clic en una para abrirla.</li>
+    <li><strong>Cotizaciones por estado</strong>: cuántas hay pendientes, aprobadas, rechazadas, facturadas y vencidas.</li>
+    <li><strong>Manual del sistema</strong>: el recuadro con el botón <strong>"Descargar manual"</strong> abre este PDF.</li>
+  </ul>
+  <div class="box info">El técnico y otros roles sin permiso comercial no ven las tarjetas ni los bloques de Clientes/Cotizaciones. Es normal.</div>
+</section>
+
+<!-- ============ 5. CLIENTES ============ -->
+<section id="s5">
+  <h2>5 · Clientes</h2>
+  <p class="lead"><span class="role">Admin</span> <span class="role">Coordinador</span> <span class="role">Ventas</span> &nbsp;·&nbsp; Menú: <strong>Clientes → Consultar Clientes / Nuevo Cliente</strong></p>
+
+  <h3>5.1 Consultar clientes</h3>
+  <figure class="fig">
+    <div class="frame"><img src="manual-assets/clientes.png" alt="Listado de clientes"></div>
+    <figcaption><b>Listado de clientes.</b> Buscador arriba; acciones por fila a la derecha.</figcaption>
+  </figure>
+  <ul>
+    <li>Escribe en el <strong>buscador</strong> el nombre o RFC para filtrar.</li>
+    <li>En cada fila, el icono de <strong>lápiz</strong> abre la ficha del cliente para editarla.</li>
+  </ul>
+
+  <h3>5.2 Alta de un cliente nuevo</h3>
+  <figure class="fig">
+    <div class="frame"><img src="manual-assets/cliente-nuevo.png" alt="Formulario de nuevo cliente"></div>
+    <figcaption><b>Formulario de cliente.</b> Los campos con <b>*</b> son obligatorios.</figcaption>
+  </figure>
+  <ol class="steps">
+    <li>Menú <strong>Clientes → Nuevo Cliente</strong>.</li>
+    <li>Llena <strong>Nombre / Razón social</strong> y <strong>RFC</strong> (obligatorios).</li>
+    <li>Agrega el <strong>domicilio fiscal</strong> y, si aplica, la <strong>sucursal</strong>.</li>
+    <li>En <strong>Contacto</strong> pon nombre, teléfono y el <strong>correo para cotizaciones</strong> (ahí llegan los envíos comerciales).</li>
+    <li>Haz clic en <strong>Guardar</strong>. El cliente ya se puede elegir al crear cotizaciones y reportes.</li>
+  </ol>
+  <div class="box warn">El RFC no se puede repetir. Si el sistema dice que ya existe, búscalo en el listado en vez de crear un duplicado.</div>
+</section>
+
+<!-- ============ 6. COTIZACIONES ============ -->
+<section id="s6">
+  <h2>6 · Cotizaciones</h2>
+  <p class="lead"><span class="role">Admin</span> <span class="role">Coordinador</span> <span class="role">Ventas</span> &nbsp;·&nbsp; Menú: <strong>Cotizaciones</strong></p>
+  <figure class="fig">
+    <div class="frame"><img src="manual-assets/cotizaciones.png" alt="Listado de cotizaciones"></div>
+    <figcaption><b>Listado de cotizaciones</b>, con filtros por mes, año, cliente y estado.</figcaption>
+  </figure>
+
+  <h3>6.1 Crear una cotización</h3>
+  <ol class="steps">
+    <li>Clic en <strong>Nueva Cotización</strong> (arriba a la derecha).</li>
+    <li>Elige el <strong>cliente</strong>. Si no existe, créalo primero en Clientes.</li>
+    <li>Agrega los <strong>conceptos</strong> (servicios de calibración): descripción, cantidad y precio unitario. El sistema calcula el subtotal, IVA y total.</li>
+    <li>Revisa <strong>vigencia</strong> y <strong>condiciones</strong>.</li>
+    <li><strong>Guardar</strong>. La cotización nace en estado <strong>Pendiente</strong>.</li>
+  </ol>
+
+  <h3>6.2 Estados de una cotización</h3>
+  <table>
+    <tr><th>Estado</th><th>Qué significa</th></tr>
+    <tr><td>Pendiente</td><td>Creada, aún sin respuesta del cliente.</td></tr>
+    <tr><td>Aprobada</td><td>El cliente la aceptó. Ya se le puede abrir un Reporte de Servicio.</td></tr>
+    <tr><td>Rechazada</td><td>El cliente no la tomó.</td></tr>
+    <tr><td>Facturada</td><td>Se generó la factura correspondiente.</td></tr>
+    <tr><td>Vencida</td><td>Pasó su fecha de vigencia sin aprobarse.</td></tr>
+  </table>
+
+  <h3>6.3 Imprimir / enviar</h3>
+  <ol class="steps">
+    <li>Abre la cotización desde el listado.</li>
+    <li>Usa el botón <strong>Imprimir</strong> (icono PDF). Se abre una vista en formato carta.</li>
+    <li>En el navegador elige <strong>"Guardar como PDF"</strong> y ya lo puedes adjuntar en un correo al cliente.</li>
+  </ol>
+  <div class="box tip">Cuando un reporte nace desde una cotización aprobada, quedan <strong>ligados</strong>: desde el reporte puedes abrir la cotización con un clic, y viceversa.</div>
+</section>
+
+<!-- ============ 7. REPORTES DE SERVICIO ============ -->
+<section id="s7">
+  <h2>7 · Reportes de Servicio</h2>
+  <p class="lead">Todos los roles &nbsp;·&nbsp; Menú: <strong>Reportes → Consultar</strong>. El Reporte de Servicio es el "expediente" de un ingreso de equipos del cliente.</p>
+
+  <h3>7.1 El listado</h3>
+  <figure class="fig">
+    <div class="frame"><img src="manual-assets/reportes.png" alt="Listado de reportes de servicio"></div>
+    <figcaption><b>Listado de Reportes de Servicio.</b></figcaption>
+  </figure>
+  <ul class="legend">
+    <li><b>1</b>Tarjetas resumen: cuántos hay en proceso, terminados y entregados.</li>
+    <li><b>2</b>Filtros: buscador por folio/OC/factura, mes, año y estado.</li>
+    <li><b>3</b>Columna <strong>Reporte de Servicio</strong>: el folio en azul; clic para abrir el detalle.</li>
+    <li><b>4</b>Columna <strong>Descargar</strong>: el icono PDF rojo genera el Reporte de Servicio imprimible.</li>
+    <li><b>5</b>Columna <strong>Cotización</strong>: si el reporte viene de una, aquí está el enlace.</li>
+  </ul>
+
+  <h3>7.2 Crear un reporte</h3>
+  <p class="lead"><span class="role">Admin</span> <span class="role">Coordinador</span> <span class="role">Ventas</span></p>
+  <ol class="steps">
+    <li>Clic en <strong>Nuevo Reporte</strong>.</li>
+    <li>Elige el <strong>cliente</strong>.</li>
+    <li>Opcional: escribe la <strong>Orden de Compra</strong> y unas <strong>observaciones</strong>.</li>
+    <li><strong>Crear</strong>. El sistema le pone un <strong>folio</strong> (por ejemplo <code>REP-2026-0004</code>) y te lleva al detalle.</li>
+  </ol>
+
+  <h3>7.3 El detalle del reporte</h3>
+  <figure class="fig">
+    <div class="frame"><img src="manual-assets/reporte-detalle.png" alt="Detalle de un reporte de servicio"></div>
+    <figcaption><b>Detalle del reporte.</b> Desde aquí se hace todo el trabajo del servicio.</figcaption>
+  </figure>
+  <ul class="legend">
+    <li><b>1</b><strong>Datos del cliente y del reporte</strong>: cliente, contacto, OC, y el campo <strong>Factura</strong> (se guarda con su botón).</li>
+    <li><b>2</b><strong>Estado del reporte</strong> (En proceso / Terminado…) y los botones <strong>PDF</strong>: Reporte de Servicio, Entrega de equipo, Entrega de certificados y Paquete de certificados.</li>
+    <li><b>3</b><strong>Recolección de equipos</strong>: marca si cada equipo está en sitio / en laboratorio / recolectado, con notas de ubicación.</li>
+    <li><b>4</b><strong>Selecciona el equipo a calibrar</strong>: aquí se crean las asignaciones (ver 7.4).</li>
+    <li><b>5</b><strong>Asignaciones</strong>: una tarjeta por equipo, con su barra de 3 pasos (Calibración → Entrega → Certificado) y sus selectores de estado.</li>
+    <li><b>6</b><strong>Comentarios</strong> e <strong>Historial</strong> (quién hizo qué y cuándo).</li>
+  </ul>
+
+  <h3>7.4 Asignar un equipo al reporte</h3>
+  <ol class="steps">
+    <li>En <strong>"Selecciona el equipo a calibrar"</strong>, elige el <strong>Técnico</strong> que hará el trabajo.</li>
+    <li>Elige el <strong>Equipo</strong> del cliente. Si no aparece, primero da de alta el equipo (ver sección 8) con ese cliente.</li>
+    <li>Elige el o los <strong>Patrones</strong> que se usarán. Si un patrón está <strong>vencido</strong>, el sistema avisa y no deja emitir el certificado con él.</li>
+    <li>Opcional: elige la <strong>plantilla de Performance</strong> a aplicar.</li>
+    <li>Clic en <strong>Asignar</strong>. Aparece una tarjeta nueva en <strong>Asignaciones</strong>.</li>
+  </ol>
+  <div class="box warn">Un mismo equipo no se puede asignar dos veces al mismo reporte. Si necesitas "como se encontró" y "como se dejó", eso se maneja dentro del cálculo de incertidumbre, no con dos asignaciones.</div>
+
+  <h3>7.5 Llevar el seguimiento (los 3 estados)</h3>
+  <p>Cada asignación tiene tres selectores. Cámbialos conforme avanza el trabajo:</p>
+  <table>
+    <tr><th>Dominio</th><th>Valores</th><th>Quién</th></tr>
+    <tr><td><strong>Calibración</strong></td><td>Pendiente → En proceso → Terminada</td><td>El técnico</td></tr>
+    <tr><td><strong>Entrega</strong></td><td>Pendiente → Entregado</td><td>Técnico / Coordinador</td></tr>
+    <tr><td><strong>Certificado</strong></td><td>Sin generar → En revisión → Autorizado</td><td>Se mueve solo al emitir/autorizar el certificado</td></tr>
+  </table>
+  <p>El botón <strong>Subir gráfica</strong> de cada asignación permite adjuntar la imagen de la gráfica de calibración que después sale en el informe.</p>
+
+  <h3>7.6 Cerrar el reporte</h3>
+  <p>Cuando todas las asignaciones están entregadas y con certificado, usa <strong>Finalizar Reporte</strong> (abajo a la derecha). Si necesitas reabrirlo, usa <strong>Reabrir</strong> junto al estado.</p>
+
+  <h3>7.7 Mis Asignaciones</h3>
+  <p class="lead"><span class="role">Admin</span> <span class="role">Coordinador</span> <span class="role">Técnico</span> &nbsp;·&nbsp; Menú: <strong>Reportes → Mis Asignaciones</strong></p>
+  <figure class="fig">
+    <div class="frame"><img src="manual-assets/reportes-mis-asignaciones.png" alt="Mis asignaciones"></div>
+    <figcaption><b>Mis Asignaciones.</b> El técnico ve aquí, en un solo lugar, todo lo que tiene pendiente de calibrar.</figcaption>
+  </figure>
+
+  <h3>7.8 Exportar</h3>
+  <p class="lead"><span class="role">Admin</span> <span class="role">Coordinador</span> <span class="role">Ventas</span> &nbsp;·&nbsp; Menú: <strong>Reportes → Exportar</strong></p>
+  <p>Genera un listado (CSV/Excel) de reportes por rango de fechas y estado, para conciliaciones o reportes a dirección.</p>
+</section>
+
+<!-- ============ 8. EQUIPOS ============ -->
+<section id="s8">
+  <h2>8 · Equipos</h2>
+  <p class="lead">Todos los roles &nbsp;·&nbsp; Menú: <strong>Equipos</strong>. Son los instrumentos <em>del cliente</em> que se calibran.</p>
+
+  <h3>8.1 Consultar equipos</h3>
+  <figure class="fig">
+    <div class="frame"><img src="manual-assets/equipos.png" alt="Listado de equipos"></div>
+    <figcaption><b>Listado de equipos.</b></figcaption>
+  </figure>
+  <ul>
+    <li>Filtra por <strong>cliente</strong>, <strong>categoría</strong> o texto.</li>
+    <li>Iconos por fila: <strong>lápiz</strong> para editar y <strong>QR</strong> para la etiqueta (ver 8.3).</li>
+  </ul>
+
+  <h3>8.2 Alta de equipo</h3>
+  <figure class="fig">
+    <div class="frame"><img src="manual-assets/equipo-alta.png" alt="Formulario de alta de equipo"></div>
+    <figcaption><b>Alta de equipo.</b></figcaption>
+  </figure>
+  <ol class="steps">
+    <li>Menú <strong>Equipos → Alta de Equipo</strong> (o el botón <strong>+</strong> en el listado).</li>
+    <li>Elige el <strong>cliente</strong> dueño del equipo.</li>
+    <li>Captura <strong>ID interno</strong>, <strong>marca</strong>, <strong>modelo</strong>, <strong>serie</strong> y <strong>descripción</strong>.</li>
+    <li>Elige la <strong>categoría</strong> (Dimensional, Presión, Masa, …) y el <strong>subtipo</strong> si aplica.</li>
+    <li>Datos metrológicos: <strong>unidades</strong>, <strong>división mínima / resolución</strong>, <strong>rango</strong>, <strong>rango de calibración</strong> y <strong>accuracy / EMP</strong>.</li>
+    <li>Opcional: <strong>patrones sugeridos</strong> — se preseleccionan al asignar el equipo en un reporte.</li>
+    <li><strong>Guardar</strong>.</li>
+  </ol>
+
+  <h3>8.3 Etiqueta con QR</h3>
+  <ol class="steps">
+    <li>En el listado de equipos, clic en el icono <strong>QR</strong> de la fila.</li>
+    <li>Elige el <strong>tamaño</strong> de etiqueta (50×30 mm es el estándar).</li>
+    <li><strong>Imprimir</strong> (a escala 1:1) o <strong>Descargar</strong>. El QR lleva a la ficha interna del equipo.</li>
+  </ol>
+
+  <h3>8.4 Historial de certificados</h3>
+  <p class="lead"><span class="role">Admin</span> <span class="role">Coordinador</span> <span class="role">Técnico</span> &nbsp;·&nbsp; Menú: <strong>Equipos → Historial Certificados</strong></p>
+  <figure class="fig">
+    <div class="frame"><img src="manual-assets/historial-certificados.png" alt="Historial de certificados"></div>
+    <figcaption><b>Historial de certificados</b> y revisión de próximos vencimientos.</figcaption>
+  </figure>
+</section>
+
+<!-- ============ 9. PATRONES ============ -->
+<section id="s9">
+  <h2>9 · Patrones</h2>
+  <p class="lead">Alta: <span class="role">Admin</span> <span class="role">Coordinador</span> &nbsp;·&nbsp; Consulta: también <span class="role">Técnico</span> &nbsp;·&nbsp; Menú: <strong>Equipos → Consultar Patrones / Alta de Patrón</strong>. Son los instrumentos de referencia <em>del laboratorio</em>.</p>
+
+  <h3>9.1 Consultar patrones</h3>
+  <figure class="fig">
+    <div class="frame"><img src="manual-assets/patrones.png" alt="Listado de patrones"></div>
+    <figcaption><b>Listado de patrones.</b> La columna <b>Estado</b> muestra Vigente / Por vencer / Vencido.</figcaption>
+  </figure>
+  <table>
+    <tr><th>Estado</th><th>Regla</th></tr>
+    <tr><td><b style="color:var(--ok)">Vigente</b></td><td>Faltan más de 30 días para el vencimiento.</td></tr>
+    <tr><td><b style="color:var(--warn)">Por vencer</b></td><td>Faltan 30 días o menos.</td></tr>
+    <tr><td><b style="color:var(--err)">Vencido</b></td><td>Ya pasó la fecha. No se puede usar para emitir certificados.</td></tr>
+  </table>
+
+  <h3>9.2 Alta de patrón</h3>
+  <figure class="fig">
+    <div class="frame"><img src="manual-assets/patron-alta.png" alt="Formulario de alta de patrón"></div>
+    <figcaption><b>Alta de patrón.</b> Está dividido en tarjetas: Información general, Metrología, Incertidumbre del certificado, Calibración y vigencia, Operación.</figcaption>
+  </figure>
+  <ol class="steps">
+    <li><strong>Información general</strong>: código (p. ej. <code>PAT-001</code>), nombre, estado, descripción, categoría, magnitud, marca, modelo, serie.</li>
+    <li><strong>Metrología</strong>: unidad, intervalo de medición y resolución.</li>
+    <li><strong>Incertidumbre del certificado del patrón</strong> — es la <em>U</em> que informa el certificado del patrón, con su <em>k</em>. El motor de incertidumbre usa <code>u = U / k</code>. Elige el <strong>modo</strong>:
+      <ul>
+        <li><strong>Fija</strong>: un solo valor de <em>U</em> para todo el intervalo.</li>
+        <li><strong>Tabla por punto</strong>: pares <code>{nominal, U}</code>; el motor <strong>interpola</strong> entre ellos.</li>
+      </ul>
+    </li>
+    <li><strong>Deriva (opcional)</strong>: cuánto cambió el patrón entre calibraciones y en cuántos meses. Se convierte en una contribución rectangular.</li>
+    <li><strong>Calibración y vigencia</strong>: trazabilidad (CENAM, NIST…), laboratorio que lo calibró, N° de certificado, fecha y periodicidad en meses. El <strong>vencimiento se calcula solo</strong> (fecha + periodicidad) y se muestra en gris.</li>
+    <li><strong>Operación</strong>: condiciones de referencia, manejo, procedimiento, transporte, almacenamiento.</li>
+    <li><strong>Guardar</strong>.</li>
+  </ol>
+
+  <h3>9.3 Adjuntar el certificado del patrón (PDF)</h3>
+  <ol class="steps">
+    <li>Guarda primero el patrón (el botón de subir está deshabilitado hasta entonces).</li>
+    <li>En <strong>Calibración y vigencia</strong>, clic en <strong>Subir certificado (PDF)</strong> y elige el archivo.</li>
+    <li>Queda una etiqueta con el nombre del archivo. Se puede descargar después desde la ficha del patrón.</li>
+  </ol>
+
+  <h3>9.4 Etiqueta QR del patrón</h3>
+  <p>Igual que con los equipos: en el listado de patrones, icono <strong>QR</strong> → tamaño → Imprimir / Descargar.</p>
+
+  <div class="box tip">Al asignar un equipo a un reporte, si el equipo trae <strong>patrones sugeridos</strong>, ya vienen preseleccionados. El presupuesto de incertidumbre toma automáticamente la <em>U</em> y la deriva del patrón elegido.</div>
+</section>
+
+<!-- ============ 10. PERFORMANCE ============ -->
+<section id="s10">
+  <h2>10 · Performance</h2>
+  <p class="lead"><span class="role">Admin</span> <span class="role">Coordinador</span> <span class="role">Técnico</span> &nbsp;·&nbsp; Menú: <strong>Performance → Consultar</strong></p>
+  <figure class="fig">
+    <div class="frame"><img src="manual-assets/performance.png" alt="Performance"></div>
+    <figcaption><b>Performance.</b> Registra el desempeño del instrumento en los puntos de calibración (lecturas, error, criterio PASA / NO PASA).</figcaption>
+  </figure>
+  <ul>
+    <li>Un registro de Performance se liga a una <strong>asignación</strong> (equipo dentro de un reporte).</li>
+    <li>Se capturan los <strong>puntos nominales</strong>, las <strong>lecturas</strong> y el <strong>EMP</strong>; el sistema calcula el error y marca <strong>PASA</strong> o <strong>NO PASA</strong>.</li>
+    <li>Estos puntos alimentan el <strong>informe de calibración</strong> del certificado.</li>
+  </ul>
+</section>
+
+<!-- ============ 11. INCERTIDUMBRE ============ -->
+<section id="s11">
+  <h2>11 · Incertidumbre</h2>
+  <p class="lead"><span class="role">Admin</span> <span class="role">Coordinador</span> <span class="role">Técnico</span> &nbsp;·&nbsp; Menú: <strong>Performance → Incertidumbre</strong> y <strong>Plantillas de Incertidumbre</strong>. Método <strong>GUM (JCGM 100:2008) + EA-4/02</strong>. El cálculo es determinístico: los mismos datos siempre dan el mismo resultado.</p>
+
+  <h3>11.1 Análisis de incertidumbre</h3>
+  <figure class="fig">
+    <div class="frame"><img src="manual-assets/incertidumbre.png" alt="Análisis de incertidumbre"></div>
+    <figcaption><b>Análisis de incertidumbre.</b> Izquierda: los datos. Derecha: el asistente de apoyo (no calcula, solo orienta).</figcaption>
+  </figure>
+  <ol class="steps">
+    <li><strong>Contexto de calibración</strong> (opcional pero recomendado): elige el <strong>Reporte de servicio</strong> y la <strong>Asignación (equipo)</strong>. Así el certificado recoge este cálculo automáticamente.</li>
+    <li><strong>Instrumento</strong>: elige <strong>Magnitud</strong>, <strong>Tipo de instrumento</strong> y una <strong>Plantilla</strong>. La plantilla precarga las contribuciones típicas.</li>
+    <li>Captura <strong>Mensurando</strong>, <strong>Unidad</strong>, <strong>Punto nominal</strong> y <strong>Nivel de confianza</strong> (por defecto 95.45%).</li>
+    <li><strong>Lecturas — repetibilidad (tipo A)</strong>: pega las lecturas separadas por espacio o coma. Con 2 o más, el motor añade la contribución de repetibilidad (grados de libertad <code>v = n − 1</code>).</li>
+    <li><strong>Presupuesto de incertidumbre</strong>: revisa/ajusta cada contribución (fuente, tipo A/B, modo, distribución, valor, divisor, coeficiente de sensibilidad, grados de libertad). Usa <strong>+ Componente</strong> para agregar una.</li>
+    <li>El bloque <strong>Resultado</strong> muestra la incertidumbre combinada y la <strong>expandida (U)</strong> con su <em>k</em>. Clic en <strong>Guardar cálculo</strong>.</li>
+    <li>Un cálculo guardado pasa por <strong>revisión</strong> y <strong>aprobación</strong> antes de usarse en un certificado.</li>
+  </ol>
+  <div class="box info">La contribución del <strong>patrón</strong> (su U y su deriva) la inyecta el motor automáticamente desde el patrón elegido en la asignación. No la captures a mano.</div>
+
+  <h3>11.2 Plantillas de incertidumbre</h3>
+  <p class="lead"><span class="role">Admin</span> <span class="role">Coordinador</span></p>
+  <figure class="fig">
+    <div class="frame"><img src="manual-assets/incertidumbre-plantillas.png" alt="Listado de plantillas de incertidumbre"></div>
+    <figcaption><b>Plantillas de incertidumbre.</b> Una plantilla es un presupuesto reutilizable por magnitud + tipo de instrumento.</figcaption>
+  </figure>
+  <figure class="fig">
+    <div class="frame"><img src="manual-assets/incertidumbre-plantilla-nueva.png" alt="Nueva plantilla de incertidumbre"></div>
+    <figcaption><b>Nueva plantilla.</b></figcaption>
+  </figure>
+  <ol class="steps">
+    <li>Menú <strong>Plantillas de Incertidumbre → Nueva</strong>.</li>
+    <li><strong>Información general</strong>: magnitud, tipo de instrumento, nombre de la plantilla, mensurando, unidad, rango típico, norma y nivel de confianza.</li>
+    <li><strong>Criterio de aceptación</strong>: EMP y regla de decisión (simple, o con banda de guarda).</li>
+    <li><strong>Contribuciones</strong>: agrega cada fuente de incertidumbre con <strong>+ Agregar contribución</strong> (fuente, símbolo, tipo, modo, distribución, valor sugerido, k, divisor, coef. de sensibilidad, grados de libertad, si es obligatoria).</li>
+    <li><strong>Guardar</strong>. La plantilla queda disponible al hacer un análisis para esa magnitud/instrumento.</li>
+  </ol>
+  <div class="box tip">Consejo: crea una plantilla por cada tipo de instrumento que calibras seguido (vernier, micrómetro, manómetro, balanza…). Ahorra capturar las mismas contribuciones cada vez.</div>
+</section>
+
+<!-- ============ 12. CERTIFICADOS ============ -->
+<section id="s12">
+  <h2>12 · Certificados de Calibración</h2>
+  <p class="lead"><span class="role">Admin</span> <span class="role">Coordinador</span> &nbsp;·&nbsp; Menú: <strong>Reportes → Certificados</strong></p>
+
+  <h3>12.1 El listado</h3>
+  <figure class="fig">
+    <div class="frame"><img src="manual-assets/certificados.png" alt="Listado de certificados"></div>
+    <figcaption><b>Certificados de calibración</b> emitidos, con su estado y vigencia.</figcaption>
+  </figure>
+
+  <h3>12.2 Emitir un certificado</h3>
+  <ol class="steps">
+    <li>El certificado se emite <strong>desde una asignación</strong> cuya calibración esté <strong>Terminada</strong> y que tenga sus cálculos de incertidumbre <strong>aprobados</strong>.</li>
+    <li>En el detalle del reporte, en la asignación, usa la acción de <strong>generar certificado</strong> (mueve el dominio "Certificado" a <em>En revisión</em>).</li>
+    <li>Al <strong>autorizar</strong> (rol calidad), el certificado toma un <strong>folio</strong>, un <strong>token público</strong> con QR y queda <strong>Vigente</strong>.</li>
+    <li>El certificado guarda un <strong>snapshot</strong> (copia congelada) del equipo, del cliente y de los patrones usados: aunque después cambien esos datos, el certificado no se altera.</li>
+  </ol>
+
+  <h3>12.3 Informe imprimible</h3>
+  <ol class="steps">
+    <li>Abre el certificado y usa <strong>Imprimir / PDF</strong>. Se abre el <strong>informe en formato MET</strong> (carta), con encabezado del laboratorio, datos del equipo, tabla de resultados por punto, gráfica de calibración, patrones utilizados y firmas.</li>
+    <li>En el navegador: destino <strong>"Guardar como PDF"</strong>, tamaño Carta o A4.</li>
+    <li>Las <strong>firmas</strong> que aparecen (Elaboró, Aprobación técnica, Calidad) son las imágenes de firma que cada usuario cargó en su perfil.</li>
+  </ol>
+
+  <h3>12.4 Verificación pública por QR</h3>
+  <p>Cada certificado lleva un <strong>QR</strong>. Al escanearlo, cualquier persona (sin usuario del sistema) llega a una página que confirma que el certificado es auténtico y muestra sus datos principales. Es la forma en que el cliente valida el documento.</p>
+  <div class="box warn">Nunca compartas el enlace de administración de un certificado. El enlace válido para el cliente es el del <strong>QR / verificación pública</strong>.</div>
+</section>
+
+<!-- ============ 13. CALIDAD ============ -->
+<section id="s13">
+  <h2>13 · Calidad</h2>
+  <p class="lead"><span class="role">Admin</span> <span class="role">Coordinador</span> &nbsp;·&nbsp; Menú: <strong>Calidad → Consultar</strong></p>
+  <figure class="fig">
+    <div class="frame"><img src="manual-assets/calidad.png" alt="Módulo de calidad"></div>
+    <figcaption><b>Calidad.</b> Seguimiento de los certificados en revisión y de los indicadores del sistema de gestión (ISO/IEC 17025).</figcaption>
+  </figure>
+</section>
+
+<!-- ============ 14. COBRANZA ============ -->
+<section id="s14">
+  <h2>14 · Cuentas por Cobrar</h2>
+  <p class="lead">Administrar pagos: <span class="role">Admin</span> <span class="role">Coordinador</span> &nbsp;·&nbsp; Consultar calendario: también <span class="role">Ventas</span> &nbsp;·&nbsp; Menú: <strong>Cuentas por Cobrar</strong></p>
+
+  <h3>14.1 Administrar pagos</h3>
+  <figure class="fig">
+    <div class="frame"><img src="manual-assets/cobranza.png" alt="Cobranza"></div>
+    <figcaption><b>Cuentas por Cobrar.</b> Facturas por cobrar, con su antigüedad y estatus.</figcaption>
+  </figure>
+  <ul>
+    <li>Registra <strong>pagos</strong> (total o parcial) contra cada factura.</li>
+    <li>El estatus cambia a <strong>Pagada</strong> cuando el saldo llega a cero.</li>
+  </ul>
+
+  <h3>14.2 Calendario de pagos</h3>
+  <figure class="fig">
+    <div class="frame"><img src="manual-assets/cobranza-calendario.png" alt="Calendario de pagos"></div>
+    <figcaption><b>Calendario de pagos.</b> Vencimientos esperados por día/semana; sirve para priorizar la gestión de cobranza.</figcaption>
+  </figure>
+</section>
+
+<!-- ============ 15. ACTIVIDADES ============ -->
+<section id="s15">
+  <h2>15 · Actividades</h2>
+  <p class="lead"><span class="role">Admin</span> <span class="role">Coordinador</span> &nbsp;·&nbsp; Menú: <strong>Actividades → Calendario</strong></p>
+  <figure class="fig">
+    <div class="frame"><img src="manual-assets/actividades.png" alt="Calendario de actividades"></div>
+    <figcaption><b>Calendario de actividades.</b> Visitas, recolecciones, entregas y pendientes del laboratorio.</figcaption>
+  </figure>
+  <ol class="steps">
+    <li>Clic en un <strong>día</strong> del calendario para crear una actividad.</li>
+    <li>Captura <strong>título</strong>, <strong>fecha/hora</strong>, <strong>responsable</strong> y notas.</li>
+    <li><strong>Guardar</strong>. La actividad aparece en el calendario y puede editarse haciendo clic sobre ella.</li>
+  </ol>
+</section>
+
+<!-- ============ 16. ADMINISTRACIÓN ============ -->
+<section id="s16">
+  <h2>16 · Administración</h2>
+  <p class="lead"><span class="role">Solo Admin</span> &nbsp;·&nbsp; Menú: <strong>Administración</strong>. Esta sección siempre es exclusiva del administrador: nadie puede quitarse ni darse permisos a sí mismo.</p>
+
+  <h3>16.1 Usuarios</h3>
+  <figure class="fig">
+    <div class="frame"><img src="manual-assets/admin-usuarios.png" alt="Administración de usuarios"></div>
+    <figcaption><b>Usuarios.</b></figcaption>
+  </figure>
+  <ol class="steps">
+    <li>Clic en <strong>Nuevo usuario</strong>.</li>
+    <li>Captura <strong>nombre</strong>, <strong>usuario</strong> (para entrar), <strong>correo</strong> y <strong>rol</strong>.</li>
+    <li>Asigna una <strong>contraseña inicial</strong>. Pídele a la persona que la cambie al primer ingreso.</li>
+    <li>El estatus <strong>Activo / Inactivo</strong> habilita o bloquea el acceso sin borrar la cuenta (así el historial sigue siendo legible).</li>
+  </ol>
+  <div class="box tip">Para "resetear" una contraseña olvidada: abre el usuario, escribe una contraseña nueva y guarda.</div>
+
+  <h3>16.2 Datos del Laboratorio</h3>
+  <figure class="fig">
+    <div class="frame"><img src="manual-assets/admin-laboratorio.png" alt="Datos del laboratorio"></div>
+    <figcaption><b>Datos del Laboratorio.</b> Nombre, acreditación, domicilio, logo. Aparecen en certificados, cotizaciones y documentos imprimibles.</figcaption>
+  </figure>
+
+  <h3>16.3 Razones Sociales</h3>
+  <figure class="fig">
+    <div class="frame"><img src="manual-assets/admin-razones-sociales.png" alt="Razones sociales"></div>
+    <figcaption><b>Razones Sociales.</b> Si el laboratorio factura con más de una razón social, se administran aquí.</figcaption>
+  </figure>
+
+  <h3>16.4 Colores</h3>
+  <figure class="fig">
+    <div class="frame"><img src="manual-assets/admin-colores.png" alt="Colores del sistema"></div>
+    <figcaption><b>Colores.</b> Color primario y secundario de la interfaz. El cambio se ve al instante para todos.</figcaption>
+  </figure>
+
+  <h3>16.5 Roles del Menú</h3>
+  <figure class="fig">
+    <div class="frame"><img src="manual-assets/admin-roles-menu.png" alt="Roles del menú"></div>
+    <figcaption><b>Roles del Menú.</b> Marca qué rol ve cada opción del menú. La sección Administración queda fuera a propósito.</figcaption>
+  </figure>
+  <ol class="steps">
+    <li>Busca la opción del menú en la lista.</li>
+    <li>Marca o desmarca las casillas de cada rol.</li>
+    <li><strong>Guardar</strong>. El cambio aplica de inmediato la próxima vez que cada usuario cargue el sistema.</li>
+  </ol>
+
+  <h3>16.6 Auditoría</h3>
+  <figure class="fig">
+    <div class="frame"><img src="manual-assets/admin-auditoria.png" alt="Auditoría"></div>
+    <figcaption><b>Auditoría.</b> Registro de acciones sensibles (quién, qué, cuándo): altas, cambios de estado, eliminaciones, accesos.</figcaption>
+  </figure>
+</section>
+
+<!-- ============ 17. FAQ ============ -->
+<section id="s17">
+  <h2>17 · Preguntas frecuentes y problemas comunes</h2>
+
+  <h3>No puedo entrar</h3>
+  <ul>
+    <li><strong>"Usuario o contraseña incorrectos"</strong>: revisa mayúsculas y que no haya espacios. Si sigues sin poder, pide al admin que te reponga la contraseña.</li>
+    <li><strong>"Demasiados intentos"</strong>: espera unos minutos; el bloqueo se quita solo.</li>
+    <li><strong>"No se pudo conectar con el servidor"</strong>: problema de red o el servidor está caído. Avisa a soporte.</li>
+  </ul>
+
+  <h3>No veo una opción del menú</h3>
+  <p>Tu rol no la tiene asignada. Pide al administrador que la habilite en <em>Administración → Roles del Menú</em>.</p>
+
+  <h3>No me deja emitir el certificado</h3>
+  <ul>
+    <li>La calibración de la asignación debe estar <strong>Terminada</strong>.</li>
+    <li>Los cálculos de incertidumbre deben estar <strong>aprobados</strong>.</li>
+    <li>Ningún patrón usado puede estar <strong>vencido</strong>. Revísalo en Patrones.</li>
+  </ul>
+
+  <h3>El equipo no aparece al asignarlo a un reporte</h3>
+  <p>El equipo debe estar dado de alta <strong>con el mismo cliente</strong> del reporte. Créalo en <em>Equipos → Alta de Equipo</em>.</p>
+
+  <h3>La firma no sale en el certificado</h3>
+  <p>Cada firmante debe cargar su imagen de firma en <em>engrane ⚙ → Firma digital</em>.</p>
+
+  <h3>El PDF sale con encabezados/pies del navegador</h3>
+  <p>Al imprimir, en "Más ajustes" del navegador desactiva <strong>"Encabezados y pies de página"</strong> y pon márgenes "Predeterminado".</p>
+
+  <h3>Cambié un dato del cliente y un certificado viejo no cambió</h3>
+  <p>Es correcto: los certificados guardan una copia congelada de los datos al momento de emitirse. No se actualizan hacia atrás.</p>
+</section>
+
+<!-- ============ 18. GLOSARIO ============ -->
+<section id="s18">
+  <h2>18 · Glosario</h2>
+  <table>
+    <tr><th>Término</th><th>Qué es</th></tr>
+    <tr><td><strong>Reporte de Servicio</strong></td><td>Expediente de un ingreso de equipos de un cliente. Agrupa todas las asignaciones.</td></tr>
+    <tr><td><strong>Asignación</strong></td><td>Un equipo concreto, dentro de un reporte, asignado a un técnico y a unos patrones.</td></tr>
+    <tr><td><strong>Patrón</strong></td><td>Instrumento de referencia del laboratorio, trazable, con el que se calibran los equipos del cliente.</td></tr>
+    <tr><td><strong>Trazabilidad</strong></td><td>Cadena documentada que liga la medición con un patrón nacional/internacional (CENAM, NIST…).</td></tr>
+    <tr><td><strong>Incertidumbre (U)</strong></td><td>Rango dentro del cual está el valor verdadero, con cierta probabilidad. <em>U</em> es la incertidumbre <strong>expandida</strong>.</td></tr>
+    <tr><td><strong>k</strong></td><td>Factor de cobertura. Para 95.45% de confianza, <em>k</em> ≈ 2. Relación: <code>u = U / k</code>.</td></tr>
+    <tr><td><strong>GUM</strong></td><td>Guía para la expresión de la incertidumbre de medida (JCGM 100:2008). El método que usa el sistema.</td></tr>
+    <tr><td><strong>EA-4/02</strong></td><td>Documento europeo que complementa la GUM para laboratorios de calibración.</td></tr>
+    <tr><td><strong>Contribución (tipo A / B)</strong></td><td>Cada fuente de incertidumbre. <strong>A</strong>: se estima con datos/estadística (repetibilidad). <strong>B</strong>: se estima de otra info (certificado, resolución, especificación).</td></tr>
+    <tr><td><strong>Deriva</strong></td><td>Cambio del patrón con el tiempo. Se incluye como contribución rectangular.</td></tr>
+    <tr><td><strong>EMP</strong></td><td>Error Máximo Permisible (MPE). Límite de aceptación del instrumento para decidir PASA / NO PASA.</td></tr>
+    <tr><td><strong>Snapshot</strong></td><td>Copia congelada de datos (equipo, cliente, patrones) guardada dentro del certificado al emitirlo.</td></tr>
+    <tr><td><strong>Token público</strong></td><td>Código del enlace/QR de verificación de un certificado, accesible sin iniciar sesión.</td></tr>
+  </table>
+
+  <div class="footer-note">
+    Manual del Sistema — Metrología · v1.0 · Septiembre 2026 · Uso interno.<br>
+    Las capturas de pantalla se tomaron con datos de demostración; los folios y valores que veas en el sistema serán distintos.
+  </div>
+</section>
+
+</body>
+</html>

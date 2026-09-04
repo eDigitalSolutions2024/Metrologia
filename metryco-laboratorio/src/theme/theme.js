@@ -72,6 +72,7 @@ export function crearTheme(coloresMarca = COLORES_MARCA_DEFAULT) {
   // @media (prefers-color-scheme: dark) en vez de activarse por selector.
   cssVariables: { colorSchemeSelector: "class" },
   colorSchemes: { light: { palette: light }, dark: { palette: dark } },
+  colorSchemeSelector: "class", // permite que el toggle claro/oscuro tenga efecto
   shape: { borderRadius: 14 },
   shadows: softShadows,
 

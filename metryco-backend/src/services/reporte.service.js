@@ -67,7 +67,7 @@ async function obtener(id) {
     .populate("equipo", "idInterno marca modelo serie descripcion categoria")
     .populate("tecnicoAsignado", "nombre usuario")
     .populate("tecnicoEjecutor", "nombre usuario")
-    .populate("patrones", "codigo nombre trazabilidad ultimaCalibracion");
+    .populate("patrones", "codigo nombre trazabilidad calibracion");
 
   return { reporte, asignaciones };
 }

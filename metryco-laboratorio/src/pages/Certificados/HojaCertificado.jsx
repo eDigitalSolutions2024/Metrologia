@@ -233,7 +233,7 @@ export default function HojaCertificado({ cert, ultima = true }) {
                 {cert.patronesSnapshot.map((p, i) => (
                   <tr key={i}>
                     <td>{p.codigo || "—"}</td>
-                    <td>{p.certificadoNo || "—"}</td>
+                    <td>{p.numeroCertificado || p.certificadoNo || "—"}</td>
                     <td>{p.nombre || "—"}</td>
                     <td>{p.modelo || "—"}</td>
                     <td>{formatDate(p.vencimiento)}</td>

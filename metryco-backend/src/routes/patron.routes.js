@@ -1,7 +1,7 @@
 const { Router } = require("express");
 const auth = require("../middleware/auth");
 const requireRole = require("../middleware/requireRole");
-const { pdfCertificado } = require("../middleware/upload");
+const { pdfPatron } = require("../middleware/upload");
 const validate = require("../middleware/validate");
 const auditar = require("../middleware/auditar");
 const { crearPatronSchema, actualizarPatronSchema } = require("../schemas/patron.schema");
@@ -21,7 +21,7 @@ router.get("/:id/qr.svg", c.qrSvg);
 // de alta ni edita el catálogo) — ventas tampoco lo administra, solo consulta.
 router.post("/", requireRole("admin", "coordinador"), validate(crearPatronSchema), c.crear);
 router.put("/:id", requireRole("admin", "coordinador"), validate(actualizarPatronSchema), c.actualizar);
-router.post("/:id/certificado", requireRole("admin", "coordinador"), pdfCertificado, c.adjuntarCertificado);
+router.post("/:id/certificado", requireRole("admin", "coordinador"), pdfPatron, c.adjuntarPdf);
 router.delete("/:id", requireRole("admin", "coordinador"), auditar("patron_eliminado", "Patron"), c.eliminar);
 
 module.exports = router;

@@ -99,7 +99,7 @@ async function obtener(reqUser) {
       patrones,
       (p) => ({
         id: p._id, ruta: `/equipos/patrones/${p._id}/editar`,
-        texto: `${p.codigo} — ${p.descripcion || p.nombre}`, detalle: `vence en ${diasHasta(p.ultimaCalibracion?.vencimiento)} días`,
+        texto: `${p.codigo} — ${p.descripcion || p.nombre}`, detalle: `vence en ${diasHasta(p.calibracion?.vencimiento)} días`,
       })
     ));
 

@@ -11,6 +11,21 @@ const { destinoGraficas } = require("../middleware/upload");
 
 const oid = (v) => (mongoose.isValidObjectId(v) ? new mongoose.Types.ObjectId(v) : null);
 
+/** Avisos sobre los patrones elegidos (vencidos / no activos). No bloquea. */
+async function avisosPatrones(ids = []) {
+  const _ids = ids.map(oid).filter(Boolean);
+  if (!_ids.length) return [];
+  const patrones = await Patron.find({ _id: { $in: _ids } });
+  const avisos = [];
+  for (const p of patrones) {
+    const v = p.estadoVigencia();
+    if (v === "vencido") avisos.push(`El patrón ${p.codigo} está VENCIDO — no podrás emitir el certificado con él.`);
+    else if (v === "por_vencer") avisos.push(`El patrón ${p.codigo} vence pronto.`);
+    if (p.estado !== "activo") avisos.push(`El patrón ${p.codigo} no está activo (${p.estado}).`);
+  }
+  return avisos;
+}
+
 async function listar({ reporteId = "", estadoCertificado = "", estadoCalibracion = "", tecnicoAsignado = "", page = 0, pageSize = 20 }) {
   const match = {};
   if (reporteId && oid(reporteId)) match.reporte = oid(reporteId);
@@ -90,7 +105,7 @@ async function crear(datos, reqUser) {
   if (patrones.length) {
     const vencido = await Patron.findOne({
       _id: { $in: patrones },
-      "ultimaCalibracion.vencimiento": { $lt: new Date() },
+      "calibracion.vencimiento": { $lt: new Date() },
     }).select("codigo nombre");
     if (vencido) {
       throw new AppError(`El patrón ${vencido.codigo} (${vencido.nombre}) está vencido y no puede usarse`, 409);
@@ -112,7 +127,10 @@ async function crear(datos, reqUser) {
     { _id: datos.reporte, status: "recepcion" },
     { $set: { status: "en_proceso" } }
   );
-  return a;
+
+  const out = a.toObject();
+  out.advertencias = await avisosPatrones(datos.patrones);
+  return out;
 }
 
 async function actualizar(id, datos, reqUser) {
@@ -140,7 +158,9 @@ async function actualizar(id, datos, reqUser) {
 
   a.historial.push(await crearEvento(reqUser, evento, {}));
   await a.save();
-  return a;
+  const out = a.toObject();
+  out.advertencias = await avisosPatrones(a.patrones);
+  return out;
 }
 
 /**

@@ -55,10 +55,10 @@ function Campo({ label, value, children }) {
 
 const VIG_DOT = { vigente: "#16A34A", por_vencer: "#D97706", vencido: "#DC2626", sin_fecha: "#94A3B8" };
 
-// El backend solo expone `ultimaCalibracion.vencimiento` (fecha) — la
-// categoría vigente/por_vencer/vencido se calcula aquí, a 30 días de aviso.
+// El backend expone `calibracion.vencimiento` (fecha) — la categoría
+// vigente/por_vencer/vencido se calcula aquí, a 30 días de aviso.
 function vigenciaPatron(p) {
-  const v = p?.ultimaCalibracion?.vencimiento;
+  const v = p?.calibracion?.vencimiento || p?.ultimaCalibracion?.vencimiento;
   if (!v) return "sin_fecha";
   const dias = (new Date(v) - Date.now()) / 86400000;
   if (dias < 0) return "vencido";

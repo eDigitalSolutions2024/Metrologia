@@ -47,8 +47,8 @@ function normalizar(tipo, item) {
       id: item.codigo,
       descripcion: item.nombre || item.descripcion,
       subdescripcion: [item.marca, item.modelo].filter(Boolean).join(" "),
-      vigenciaTexto: item.ultimaCalibracion?.vencimiento
-        ? `Vence ${formatDateShort(item.ultimaCalibracion.vencimiento)}`
+      vigenciaTexto: (item.calibracion?.vencimiento || item.ultimaCalibracion?.vencimiento)
+        ? `Vence ${formatDateShort(item.calibracion?.vencimiento || item.ultimaCalibracion?.vencimiento)}`
         : "",
     };
   }

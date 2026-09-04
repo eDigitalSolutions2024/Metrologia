@@ -177,6 +177,20 @@ async function emitir(datos, reqUser) {
   if (!clienteId) throw new AppError("No se pudo determinar el cliente", 400);
   if (!fechaCalibracion) throw new AppError("La fecha de calibración es obligatoria", 400);
 
+  // Bloqueo: no se emite si un patrón usado estaba fuera de vigencia en la
+  // fecha de calibración (salvo que se fuerce explícitamente).
+  if (!datos.forzarPatronVencido) {
+    const vencidos = patronesDocs
+      .filter((p) => p.estadoVigencia && p.estadoVigencia(fechaCalibracion) === "vencido")
+      .map((p) => p.codigo);
+    if (vencidos.length) {
+      throw new AppError(
+        `No se puede emitir: patrón(es) fuera de vigencia en la fecha de calibración: ${vencidos.join(", ")}.`,
+        409
+      );
+    }
+  }
+
   const Cliente = require("../models/Cliente");
   const clienteDoc = await Cliente.findById(clienteId).select("nombre domicilioFiscal");
   const d = clienteDoc?.domicilioFiscal;
@@ -271,11 +285,15 @@ async function emitir(datos, reqUser) {
       nombre: p.nombre,
       modelo: p.modelo,
       trazabilidad: p.trazabilidad,
-      certificadoNo: p.ultimaCalibracion?.certificadoNo,
-      vencimiento: p.ultimaCalibracion?.vencimiento,
-      incertidumbre: p.incertidumbre?.valor
-        ? `${p.incertidumbre.valor} ${p.incertidumbre.unidad || ""} (k=${p.incertidumbre.k || 2})`
-        : undefined,
+      numeroCertificado: p.calibracion?.numeroCertificado,
+      laboratorio: p.calibracion?.laboratorio,
+      vencimiento: p.calibracion?.vencimiento,
+      incertidumbre:
+        p.incertidumbre?.modo === "fija" && p.incertidumbre?.valor != null
+          ? `${p.incertidumbre.valor} ${p.incertidumbre.unidad || p.unidad || ""} (k=${p.incertidumbre.k || 2})`
+          : p.incertidumbre?.modo === "tabla"
+          ? `según certificado (tabla, k=${p.incertidumbre.k || 2})`
+          : undefined,
     })),
     laboratorio: { nombre: laboratorioActual.nombre, acreditacion: laboratorioActual.acreditacion },
     fechaCalibracion,
