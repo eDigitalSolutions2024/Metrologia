@@ -1,11 +1,12 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
-  Grid, Box, Typography, Divider, Chip, Avatar, LinearProgress, Skeleton,
+  Grid, Box, Typography, Divider, Chip, Avatar, LinearProgress, Skeleton, Button,
 } from "@mui/material";
 import {
   PeopleAltOutlined, DescriptionOutlined, PrecisionManufacturingOutlined,
   WorkspacePremiumOutlined, CheckCircleOutlineOutlined, BlockOutlined, ReceiptLongOutlined,
+  MenuBookOutlined, FileDownloadOutlined,
 } from "@mui/icons-material";
 import { useTheme } from "@mui/material/styles";
 import { formatCurrency } from "../../shared/utils/currency";
@@ -90,6 +91,36 @@ export default function Dashboard() {
   return (
     <Box>
       <PageHeader title="Panel general" subtitle={`Resumen del laboratorio — ${mesActual()}`} />
+
+      <Box
+        sx={{
+          display: "flex", alignItems: "center", gap: 2, flexWrap: "wrap",
+          p: 2, mb: 3.5, borderRadius: 3,
+          border: "1px solid", borderColor: "divider",
+          bgcolor: "background.paper",
+        }}
+      >
+        <Box sx={{ width: 44, height: 44, borderRadius: 2, display: "grid", placeItems: "center", flexShrink: 0, bgcolor: theme.palette.secondary.main + "18", color: "secondary.main" }}>
+          <MenuBookOutlined />
+        </Box>
+        <Box sx={{ flex: 1, minWidth: 220 }}>
+          <Typography variant="body2" fontWeight={700}>Manual del sistema</Typography>
+          <Typography variant="caption" color="text.secondary">
+            Guía paso a paso de todos los módulos, con capturas de pantalla. Formato PDF.
+          </Typography>
+        </Box>
+        <Button
+          component="a"
+          href="/Manual-Metryco.pdf"
+          target="_blank"
+          rel="noopener"
+          variant="outlined"
+          startIcon={<FileDownloadOutlined />}
+          sx={{ borderRadius: 2, flexShrink: 0 }}
+        >
+          Descargar manual
+        </Button>
+      </Box>
 
       <Grid container spacing={2.5} sx={{ mb: 3.5 }}>
         {stats.map((s) => (
