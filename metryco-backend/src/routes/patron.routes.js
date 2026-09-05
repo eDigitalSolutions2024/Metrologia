@@ -12,6 +12,7 @@ router.use(auth);
 
 router.get("/", c.listar);
 router.get("/por-vencer", c.porVencer);
+router.get("/siguiente-codigo", c.siguienteCodigo);
 router.get("/:id", c.obtener);
 router.get("/:id/certificado", c.descargarCertificado);
 router.get("/:id/qr.png", c.qrPng);

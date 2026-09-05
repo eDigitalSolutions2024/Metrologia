@@ -15,7 +15,7 @@ import AppCard from "../../shared/components/AppCard";
 import PageHeader from "../../shared/components/PageHeader";
 import StraightenOutlinedIcon from "@mui/icons-material/StraightenOutlined";
 import { CATEGORIAS } from "./categorias";
-import { obtenerPatron, crearPatron, actualizarPatron, adjuntarCertificadoPatron } from "../../services/patrones";
+import { obtenerPatron, crearPatron, actualizarPatron, adjuntarCertificadoPatron, obtenerSiguienteCodigoPatron } from "../../services/patrones";
 
 const num = (v) => (v === "" || v == null ? undefined : Number(v));
 
@@ -36,10 +36,12 @@ export default function PatronForm() {
   const [saving, setSaving] = useState(false);
   const [patronId, setPatronId] = useState(id || null);
   const [archivoInfo, setArchivoInfo] = useState(null);
+  const [codigoAutoGenerado, setCodigoAutoGenerado] = useState(!isEdit);
+  const [generandoCodigo, setGenerandoCodigo] = useState(false);
 
-  const { register, control, handleSubmit, watch, reset, formState: { errors } } = useForm({
+  const { register, control, handleSubmit, watch, reset, setValue, formState: { errors } } = useForm({
     defaultValues: {
-      codigo: "", nombre: "", descripcion: "", categoria: "", magnitud: "",
+      codigo: "", nombre: "", descripcion: "", comentarios: "", categoria: "", magnitud: "",
       marca: "", modelo: "", serie: "",
       unidad: "", intervaloMedicion: "", resolucion: "",
       incertidumbre: { modo: "fija", k: 2, unidad: "", valor: "", puntos: [{ nominal: "", U: "" }] },
@@ -57,12 +59,25 @@ export default function PatronForm() {
   const periodicidad = watch("calibracion.periodicidadMeses");
   const vencPreview = useMemo(() => vencimientoPreview(fecha, periodicidad), [fecha, periodicidad]);
 
+  // En alta: se muestra de una vez el código que le tocaría (consecutivo
+  // global), editable si se prefiere capturar uno propio.
+  useEffect(() => {
+    if (isEdit) return;
+    setGenerandoCodigo(true);
+    obtenerSiguienteCodigoPatron()
+      .then((codigo) => setValue("codigo", codigo))
+      .catch(() => {})
+      .finally(() => setGenerandoCodigo(false));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isEdit]);
+
   useEffect(() => {
     if (!isEdit) return;
     obtenerPatron(id)
       .then((p) => {
         reset({
           codigo: p.codigo || "", nombre: p.nombre || "", descripcion: p.descripcion || "",
+          comentarios: p.comentarios || "",
           categoria: p.categoria || "", magnitud: p.magnitud || "",
           marca: p.marca || "", modelo: p.modelo || "", serie: p.serie || "",
           unidad: p.unidad || "", intervaloMedicion: p.intervaloMedicion || "", resolucion: p.resolucion || "",
@@ -158,7 +173,16 @@ export default function PatronForm() {
         <AppCard title="Información general">
           <Grid container spacing={2}>
             <Grid size={{ xs: 12, md: 3 }}>
-              <TextField fullWidth size="small" label="Código *" error={!!errors.codigo} helperText={errors.codigo && "Obligatorio"} {...register("codigo", { required: true })} />
+              <TextField
+                fullWidth size="small" label="Código"
+                helperText={
+                  isEdit ? undefined
+                  : generandoCodigo ? "Generando…"
+                  : codigoAutoGenerado ? "Generado automáticamente — puedes cambiarlo"
+                  : "Editado manualmente"
+                }
+                {...register("codigo", { onChange: () => setCodigoAutoGenerado(false) })}
+              />
             </Grid>
             <Grid size={{ xs: 12, md: 6 }}>
               <TextField fullWidth size="small" label="Nombre *" error={!!errors.nombre} helperText={errors.nombre && "Obligatorio"} {...register("nombre", { required: true })} />
@@ -172,6 +196,9 @@ export default function PatronForm() {
             </Grid>
             <Grid size={{ xs: 12, md: 8 }}>
               <TextField fullWidth size="small" label="Descripción" {...register("descripcion")} />
+            </Grid>
+            <Grid size={{ xs: 12 }}>
+              <TextField fullWidth size="small" label="Comentarios" multiline minRows={2} {...register("comentarios")} />
             </Grid>
             <Grid size={{ xs: 12, md: 4 }}>
               <TextField select fullWidth size="small" label="Categoría" defaultValue="" {...register("categoria")}>

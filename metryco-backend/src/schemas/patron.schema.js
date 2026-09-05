@@ -46,7 +46,8 @@ const calibracionSchema = z.object({
 }).partial().optional();
 
 const basePatron = {
-  codigo: z.string().trim().min(1, "El código es obligatorio"),
+  // Opcional: si no se captura, el servicio genera uno consecutivo (PAT-XXX).
+  codigo: z.string().trim().optional(),
   nombre: z.string().trim().min(1, "El nombre es obligatorio"),
   descripcion: z.string().trim().optional(),
   categoria: categoriaOpcional,

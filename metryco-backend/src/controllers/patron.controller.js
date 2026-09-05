@@ -1,6 +1,10 @@
 const asyncHandler = require("../utils/asyncHandler");
 const service = require("../services/patron.service");
 
+const siguienteCodigo = asyncHandler(async (req, res) => {
+  res.json({ success: true, data: { codigo: await service.siguienteCodigo() } });
+});
+
 const listar = asyncHandler(async (req, res) => {
   const { search = "", categoria = "", vigencia = "", estado = "", page = 0, pageSize = 50 } = req.query;
   const { items, total } = await service.listar({
@@ -53,5 +57,5 @@ const qrSvg = asyncHandler(async (req, res) => {
 
 module.exports = {
   listar, obtener, crear, actualizar, eliminar, adjuntarPdf, porVencer,
-  adjuntarCertificado, descargarCertificado, qrPng, qrSvg,
+  adjuntarCertificado, descargarCertificado, qrPng, qrSvg, siguienteCodigo,
 };

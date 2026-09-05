@@ -27,6 +27,11 @@ export async function eliminarPatron(id) {
   return data.data;
 }
 
+export async function obtenerSiguienteCodigoPatron() {
+  const { data } = await api.get(`${ENDPOINTS.PATRONES}/siguiente-codigo`);
+  return data.data.codigo;
+}
+
 export async function adjuntarCertificadoPatron(id, file) {
   const form = new FormData();
   form.append("archivo", file);

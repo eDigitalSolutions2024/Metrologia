@@ -1,11 +1,29 @@
 const fs = require("fs");
 const path = require("path");
 const Patron = require("../models/Patron");
+const Counter = require("../models/Counter");
 const AppError = require("../utils/AppError");
 const escapeRegex = require("../utils/escapeRegex");
 const { crearEvento } = require("../utils/historial");
 const { uploadsDir, publicWebUrl } = require("../config/env");
 const qr = require("../utils/qr");
+
+/**
+ * Código consecutivo global (no hay "cliente" en Patrón): "PAT-001", "PAT-002"...
+ * Solo se usa cuando no se captura uno propio.
+ */
+async function siguienteCodigo() {
+  for (let intento = 0; intento < 20; intento++) {
+    const counter = await Counter.findByIdAndUpdate(
+      "PAT-CODIGO",
+      { $inc: { seq: 1 } },
+      { new: true, upsert: true }
+    );
+    const codigo = `PAT-${String(counter.seq).padStart(3, "0")}`;
+    if (!(await Patron.exists({ codigo }))) return codigo;
+  }
+  throw new AppError("No se pudo generar un código único, intenta capturarlo manualmente", 500);
+}
 
 function urlInterna(id) {
   return `${publicWebUrl.replace(/\/$/, "")}/equipos/patrones/${id}/editar`;
@@ -62,13 +80,13 @@ async function obtener(id) {
 }
 
 async function crear(datos, reqUser) {
-  if (!datos.codigo) throw new AppError("El código del patrón es obligatorio", 400);
   if (!datos.nombre) throw new AppError("El nombre del patrón es obligatorio", 400);
+  const codigo = datos.codigo?.trim() ? String(datos.codigo).trim().toUpperCase() : await siguienteCodigo();
 
-  const ev = await crearEvento(reqUser, "patron_creado", { codigo: datos.codigo });
+  const ev = await crearEvento(reqUser, "patron_creado", { codigo });
   const patron = await Patron.create({
     ...datos,
-    codigo: String(datos.codigo).toUpperCase(),
+    codigo,
     calibracion: normalizarCalibracion(datos.calibracion),
     registradoPor: reqUser?.id,
     historial: [ev],
@@ -82,7 +100,7 @@ async function actualizar(id, datos, reqUser) {
 
   const editables = [
     "nombre", "descripcion", "categoria", "magnitud", "marca", "modelo", "serie",
-    "unidad", "intervaloMedicion", "resolucion", "incertidumbre", "deriva",
+    "unidad", "intervaloMedicion", "resolucion", "comentarios", "incertidumbre", "deriva",
     "trazabilidad", "condicionesReferencia", "manejo", "procedimiento",
     "transporte", "almacenamiento", "estado",
   ];
@@ -181,5 +199,5 @@ async function qrSvg(id) {
 
 module.exports = {
   listar, obtener, crear, actualizar, eliminar, porVencer, calcularVencimiento,
-  adjuntarPdf, adjuntarCertificado, archivoStream, qrPng, qrSvg,
+  adjuntarPdf, adjuntarCertificado, archivoStream, qrPng, qrSvg, siguienteCodigo,
 };
