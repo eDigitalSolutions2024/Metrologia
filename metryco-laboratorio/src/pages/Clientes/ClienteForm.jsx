@@ -26,6 +26,7 @@ import {
   listarContactos, crearContacto, actualizarContacto, eliminarContacto,
 } from "../../services/contactos";
 import { generarPasswordSegura } from "../../shared/utils/generarPassword";
+import { SECTORES } from "../../shared/constants/sectores";
 import ContactoDialog from "./ContactoDialog";
 import ConfirmDialog from "../../shared/components/ConfirmDialog";
 
@@ -461,6 +462,23 @@ export default function ClienteForm() {
                   render={({ field }) => (
                     <Select label="Sucursal" {...field} value={field.value ?? ""} sx={{ borderRadius: 2 }}>
                       {SUCURSALES.map((s) => (
+                        <MenuItem key={s.value} value={s.value}>{s.label}</MenuItem>
+                      ))}
+                    </Select>
+                  )}
+                />
+              </FormControl>
+            </Grid>
+            <Grid size={{ xs: 12, sm: 6, md: 4 }}>
+              <FormControl fullWidth size="small">
+                <InputLabel>Sector</InputLabel>
+                <Controller
+                  name="sector"
+                  control={control}
+                  render={({ field }) => (
+                    <Select label="Sector" {...field} value={field.value ?? ""} sx={{ borderRadius: 2 }}>
+                      <MenuItem value="">Sin especificar</MenuItem>
+                      {SECTORES.map((s) => (
                         <MenuItem key={s.value} value={s.value}>{s.label}</MenuItem>
                       ))}
                     </Select>

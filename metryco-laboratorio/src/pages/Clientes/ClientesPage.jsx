@@ -19,15 +19,7 @@ import ConfirmDialog from "../../shared/components/ConfirmDialog";
 import PasswordConfirmDialog from "../../shared/components/PasswordConfirmDialog";
 import { listarClientes, actualizarCliente, eliminarCliente } from "../../services/clientes";
 import { useDebounce } from "../../shared/hooks/useDebounce";
-
-const SECTOR_MAP = {
-  automotriz:   { label: "Automotriz",   color: "primary" },
-  aeroespacial: { label: "Aeroespacial", color: "info" },
-  electronica:  { label: "Electrónica",  color: "secondary" },
-  alimentos:    { label: "Alimentos",    color: "success" },
-  farmaceutica: { label: "Farmacéutica", color: "warning" },
-  manufactura:  { label: "Manufactura",  color: "default" },
-};
+import { SECTORES, SECTOR_MAP } from "../../shared/constants/sectores";
 
 export default function ClientesPage() {
   const navigate = useNavigate();
@@ -191,12 +183,9 @@ export default function ClientesPage() {
           <InputLabel>Sector</InputLabel>
           <Select label="Sector" value={sectorFilter} onChange={(e) => setSectorFilter(e.target.value)} sx={{ borderRadius: 2 }}>
             <MenuItem value="todos">Todos los sectores</MenuItem>
-            <MenuItem value="automotriz">Automotriz</MenuItem>
-            <MenuItem value="aeroespacial">Aeroespacial</MenuItem>
-            <MenuItem value="electronica">Electrónica</MenuItem>
-            <MenuItem value="manufactura">Manufactura</MenuItem>
-            <MenuItem value="alimentos">Alimentos</MenuItem>
-            <MenuItem value="farmaceutica">Farmacéutica</MenuItem>
+            {SECTORES.map((s) => (
+              <MenuItem key={s.value} value={s.value}>{s.label}</MenuItem>
+            ))}
           </Select>
         </FormControl>
       </Box>
