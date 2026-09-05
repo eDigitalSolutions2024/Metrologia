@@ -309,6 +309,30 @@ export default function ClienteForm() {
           <Box sx={{ display: "flex", flexDirection: "row", flexWrap: "nowrap", alignItems: "center", gap: 1.25, mb: 2 }}>
             <Box sx={{ width: 4, height: 20, borderRadius: 1, bgcolor: "secondary.main", flexShrink: 0 }} />
             <Typography variant="h6" fontWeight={700}>
+              Contacto Principal
+            </Typography>
+          </Box>
+          <Grid container spacing={2}>
+            <Grid size={{ xs: 12, sm: 6, md: 4 }}>
+              <AppInput label="Nombre Contacto" {...register("contacto.nombre")} />
+            </Grid>
+            <Grid size={{ xs: 12, sm: 6, md: 4 }}>
+              <AppInput label="Telefono" {...register("contacto.telefono")} />
+            </Grid>
+            <Grid size={{ xs: 12, sm: 6, md: 4 }} />
+            <Grid size={{ xs: 12, sm: 6, md: 4 }}>
+              <AppInput label="Correo (Cotizaciones)" {...register("contacto.emailCotizaciones")} />
+            </Grid>
+            <Grid size={{ xs: 12, sm: 6, md: 4 }}>
+              <AppInput label="Correo (Facturación)" {...register("contacto.emailFacturacion")} />
+            </Grid>
+          </Grid>
+
+          <Divider sx={{ my: 3 }} />
+
+          <Box sx={{ display: "flex", flexDirection: "row", flexWrap: "nowrap", alignItems: "center", gap: 1.25, mb: 2 }}>
+            <Box sx={{ width: 4, height: 20, borderRadius: 1, bgcolor: "secondary.main", flexShrink: 0 }} />
+            <Typography variant="h6" fontWeight={700}>
               Domicilio Fiscal
             </Typography>
           </Box>
