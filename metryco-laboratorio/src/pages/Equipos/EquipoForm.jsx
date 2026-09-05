@@ -11,7 +11,7 @@ import AppCard from "../../shared/components/AppCard";
 import AppInput from "../../shared/components/AppInput";
 import { listarClientes } from "../../services/clientes";
 import { listarPatrones } from "../../services/patrones";
-import { obtenerEquipo, crearEquipo, actualizarEquipo } from "../../services/equipos";
+import { obtenerEquipo, crearEquipo, actualizarEquipo, obtenerSiguienteIdInterno } from "../../services/equipos";
 import { CATEGORIAS } from "./categorias";
 import { useAuth } from "../../core/auth/useAuth";
 
@@ -29,10 +29,29 @@ export default function EquipoForm() {
   const [loading, setLoading] = useState(isEdit);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+  const [idAutoGenerado, setIdAutoGenerado] = useState(!isEdit);
+  const [generandoId, setGenerandoId] = useState(false);
 
-  const { register, handleSubmit, control, reset, formState: { errors } } = useForm({
+  const { register, handleSubmit, control, reset, watch, setValue, formState: { errors } } = useForm({
     defaultValues: { patrones: [] },
   });
+
+  const clienteIdElegido = watch("clienteId");
+
+  // En alta (no edición): en cuanto se elige cliente, se muestra de una vez
+  // el ID que le tocaría (prefijo del nombre del cliente + consecutivo) —
+  // el técnico lo ve antes de guardar, no hasta que ya guardó. Si el técnico
+  // escribe su propio ID a mano, se deja de sobreescribir.
+  useEffect(() => {
+    if (isEdit || !clienteIdElegido || !idAutoGenerado) return;
+    let cancelado = false;
+    setGenerandoId(true);
+    obtenerSiguienteIdInterno(clienteIdElegido)
+      .then((idInterno) => { if (!cancelado) setValue("idInterno", idInterno); })
+      .catch(() => {})
+      .finally(() => { if (!cancelado) setGenerandoId(false); });
+    return () => { cancelado = true; };
+  }, [clienteIdElegido, isEdit, idAutoGenerado, setValue]);
 
   useEffect(() => {
     listarClientes({ pageSize: 200 }).then(({ items }) => setClientes(items)).catch(() => setClientes([]));
@@ -110,10 +129,17 @@ export default function EquipoForm() {
             <Grid size={{ xs: 12, md: 3 }}>
               <AppInput
                 label="ID Interno"
-                placeholder={isEdit ? undefined : "Auto (si lo dejas vacío)"}
-                helperText={isEdit ? undefined : "Déjalo en blanco para generarlo automáticamente"}
+                placeholder={isEdit || clienteIdElegido ? undefined : "Elige un cliente para generarlo"}
+                helperText={
+                  isEdit ? undefined
+                  : generandoId ? "Generando…"
+                  : idAutoGenerado ? "Generado automáticamente — puedes cambiarlo"
+                  : "Editado manualmente"
+                }
                 error={errors.idInterno}
-                {...register("idInterno")}
+                {...register("idInterno", {
+                  onChange: () => setIdAutoGenerado(false),
+                })}
               />
             </Grid>
             <Grid size={{ xs: 12, md: 5 }}>

@@ -23,6 +23,11 @@ export async function eliminarEquipo(id) {
   return data.data;
 }
 
+export async function obtenerSiguienteIdInterno(clienteId) {
+  const { data } = await api.get(`${ENDPOINTS.EQUIPOS}/siguiente-id`, { params: { cliente: clienteId } });
+  return data.data.idInterno;
+}
+
 export async function fetchQrEquipoBlob(id, tipo = "png") {
   const { data } = await api.get(`${ENDPOINTS.EQUIPOS}/${id}/qr.${tipo}`, { responseType: "blob" });
   return data;

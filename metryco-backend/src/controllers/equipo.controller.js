@@ -11,6 +11,11 @@ function ocultarCosto(equipo) {
   return resto;
 }
 
+const siguienteId = asyncHandler(async (req, res) => {
+  const idInterno = await service.previewSiguienteIdInterno(req.query.cliente);
+  res.json({ success: true, data: { idInterno } });
+});
+
 const listar = asyncHandler(async (req, res) => {
   const { search = "", clienteId = "", categoria = "", incluirInactivos = "", page = 0, pageSize = 10 } = req.query;
   const { items, total } = await service.listar({
@@ -52,4 +57,4 @@ const qrSvg = asyncHandler(async (req, res) => {
   res.type("svg").send(await service.qrSvg(req.params.id));
 });
 
-module.exports = { listar, obtener, crear, actualizar, eliminar, reactivar, qrPng, qrSvg };
+module.exports = { listar, obtener, crear, actualizar, eliminar, reactivar, qrPng, qrSvg, siguienteId };

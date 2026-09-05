@@ -132,4 +132,14 @@ async function qrSvg(id) {
   return qr.svg(urlInterna(equipo._id));
 }
 
-module.exports = { listar, obtener, crear, actualizar, eliminar, reactivar, qrPng, qrSvg };
+// Sujeta el consecutivo (misma función que usa crear() cuando idInterno
+// viene vacío) para que el técnico vea el ID real antes de guardar. Si al
+// final cancela el alta, ese número simplemente se salta — igual que pasa
+// con los folios de Reporte/Certificado cuando algo no se completa.
+async function previewSiguienteIdInterno(clienteId) {
+  if (!mongoose.isValidObjectId(clienteId)) throw new AppError("Cliente inválido", 400);
+  if (!(await Cliente.exists({ _id: clienteId }))) throw new AppError("Cliente no encontrado", 404);
+  return siguienteIdInterno(clienteId);
+}
+
+module.exports = { listar, obtener, crear, actualizar, eliminar, reactivar, qrPng, qrSvg, previewSiguienteIdInterno };

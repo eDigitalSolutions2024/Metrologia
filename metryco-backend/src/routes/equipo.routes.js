@@ -10,6 +10,7 @@ const router = Router();
 router.use(auth);
 
 router.get("/", c.listar);
+router.get("/siguiente-id", c.siguienteId);
 router.get("/:id", c.obtener);
 router.get("/:id/qr.png", c.qrPng);
 router.get("/:id/qr.svg", c.qrSvg);
