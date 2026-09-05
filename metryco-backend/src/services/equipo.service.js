@@ -7,19 +7,44 @@ const escapeRegex = require("../utils/escapeRegex");
 const qr = require("../utils/qr");
 const { publicWebUrl } = require("../config/env");
 
+// Palabras que no aportan identidad al nombre de la empresa (razón social /
+// conectores comunes) — se ignoran al armar el prefijo.
+const PALABRAS_IGNORADAS = new Set([
+  "SA", "CV", "SC", "SAPI", "SOFOM", "SOFIPO", "SRL", "CIA",
+  "DE", "DEL", "LA", "LAS", "EL", "LOS", "Y",
+]);
+
+/** "Aceros del Bravo SA de CV" -> "AB" · "Intermex Manufactura" -> "IM" */
+function prefijoDesdeNombre(nombre = "") {
+  const palabras = nombre
+    .toUpperCase()
+    .normalize("NFD").replace(/[̀-ͯ]/g, "")
+    .replace(/[^A-Z\s]/g, " ")
+    .split(/\s+/)
+    .filter((w) => w && !PALABRAS_IGNORADAS.has(w));
+
+  if (!palabras.length) return "EQ";
+  if (palabras.length === 1) return palabras[0].slice(0, 3);
+  return palabras.map((w) => w[0]).join("").slice(0, 4);
+}
+
 /**
- * ID interno consecutivo por CLIENTE (no global): "EQ-001", "EQ-002"...
+ * ID interno consecutivo por CLIENTE (no global), con prefijo ligado a su
+ * nombre para que sea identificable a simple vista: "AB-001", "AB-002"...
  * Solo se usa cuando el usuario no captura uno propio (código de activo del
  * cliente) — el contador es atómico así que es seguro con concurrencia.
  */
 async function siguienteIdInterno(clienteId) {
+  const cliente = await Cliente.findById(clienteId).select("nombre nombreComercial");
+  const prefijo = prefijoDesdeNombre(cliente?.nombreComercial || cliente?.nombre);
+
   for (let intento = 0; intento < 20; intento++) {
     const counter = await Counter.findByIdAndUpdate(
       `EQ-${clienteId}`,
       { $inc: { seq: 1 } },
       { new: true, upsert: true }
     );
-    const idInterno = `EQ-${String(counter.seq).padStart(3, "0")}`;
+    const idInterno = `${prefijo}-${String(counter.seq).padStart(3, "0")}`;
     // Por si alguien ya había capturado ese mismo código a mano antes.
     if (!(await Equipo.exists({ cliente: clienteId, idInterno }))) return idInterno;
   }
