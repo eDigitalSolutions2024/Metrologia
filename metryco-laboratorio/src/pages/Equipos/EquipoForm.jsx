@@ -108,7 +108,13 @@ export default function EquipoForm() {
         <AppCard title="Identificación" sx={{ mb: 3 }}>
           <Grid container spacing={2}>
             <Grid size={{ xs: 12, md: 3 }}>
-              <AppInput label="ID Interno" error={errors.idInterno} {...register("idInterno", { required: "Obligatorio" })} />
+              <AppInput
+                label="ID Interno"
+                placeholder={isEdit ? undefined : "Auto (si lo dejas vacío)"}
+                helperText={isEdit ? undefined : "Déjalo en blanco para generarlo automáticamente"}
+                error={errors.idInterno}
+                {...register("idInterno")}
+              />
             </Grid>
             <Grid size={{ xs: 12, md: 5 }}>
               <Controller

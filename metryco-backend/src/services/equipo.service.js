@@ -1,10 +1,30 @@
 const mongoose = require("mongoose");
 const Equipo = require("../models/Equipo");
 const Cliente = require("../models/Cliente");
+const Counter = require("../models/Counter");
 const AppError = require("../utils/AppError");
 const escapeRegex = require("../utils/escapeRegex");
 const qr = require("../utils/qr");
 const { publicWebUrl } = require("../config/env");
+
+/**
+ * ID interno consecutivo por CLIENTE (no global): "EQ-001", "EQ-002"...
+ * Solo se usa cuando el usuario no captura uno propio (código de activo del
+ * cliente) — el contador es atómico así que es seguro con concurrencia.
+ */
+async function siguienteIdInterno(clienteId) {
+  for (let intento = 0; intento < 20; intento++) {
+    const counter = await Counter.findByIdAndUpdate(
+      `EQ-${clienteId}`,
+      { $inc: { seq: 1 } },
+      { new: true, upsert: true }
+    );
+    const idInterno = `EQ-${String(counter.seq).padStart(3, "0")}`;
+    // Por si alguien ya había capturado ese mismo código a mano antes.
+    if (!(await Equipo.exists({ cliente: clienteId, idInterno }))) return idInterno;
+  }
+  throw new AppError("No se pudo generar un ID interno único, intenta capturarlo manualmente", 500);
+}
 
 function urlInterna(id) {
   return `${publicWebUrl.replace(/\/$/, "")}/equipos/${id}/editar`;
@@ -45,8 +65,8 @@ async function obtener(id) {
 async function crear(datos, usuarioId) {
   if (!mongoose.isValidObjectId(datos.cliente)) throw new AppError("Cliente inválido", 400);
   if (!(await Cliente.exists({ _id: datos.cliente }))) throw new AppError("Cliente no encontrado", 404);
-  if (!datos.idInterno) throw new AppError("El ID interno es obligatorio", 400);
-  return Equipo.create({ ...datos, registradoPor: usuarioId });
+  const idInterno = datos.idInterno?.trim() || (await siguienteIdInterno(datos.cliente));
+  return Equipo.create({ ...datos, idInterno, registradoPor: usuarioId });
 }
 
 async function actualizar(id, datos) {

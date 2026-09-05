@@ -15,7 +15,8 @@ const monedaOpcional = z.preprocess(
 );
 
 const baseEquipo = {
-  idInterno: z.string().trim().min(1, "El ID interno es obligatorio"),
+  // Opcional: si no se captura, el servicio genera uno consecutivo por cliente.
+  idInterno: z.string().trim().optional(),
   cliente: objectId,
   marca: z.string().trim().optional(),
   modelo: z.string().trim().optional(),
