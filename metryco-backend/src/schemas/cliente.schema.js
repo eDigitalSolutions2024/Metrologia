@@ -26,6 +26,7 @@ const domicilioSchema = z.object({
 const contactoSchema = z.object({
   nombre: z.string().trim().optional(),
   telefono: z.string().trim().optional(),
+  correo: z.string().trim().optional(),
   emailCotizaciones: z.string().trim().optional(),
   emailFacturacion: z.string().trim().optional(),
 }).partial().optional();

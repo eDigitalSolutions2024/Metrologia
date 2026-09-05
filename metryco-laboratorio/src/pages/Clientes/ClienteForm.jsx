@@ -331,6 +331,9 @@ export default function ClienteForm() {
             <Grid size={{ xs: 12, sm: 6, md: 4 }}>
               <AppInput label="Telefono" {...register("contacto.telefono")} />
             </Grid>
+            <Grid size={{ xs: 12, sm: 6, md: 4 }}>
+              <AppInput label="Correo" {...register("contacto.correo")} />
+            </Grid>
           </Grid>
         </AppCard>
 
@@ -585,7 +588,7 @@ export default function ClienteForm() {
                   <Box sx={{ flex: 1, minWidth: 0 }}>
                     <Typography variant="body2" fontWeight={600} noWrap>{c.nombre}</Typography>
                     <Typography variant="caption" color="text.secondary" sx={{ display: "block" }} noWrap>
-                      {[c.telefono, c.correo, c.emailCotizaciones, c.emailFacturacion].filter(Boolean).join(" · ") || "Sin más datos"}
+                      {[c.telefono, c.correo].filter(Boolean).join(" · ") || "Sin más datos"}
                     </Typography>
                   </Box>
                   <Tooltip title="Editar contacto">

@@ -12,16 +12,13 @@ export default function ContactoDialog({ open, contacto, onClose, onSave, loadin
     handleSubmit,
     reset,
     formState: { errors },
-  } = useForm({ defaultValues: { nombre: "", telefono: "", correo: "", emailCotizaciones: "", emailFacturacion: "" } });
+  } = useForm({ defaultValues: { nombre: "", telefono: "", correo: "" } });
 
   useEffect(() => {
     if (open) {
       reset(contacto
-        ? {
-            nombre: contacto.nombre, telefono: contacto.telefono, correo: contacto.correo,
-            emailCotizaciones: contacto.emailCotizaciones || "", emailFacturacion: contacto.emailFacturacion || "",
-          }
-        : { nombre: "", telefono: "", correo: "", emailCotizaciones: "", emailFacturacion: "" });
+        ? { nombre: contacto.nombre, telefono: contacto.telefono, correo: contacto.correo || "" }
+        : { nombre: "", telefono: "", correo: "" });
     }
   }, [open, contacto, reset]);
 
@@ -37,8 +34,6 @@ export default function ContactoDialog({ open, contacto, onClose, onSave, loadin
           />
           <AppInput label="Teléfono" {...register("telefono")} />
           <AppInput label="Correo" {...register("correo")} />
-          <AppInput label="Email Cotizaciones" {...register("emailCotizaciones")} />
-          <AppInput label="Email Facturación" {...register("emailFacturacion")} />
         </DialogContent>
         <DialogActions sx={{ px: 3, pb: 2 }}>
           <Button type="button" onClick={onClose} disabled={loading}>Cancelar</Button>

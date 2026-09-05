@@ -19,6 +19,7 @@ const contactoSchema = new Schema(
   {
     nombre: String,
     telefono: String,
+    correo: String,
     emailCotizaciones: String,
     emailFacturacion: String,
   },

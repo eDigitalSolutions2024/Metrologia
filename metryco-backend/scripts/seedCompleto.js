@@ -151,7 +151,6 @@ async function run() {
         nombre: "Contacto de Facturación",
         telefono: `656-${900 + i}-${1000 + i}`,
         correo: `facturacion@${(c.nombreComercial || c.nombre).toLowerCase().replace(/\s+/g, "")}-demo.mx`,
-        emailFacturacion: `facturacion@${(c.nombreComercial || c.nombre).toLowerCase().replace(/\s+/g, "")}-demo.mx`,
         status: "activo",
       });
     }
