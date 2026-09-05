@@ -133,16 +133,6 @@ export function crearTheme(coloresMarca = COLORES_MARCA_DEFAULT) {
       },
     },
 
-    // Sin esto, el label de CUALQUIER TextField/Select del sistema (no solo
-    // AppInput) se queda sin "encoger" cuando el valor llega vía
-    // react-hook-form reset() en vez de un onChange del usuario (editar un
-    // registro, datos autogenerados, etc.) — queda superpuesto letra sobre
-    // letra con el valor. Se fuerza aquí, a nivel de tema, para que ningún
-    // formulario del sistema pueda tener este bug otra vez.
-    MuiInputLabel: {
-      defaultProps: { shrink: true },
-    },
-
     MuiOutlinedInput: {
       styleOverrides: {
         root: {

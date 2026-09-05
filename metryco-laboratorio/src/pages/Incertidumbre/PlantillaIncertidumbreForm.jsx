@@ -251,25 +251,43 @@ export default function PlantillaIncertidumbreForm() {
                 <Grid size={{ xs: 6, md: 1.5 }}>
                   <FormControl fullWidth size="small">
                     <InputLabel>Tipo</InputLabel>
-                    <Select label="Tipo" defaultValue={f.tipo} {...register(`contribuciones.${i}.tipo`)} sx={{ borderRadius: 2 }}>
-                      {TIPOS.map((t) => <MenuItem key={t} value={t}>{t}</MenuItem>)}
-                    </Select>
+                    <Controller
+                      name={`contribuciones.${i}.tipo`}
+                      control={control}
+                      render={({ field }) => (
+                        <Select label="Tipo" {...field} value={field.value ?? f.tipo} sx={{ borderRadius: 2 }}>
+                          {TIPOS.map((t) => <MenuItem key={t} value={t}>{t}</MenuItem>)}
+                        </Select>
+                      )}
+                    />
                   </FormControl>
                 </Grid>
                 <Grid size={{ xs: 12, md: 2.5 }}>
                   <FormControl fullWidth size="small">
                     <InputLabel>Modo</InputLabel>
-                    <Select label="Modo" defaultValue={f.modo} {...register(`contribuciones.${i}.modo`)} sx={{ borderRadius: 2 }}>
-                      {MODOS.map((m) => <MenuItem key={m} value={m}>{m}</MenuItem>)}
-                    </Select>
+                    <Controller
+                      name={`contribuciones.${i}.modo`}
+                      control={control}
+                      render={({ field }) => (
+                        <Select label="Modo" {...field} value={field.value ?? f.modo} sx={{ borderRadius: 2 }}>
+                          {MODOS.map((m) => <MenuItem key={m} value={m}>{m}</MenuItem>)}
+                        </Select>
+                      )}
+                    />
                   </FormControl>
                 </Grid>
                 <Grid size={{ xs: 12, md: 2.5 }}>
                   <FormControl fullWidth size="small">
                     <InputLabel>Distribución</InputLabel>
-                    <Select label="Distribución" defaultValue={f.distribucion} {...register(`contribuciones.${i}.distribucion`)} sx={{ borderRadius: 2 }}>
-                      {DISTRIBUCIONES.map((d) => <MenuItem key={d} value={d}>{d}</MenuItem>)}
-                    </Select>
+                    <Controller
+                      name={`contribuciones.${i}.distribucion`}
+                      control={control}
+                      render={({ field }) => (
+                        <Select label="Distribución" {...field} value={field.value ?? f.distribucion} sx={{ borderRadius: 2 }}>
+                          {DISTRIBUCIONES.map((d) => <MenuItem key={d} value={d}>{d}</MenuItem>)}
+                        </Select>
+                      )}
+                    />
                   </FormControl>
                 </Grid>
                 <Grid size={{ xs: 6, md: 0.5 }} sx={{ display: "flex", justifyContent: "flex-end" }}>

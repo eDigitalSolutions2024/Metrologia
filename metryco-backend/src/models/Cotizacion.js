@@ -3,6 +3,9 @@ const { Schema, model } = require("mongoose");
 const itemSchema = new Schema(
   {
     descripcion: { type: String, required: true, trim: true },
+    marca: { type: String, trim: true },
+    modelo: { type: String, trim: true },
+    tiempoEntrega: { type: String, trim: true }, // texto libre: "5 días hábiles", "2 semanas"...
     cantidad: { type: Number, required: true, min: 0 },
     precioUnitario: { type: Number, required: true, min: 0 },
   },
@@ -32,6 +35,7 @@ const cotizacionSchema = new Schema(
     razonSocial: { type: Schema.Types.ObjectId, ref: "RazonSocial" },
     fecha: { type: Date, default: Date.now },
     vigencia: { type: Date, required: true },
+    ordenCompra: { type: String, trim: true },
     items: {
       type: [itemSchema],
       validate: {

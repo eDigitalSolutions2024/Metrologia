@@ -383,7 +383,7 @@ export default function ReporteDetallePage() {
       {puedeAsignar && (
         <>
           <Typography variant="subtitle2" fontWeight={700} sx={{ mb: 1 }}>Selecciona el equipo a calibrar</Typography>
-          <AsignarForm clienteId={cliente._id} reporteId={id} onDone={cargar} />
+          <AsignarForm clienteId={cliente._id} reporteId={id} equiposYaAsignados={asignaciones.map((a) => a.equipo?._id)} onDone={cargar} />
         </>
       )}
 
@@ -546,7 +546,7 @@ export default function ReporteDetallePage() {
   );
 }
 
-function AsignarForm({ clienteId, reporteId, onDone }) {
+function AsignarForm({ clienteId, reporteId, equiposYaAsignados = [], onDone }) {
   const [equipos, setEquipos] = useState([]);
   const [tecnicos, setTecnicos] = useState([]);
   const [patronesDisp, setPatronesDisp] = useState([]);
@@ -609,9 +609,12 @@ function AsignarForm({ clienteId, reporteId, onDone }) {
         <FormControl size="small" sx={{ minWidth: 220 }}>
           <InputLabel>Equipo</InputLabel>
           <Select label="Equipo" value={equipo} onChange={(e) => setEquipo(e.target.value)}>
-            {equipos.map((eq) => (
+            {equipos.filter((eq) => !equiposYaAsignados.includes(eq._id)).map((eq) => (
               <MenuItem key={eq._id} value={eq._id}>{eq.idInterno} — {eq.marca} {eq.modelo}</MenuItem>
             ))}
+            {equipos.length > 0 && equipos.every((eq) => equiposYaAsignados.includes(eq._id)) && (
+              <MenuItem value="" disabled>Todos los equipos de este cliente ya están asignados aquí</MenuItem>
+            )}
           </Select>
         </FormControl>
         <Autocomplete

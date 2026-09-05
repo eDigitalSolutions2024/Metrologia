@@ -328,6 +328,85 @@ async function emitir(datos, reqUser) {
   return conEstadoVigente(cert);
 }
 
+/**
+ * Vista previa de la hoja de certificado ANTES de que Calidad autorice —
+ * mismos datos que armaría `emitir()` (equipo, patrones, puntos aprobados),
+ * pero NO crea ningún documento ni folio/QR real: es solo para que Calidad
+ * pueda ver cómo se vería antes de aprobar/rechazar.
+ */
+async function previsualizar(asignacionId) {
+  if (!oid(asignacionId)) throw new AppError("Asignación inválida", 400);
+  const asig = await Asignacion.findById(asignacionId).populate("equipo").populate("patrones");
+  if (!asig) throw new AppError("Asignación no encontrada", 404);
+
+  const laboratorioActual = await configuracionService.obtenerLaboratorio();
+  const equipoDoc = asig.equipo;
+  const patronesDocs = asig.patrones || [];
+  const rep = await Reporte.findById(asig.reporte).select("cliente folio");
+
+  const Cliente = require("../models/Cliente");
+  const clienteDoc = await Cliente.findById(rep?.cliente).select("nombre domicilioFiscal");
+  const d = clienteDoc?.domicilioFiscal;
+  const direccionCliente = d
+    ? [
+        [d.calle, d.numExterior, d.numInterior].filter(Boolean).join(" "),
+        d.colonia, d.municipio || d.ciudad, [d.estado, d.cp].filter(Boolean).join(" C.P. "),
+      ].filter(Boolean).join(", ")
+    : undefined;
+
+  const CalculoIncertidumbre = require("../models/CalculoIncertidumbre");
+  const calcs = await CalculoIncertidumbre.find({ asignacion: asignacionId, estado: "aprobado" }).sort({ puntoNominal: 1 });
+  const puntos = calcs.map((c) => ({
+    calculo: c._id,
+    folioCalculo: c.folio,
+    mensurando: c.mensurando,
+    condicion: c.condicion || "unico",
+    puntoNominal: c.puntoNominal,
+    lecturas: c.lecturas || [],
+    valorMedido: c.resultado?.y ?? c.valorMedido,
+    desviacionStd: c.desviacionStd ?? 0,
+    errorIndicacion: c.errorIndicacion,
+    emp: c.emp,
+    criterio: c.criterio || "sin_evaluar",
+    unidad: c.unidad,
+    uCombinada: c.resultado?.uCombinada,
+    incertidumbreExpandida: c.resultado?.incertidumbreExpandida,
+    k: c.resultado?.k,
+    nivelConfianza: c.resultado?.nivelConfianza,
+  }));
+
+  return {
+    _id: `preview-${asig._id}`,
+    folio: `VISTA PREVIA${rep?.folio ? " · " + rep.folio : ""}`,
+    preview: true,
+    equipoSnapshot: {
+      idInterno: equipoDoc?.idInterno, marca: equipoDoc?.marca, modelo: equipoDoc?.modelo,
+      serie: equipoDoc?.serie, descripcion: equipoDoc?.descripcion, categoria: equipoDoc?.categoria,
+      subtipo: equipoDoc?.subtipo, accuracy: equipoDoc?.accuracy, unidades: equipoDoc?.unidades,
+      divisionMinima: equipoDoc?.divisionMinima, resolucion: equipoDoc?.resolucion,
+      rango: equipoDoc?.rangoCalibracion || equipoDoc?.rango, rangoUso: equipoDoc?.rangoUso,
+      rangoCalibracion: equipoDoc?.rangoCalibracion, localizacion: equipoDoc?.localizacion,
+    },
+    clienteSnapshot: { nombre: clienteDoc?.nombre, direccion: direccionCliente },
+    patronesSnapshot: patronesDocs.map((p) => ({
+      codigo: p.codigo, nombre: p.nombre, modelo: p.modelo, trazabilidad: p.trazabilidad,
+      numeroCertificado: p.calibracion?.numeroCertificado, laboratorio: p.calibracion?.laboratorio,
+      vencimiento: p.calibracion?.vencimiento,
+      incertidumbre:
+        p.incertidumbre?.modo === "fija" && p.incertidumbre?.valor != null
+          ? `${p.incertidumbre.valor} ${p.incertidumbre.unidad || p.unidad || ""} (k=${p.incertidumbre.k || 2})`
+          : p.incertidumbre?.modo === "tabla" ? `según certificado (tabla, k=${p.incertidumbre.k || 2})` : undefined,
+    })),
+    laboratorio: { nombre: laboratorioActual.nombre, acreditacion: laboratorioActual.acreditacion },
+    fechaCalibracion: asig.fechaCalibracion,
+    fechaEmision: new Date(),
+    puntos,
+    resultado: puntos.length
+      ? { valorMedido: puntos[0].valorMedido, unidad: puntos[0].unidad, incertidumbreExpandida: puntos[0].incertidumbreExpandida, k: puntos[0].k, nivelConfianza: puntos[0].nivelConfianza }
+      : undefined,
+  };
+}
+
 async function actualizar(id, datos, reqUser) {
   const cert = await Certificado.findById(id);
   if (!cert) throw new AppError("Certificado no encontrado", 404);
@@ -468,5 +547,5 @@ async function archivoStream(id) {
 module.exports = {
   listar, obtener, exportar, emitir, actualizar, cambiarEstado, adjuntarPdf,
   anular, regenerarToken, qrPng, qrSvg, archivoStream, porVencer, porReporte,
-  urlPublica, rutaArchivo,
+  urlPublica, rutaArchivo, previsualizar,
 };

@@ -16,6 +16,9 @@ import InsertDriveFileOutlinedIcon from "@mui/icons-material/InsertDriveFileOutl
 import DownloadOutlinedIcon from "@mui/icons-material/DownloadOutlined";
 import ReceiptLongOutlinedIcon from "@mui/icons-material/ReceiptLongOutlined";
 import ContentCopyOutlinedIcon from "@mui/icons-material/ContentCopyOutlined";
+import PersonOutlineIcon from "@mui/icons-material/PersonOutlineOutlined";
+import TuneOutlinedIcon from "@mui/icons-material/TuneOutlined";
+import ListAltOutlinedIcon from "@mui/icons-material/ListAltOutlined";
 
 import AppButton from "../../shared/components/AppButton";
 import AppInput from "../../shared/components/AppInput";
@@ -50,15 +53,18 @@ const STATUS_MAP = {
   vencida: { label: "Vencida", color: "default" },
 };
 
+const ITEM_VACIO = { descripcion: "", marca: "", modelo: "", tiempoEntrega: "", cantidad: 1, precioUnitario: 0 };
+
 const DEFAULT_VALUES = {
   cliente: "",
   razonSocial: "",
   contacto: "",
   vigencia: "",
+  ordenCompra: "",
   observaciones: "",
   moneda: "MXN",
   ivaPorcentaje: 16,
-  items: [{ descripcion: "", cantidad: 1, precioUnitario: 0 }],
+  items: [ITEM_VACIO],
 };
 
 export default function CotizacionDialog({ open, cotizacionId, duplicarDesdeId, onClose, onSaved, onGenerarFactura, onDuplicar }) {
@@ -115,6 +121,7 @@ export default function CotizacionDialog({ open, cotizacionId, duplicarDesdeId, 
             razonSocial: cotizacion.razonSocial?._id || cotizacion.razonSocial || "",
             contacto: cotizacion.contacto?._id || cotizacion.contacto || "",
             vigencia: cotizacion.vigencia ? cotizacion.vigencia.slice(0, 10) : "",
+            ordenCompra: cotizacion.ordenCompra || "",
             observaciones: cotizacion.observaciones || "",
             moneda: cotizacion.moneda || "MXN",
             ivaPorcentaje: cotizacion.ivaPorcentaje ?? 16,
@@ -131,10 +138,14 @@ export default function CotizacionDialog({ open, cotizacionId, duplicarDesdeId, 
             razonSocial: cotizacion.razonSocial?._id || cotizacion.razonSocial || "",
             contacto: cotizacion.contacto?._id || cotizacion.contacto || "",
             vigencia: "",
+            ordenCompra: "",
             observaciones: cotizacion.observaciones || "",
             moneda: cotizacion.moneda || "MXN",
             ivaPorcentaje: cotizacion.ivaPorcentaje ?? 16,
-            items: cotizacion.items.map((i) => ({ descripcion: i.descripcion, cantidad: i.cantidad, precioUnitario: i.precioUnitario })),
+            items: cotizacion.items.map((i) => ({
+              descripcion: i.descripcion, marca: i.marca || "", modelo: i.modelo || "",
+              tiempoEntrega: i.tiempoEntrega || "", cantidad: i.cantidad, precioUnitario: i.precioUnitario,
+            })),
           });
           setCotizacionData(null);
           setAdjuntos([]);
@@ -257,11 +268,18 @@ export default function CotizacionDialog({ open, cotizacionId, duplicarDesdeId, 
                   <Grid size={{ xs: 12, md: 8 }}>
                     <FormControl fullWidth size="small" error={!!errors.cliente}>
                       <InputLabel>Cliente</InputLabel>
-                      <Select label="Cliente" defaultValue="" {...register("cliente", { required: true })} sx={{ borderRadius: 2 }}>
-                        {clientes.map((c) => (
-                          <MenuItem key={c._id} value={c._id}>{c.nombre}</MenuItem>
-                        ))}
-                      </Select>
+                      <Controller
+                        name="cliente"
+                        control={control}
+                        rules={{ required: true }}
+                        render={({ field }) => (
+                          <Select label="Cliente" {...field} value={field.value ?? ""} sx={{ borderRadius: 2 }}>
+                            {clientes.map((c) => (
+                              <MenuItem key={c._id} value={c._id}>{c.nombre}</MenuItem>
+                            ))}
+                          </Select>
+                        )}
+                      />
                     </FormControl>
                   </Grid>
                   <Grid size={{ xs: 12, md: 4 }}>
@@ -321,6 +339,7 @@ export default function CotizacionDialog({ open, cotizacionId, duplicarDesdeId, 
                 <AppCard
                   dense
                   title="Cliente"
+                  icon={<PersonOutlineIcon />}
                   sx={{ mb: 2.5 }}
                   action={
                     !isEdit && (
@@ -368,7 +387,7 @@ export default function CotizacionDialog({ open, cotizacionId, duplicarDesdeId, 
                   </Grid>
                 </AppCard>
 
-                <AppCard dense title="Configuración de la cotización" sx={{ mb: 2.5 }}>
+                <AppCard dense title="Configuración de la cotización" icon={<TuneOutlinedIcon />} sx={{ mb: 2.5 }}>
                   <Grid container spacing={2}>
                     <Grid size={{ xs: 12, md: 3 }}>
                       <FormControl fullWidth size="small" error={!!errors.razonSocial}>
@@ -424,12 +443,18 @@ export default function CotizacionDialog({ open, cotizacionId, duplicarDesdeId, 
                         />
                       </FormControl>
                     </Grid>
+                    <Grid size={{ xs: 12, md: 3 }}>
+                      <AppInput label="Orden de Compra" {...register("ordenCompra")} placeholder="Ej: OC-2026-045" />
+                    </Grid>
                   </Grid>
                 </AppCard>
 
-                <Typography variant="subtitle2" fontWeight={700} sx={{ mb: 1.5 }}>
-                  Servicios / Partidas
-                </Typography>
+                <Box sx={{ display: "flex", alignItems: "center", gap: 0.75, mb: 1.5 }}>
+                  <ListAltOutlinedIcon fontSize="small" sx={{ color: "secondary.main" }} />
+                  <Typography variant="subtitle2" fontWeight={700}>
+                    Servicios / Partidas
+                  </Typography>
+                </Box>
                 <Paper elevation={0} sx={{ border: 1, borderColor: "divider", borderRadius: 1.5, overflow: "hidden", mb: 2 }}>
                   <Table size="small" sx={{ "& .MuiTableCell-root": { py: 1.5, px: 2.25 } }}>
                     <TableHead>
@@ -446,6 +471,11 @@ export default function CotizacionDialog({ open, cotizacionId, duplicarDesdeId, 
                         <TableRow key={field.id}>
                           <TableCell>
                             <AppInput {...register(`items.${idx}.descripcion`, { required: true })} placeholder="Ej: Calibración de vernier" />
+                            <Box sx={{ display: "flex", gap: 1, mt: 1.25 }}>
+                              <AppInput label="Marca" {...register(`items.${idx}.marca`)} size="small" fullWidth />
+                              <AppInput label="Modelo" {...register(`items.${idx}.modelo`)} size="small" fullWidth />
+                              <AppInput label="Tiempo de entrega" {...register(`items.${idx}.tiempoEntrega`)} size="small" fullWidth />
+                            </Box>
                           </TableCell>
                           <TableCell>
                             <AppInput type="number" {...register(`items.${idx}.cantidad`, { required: true, min: 1 })} inputProps={{ min: 1 }} />
@@ -474,7 +504,7 @@ export default function CotizacionDialog({ open, cotizacionId, duplicarDesdeId, 
                     type="button"
                     variant="outlined"
                     startIcon={<AddCircleOutlineIcon />}
-                    onClick={() => append({ descripcion: "", cantidad: 1, precioUnitario: 0 })}
+                    onClick={() => append({ ...ITEM_VACIO })}
                     sx={{ borderRadius: 2 }}
                   >
                     Agregar partida

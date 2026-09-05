@@ -1,20 +1,38 @@
 import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import {
-  Box, Typography, TextField, MenuItem, Select, FormControl, InputLabel,
-  Button, Dialog, DialogTitle, DialogContent, DialogActions, Alert, IconButton, Tooltip,
+  Box, Typography, TextField, MenuItem, Select, FormControl, InputLabel, Grid,
+  Button, Dialog, DialogTitle, DialogContent, DialogActions, Alert, IconButton, Tooltip, Chip, Avatar,
 } from "@mui/material";
 import FileDownloadOutlinedIcon from "@mui/icons-material/FileDownloadOutlined";
 import NotificationsActiveOutlinedIcon from "@mui/icons-material/NotificationsActiveOutlined";
 import EditOutlinedIcon from "@mui/icons-material/EditOutlined";
 import DescriptionOutlinedIcon from "@mui/icons-material/DescriptionOutlined";
 import InsertChartOutlinedIcon from "@mui/icons-material/InsertChartOutlined";
+import HistoryOutlinedIcon from "@mui/icons-material/HistoryOutlined";
+import VerifiedOutlinedIcon from "@mui/icons-material/VerifiedOutlined";
+import ScheduleOutlinedIcon from "@mui/icons-material/ScheduleOutlined";
+import ReportGmailerrorredOutlinedIcon from "@mui/icons-material/ReportGmailerrorredOutlined";
 
 import AppButton from "../../shared/components/AppButton";
 import AppTable from "../../shared/components/AppTable";
+import PageHeader from "../../shared/components/PageHeader";
+import StatCard from "../../shared/components/StatCard";
 import { listarClientes } from "../../services/clientes";
 import { exportCsv } from "../../shared/utils/exportCsv";
-import { listarEquipos } from "../../services/equipos";
 import { listarPatrones } from "../../services/patrones";
+import { listarCertificados } from "../../services/certificados";
+import { fetchGraficaAsignacionBlob } from "../../services/reportes";
+import { formatDate } from "../../shared/utils/formatDate";
+import { iconoCategoria, colorCategoria } from "./categorias";
+
+const ESTADO_MAP = {
+  vigente: { label: "Vigente", color: "success" },
+  por_vencer: { label: "Por vencer", color: "warning" },
+  vencido: { label: "Vencido", color: "error" },
+  anulado: { label: "Anulado", color: "default" },
+  borrador: { label: "Borrador", color: "info" },
+};
 
 function VencimientoAutomaticoDialog({ open, onClose }) {
   const [confirmado, setConfirmado] = useState(false);
@@ -79,8 +97,10 @@ function VencimientoAutomaticoDialog({ open, onClose }) {
 }
 
 // Refleja php/historial_certificados_buscar.php: filtro por Cliente o por ID
-// Planta (id_interno del equipo), listado de certificados emitidos por equipo.
+// Planta (id_interno del equipo), listado de CERTIFICADOS emitidos (uno o
+// varios por equipo a lo largo del tiempo).
 export default function HistorialCertificadosPage() {
+  const navigate = useNavigate();
   const [clientes, setClientes] = useState([]);
   const [clienteFiltro, setClienteFiltro] = useState("");
   const [idPlanta, setIdPlanta] = useState("");
@@ -91,6 +111,7 @@ export default function HistorialCertificadosPage() {
   const [items, setItems] = useState([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
 
   useEffect(() => {
     listarClientes({ pageSize: 200 })
@@ -100,54 +121,105 @@ export default function HistorialCertificadosPage() {
 
   useEffect(() => {
     setLoading(true);
-    listarEquipos({ search: buscar, clienteId: clienteFiltro, page, pageSize: rowsPerPage })
+    listarCertificados({ search: buscar, clienteId: clienteFiltro, page, pageSize: rowsPerPage })
       .then(({ items, total }) => { setItems(items); setTotal(total); })
       .catch(() => { setItems([]); setTotal(0); })
       .finally(() => setLoading(false));
   }, [buscar, clienteFiltro, page, rowsPerPage]);
 
+  const cuenta = (estado) => items.filter((c) => (c.estadoEfectivo || c.estado) === estado).length;
+
+  const descargarGrafica = async (cert) => {
+    setError("");
+    try {
+      const blob = await fetchGraficaAsignacionBlob(cert.asignacion);
+      const url = URL.createObjectURL(blob);
+      const el = document.createElement("a");
+      el.href = url; el.download = `grafica-${cert.folio}`;
+      el.click();
+      setTimeout(() => URL.revokeObjectURL(url), 60000);
+    } catch {
+      setError("Ese certificado no tiene gráfica adjunta.");
+    }
+  };
+
   const columns = [
-    { field: "idInterno", headerName: "ID Cliente" },
-    { field: "cliente", headerName: "Cliente", renderCell: (row) => row.cliente?.nombre || "—" },
-    { field: "marca", headerName: "Marca" },
-    { field: "modelo", headerName: "Modelo" },
-    { field: "serie", headerName: "Serie" },
     {
-      field: "editarPortada",
-      headerName: "Editar Portada",
-      align: "center",
-      renderCell: () => (
-        <Tooltip title="Editar portada (requiere asignación de calibración)">
-          <span><IconButton size="small" disabled><EditOutlinedIcon fontSize="small" /></IconButton></span>
-        </Tooltip>
-      ),
+      field: "folio", headerName: "Certificado",
+      renderCell: (c) => {
+        const Icono = iconoCategoria(c.equipoSnapshot?.categoria);
+        const color = colorCategoria(c.equipoSnapshot?.categoria);
+        return (
+          <Box sx={{ display: "flex", alignItems: "center", gap: 1.25 }}>
+            <Avatar sx={{ width: 32, height: 32, bgcolor: `${color}1a`, color }}>
+              <Icono fontSize="small" />
+            </Avatar>
+            <Box sx={{ minWidth: 0 }}>
+              <Typography variant="body2" fontWeight={700} noWrap>{c.folio}</Typography>
+              <Typography variant="caption" color="text.secondary" noWrap sx={{ display: "block" }}>
+                {c.equipoSnapshot?.idInterno || "—"} · {c.equipoSnapshot?.descripcion || "—"}
+              </Typography>
+            </Box>
+          </Box>
+        );
+      },
+    },
+    { field: "cliente", headerName: "Cliente", renderCell: (c) => c.cliente?.nombre || c.clienteSnapshot?.nombre || "—" },
+    { field: "marcaModelo", headerName: "Marca / Modelo", renderCell: (c) => [c.equipoSnapshot?.marca, c.equipoSnapshot?.modelo].filter(Boolean).join(" / ") || "—" },
+    { field: "serie", headerName: "Serie", renderCell: (c) => c.equipoSnapshot?.serie || "—" },
+    { field: "fecha", headerName: "Fecha Calibración", renderCell: (c) => formatDate(c.fechaCalibracion) },
+    {
+      field: "estado", headerName: "Estado",
+      renderCell: (c) => {
+        const e = ESTADO_MAP[c.estadoEfectivo || c.estado] || ESTADO_MAP.borrador;
+        return <Chip size="small" label={e.label} color={e.color} />;
+      },
     },
     {
-      field: "portada",
-      headerName: "Portada",
+      field: "acciones",
+      headerName: "Acciones",
       align: "center",
-      renderCell: () => (
-        <Tooltip title="Disponible cuando exista la asignación de calibración">
-          <span><IconButton size="small" disabled><DescriptionOutlinedIcon fontSize="small" /></IconButton></span>
-        </Tooltip>
-      ),
-    },
-    {
-      field: "grafica",
-      headerName: "Gráfica",
-      align: "center",
-      renderCell: () => (
-        <Tooltip title="Disponible cuando exista la asignación de calibración">
-          <span><IconButton size="small" disabled><InsertChartOutlinedIcon fontSize="small" /></IconButton></span>
-        </Tooltip>
+      renderCell: (c) => (
+        <Box sx={{ display: "flex", alignItems: "center", justifyContent: "center", flexWrap: "nowrap" }}>
+          <Tooltip title={c.reporte ? "Editar en el reporte de origen" : "Sin reporte ligado"}>
+            <span>
+              <IconButton
+                size="small"
+                disabled={!c.reporte}
+                onClick={() => navigate(`/reportes/${c.reporte?._id || c.reporte}`)}
+              >
+                <EditOutlinedIcon fontSize="small" sx={{ color: "secondary.main" }} />
+              </IconButton>
+            </span>
+          </Tooltip>
+          <Tooltip title="Ver / descargar certificado (Portada)">
+            <IconButton size="small" onClick={() => window.open(`/informe/certificado/${c._id}`, "_blank")}>
+              <DescriptionOutlinedIcon fontSize="small" sx={{ color: "primary.main" }} />
+            </IconButton>
+          </Tooltip>
+          <Tooltip title={c.asignacion ? "Descargar gráfica adjunta" : "Sin asignación ligada"}>
+            <span>
+              <IconButton size="small" disabled={!c.asignacion} onClick={() => descargarGrafica(c)}>
+                <InsertChartOutlinedIcon fontSize="small" sx={{ color: "primary.main" }} />
+              </IconButton>
+            </span>
+          </Tooltip>
+        </Box>
       ),
     },
   ];
 
   const exportarCertificados = () => {
     exportCsv(
-      items.map((e) => ({
-        IDCliente: e.idInterno, Cliente: e.cliente?.nombre || "", Marca: e.marca, Modelo: e.modelo, Serie: e.serie,
+      items.map((c) => ({
+        Certificado: c.folio,
+        IDCliente: c.equipoSnapshot?.idInterno || "",
+        Cliente: c.cliente?.nombre || c.clienteSnapshot?.nombre || "",
+        Marca: c.equipoSnapshot?.marca || "",
+        Modelo: c.equipoSnapshot?.modelo || "",
+        Serie: c.equipoSnapshot?.serie || "",
+        FechaCalibracion: c.fechaCalibracion ? formatDate(c.fechaCalibracion) : "",
+        Estado: c.estadoEfectivo || c.estado,
       })),
       "historial_certificados.csv"
     );
@@ -155,27 +227,40 @@ export default function HistorialCertificadosPage() {
 
   return (
     <Box>
-      <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", mb: 3, flexWrap: "wrap", gap: 2 }}>
-        <Box>
-          <Typography variant="h5" fontWeight={700}>Historial de Certificados</Typography>
-          <Typography variant="body2" color="text.secondary">
-            {total} equipos con certificados asociados
-          </Typography>
-        </Box>
-        <Box sx={{ display: "flex", gap: 1.5 }}>
-          <AppButton
-            variant="outlined"
-            startIcon={<NotificationsActiveOutlinedIcon />}
-            onClick={() => setVencimientoOpen(true)}
-            sx={{ borderRadius: 2 }}
-          >
-            Vencimiento Automático
-          </AppButton>
-          <AppButton startIcon={<FileDownloadOutlinedIcon />} onClick={exportarCertificados} sx={{ borderRadius: 2 }}>
-            Exportar Excel Certificados
-          </AppButton>
-        </Box>
-      </Box>
+      <PageHeader
+        icon={<HistoryOutlinedIcon />}
+        title="Historial de Certificados"
+        subtitle={`${total} certificados emitidos`}
+        actions={
+          <>
+            <AppButton
+              variant="outlined"
+              startIcon={<NotificationsActiveOutlinedIcon />}
+              onClick={() => setVencimientoOpen(true)}
+              sx={{ borderRadius: 2 }}
+            >
+              Vencimiento Automático
+            </AppButton>
+            <AppButton startIcon={<FileDownloadOutlinedIcon />} onClick={exportarCertificados} sx={{ borderRadius: 2 }}>
+              Exportar Excel Certificados
+            </AppButton>
+          </>
+        }
+      />
+
+      <Grid container spacing={2.5} sx={{ mb: 3.5 }}>
+        <Grid size={{ xs: 12, sm: 4 }}>
+          <StatCard label="Vigentes (página)" value={cuenta("vigente")} icon={<VerifiedOutlinedIcon />} color="#16A34A" />
+        </Grid>
+        <Grid size={{ xs: 12, sm: 4 }}>
+          <StatCard label="Por vencer" value={cuenta("por_vencer")} icon={<ScheduleOutlinedIcon />} color="#D97706" />
+        </Grid>
+        <Grid size={{ xs: 12, sm: 4 }}>
+          <StatCard label="Vencidos" value={cuenta("vencido")} icon={<ReportGmailerrorredOutlinedIcon />} color="#DC2626" />
+        </Grid>
+      </Grid>
+
+      {error && <Alert severity="warning" sx={{ mb: 2, borderRadius: 2 }} onClose={() => setError("")}>{error}</Alert>}
 
       <Box sx={{ display: "flex", gap: 2, mb: 2, flexWrap: "wrap", alignItems: "center" }}>
         <FormControl size="small" sx={{ minWidth: 260 }}>
@@ -191,12 +276,12 @@ export default function HistorialCertificadosPage() {
           </Select>
         </FormControl>
         <TextField
-          label="ID Cliente (Historial Certificados)"
+          label="ID Cliente / folio"
           size="small"
           value={idPlanta}
           onChange={(e) => setIdPlanta(e.target.value)}
           onKeyDown={(e) => { if (e.key === "Enter") { setPage(0); setBuscar(idPlanta); } }}
-          sx={{ width: 260, "& .MuiOutlinedInput-root": { borderRadius: 2 } }}
+          sx={{ width: 280, "& .MuiOutlinedInput-root": { borderRadius: 2 } }}
         />
         <Button variant="contained" onClick={() => { setPage(0); setBuscar(idPlanta); }} sx={{ borderRadius: 2 }}>Buscar</Button>
       </Box>

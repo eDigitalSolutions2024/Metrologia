@@ -139,6 +139,38 @@ async function eliminar(id) {
   return conVigencia(patron);
 }
 
+/**
+ * Borrado real (no baja lógica). Solo se permite si el patrón NUNCA se usó
+ * en una calibración real — si ya tiene Asignaciones o Cálculos de
+ * incertidumbre que lo referencian, borrarlo de verdad dejaría esos
+ * registros históricos apuntando a un patrón inexistente. En ese caso hay
+ * que darlo de baja en vez de eliminarlo.
+ */
+async function eliminarPermanente(id) {
+  const Asignacion = require("../models/Asignacion");
+  const CalculoIncertidumbre = require("../models/CalculoIncertidumbre");
+
+  const patron = await Patron.findById(id);
+  if (!patron) throw new AppError("Patrón no encontrado", 404);
+
+  const [enAsignacion, enCalculo] = await Promise.all([
+    Asignacion.exists({ patrones: id }),
+    CalculoIncertidumbre.exists({ patronesUsados: id }),
+  ]);
+  if (enAsignacion || enCalculo) {
+    throw new AppError(
+      "No se puede eliminar: este patrón ya se usó en calibraciones o cálculos de incertidumbre. Dalo de baja en vez de eliminarlo.",
+      409
+    );
+  }
+
+  const ruta = rutaArchivo(patron);
+  if (ruta && fs.existsSync(ruta)) fs.unlink(ruta, () => {});
+
+  await Patron.deleteOne({ _id: id });
+  return patron;
+}
+
 async function adjuntarPdf(id, file, reqUser) {
   if (!file) throw new AppError("No se recibió el archivo", 400);
   const patron = await Patron.findById(id);
@@ -203,6 +235,6 @@ async function qrSvg(id) {
 }
 
 module.exports = {
-  listar, obtener, crear, actualizar, eliminar, porVencer, calcularVencimiento,
+  listar, obtener, crear, actualizar, eliminar, eliminarPermanente, porVencer, calcularVencimiento,
   adjuntarPdf, adjuntarCertificado, archivoStream, qrPng, qrSvg, siguienteCodigo,
 };

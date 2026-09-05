@@ -16,6 +16,7 @@ router.use(auth);
 router.get("/", c.listar);
 router.get("/exportar", c.exportar);
 router.get("/por-reporte/:reporteId", c.porReporte);
+router.get("/preview/:asignacionId", c.previsualizar);
 router.get("/:id", c.obtener);
 router.get("/:id/qr.png", c.qrPng);
 router.get("/:id/qr.svg", c.qrSvg);

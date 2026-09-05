@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { useForm, useFieldArray } from "react-hook-form";
+import { useForm, useFieldArray, Controller } from "react-hook-form";
 import {
   Box, Typography, Grid, MenuItem, TextField, IconButton, Button, Alert, Chip, Divider,
 } from "@mui/material";
@@ -9,12 +9,17 @@ import AddIcon from "@mui/icons-material/Add";
 import DeleteOutlineIcon from "@mui/icons-material/DeleteOutlined";
 import UploadFileOutlinedIcon from "@mui/icons-material/UploadFileOutlined";
 import DescriptionOutlinedIcon from "@mui/icons-material/DescriptionOutlined";
+import BadgeOutlinedIcon from "@mui/icons-material/BadgeOutlined";
+import SquareFootOutlinedIcon from "@mui/icons-material/SquareFootOutlined";
+import FunctionsOutlinedIcon from "@mui/icons-material/FunctionsOutlined";
+import VerifiedOutlinedIcon from "@mui/icons-material/VerifiedOutlined";
+import BuildOutlinedIcon from "@mui/icons-material/BuildOutlined";
 
 import AppButton from "../../shared/components/AppButton";
 import AppCard from "../../shared/components/AppCard";
 import PageHeader from "../../shared/components/PageHeader";
 import StraightenOutlinedIcon from "@mui/icons-material/StraightenOutlined";
-import { CATEGORIAS } from "./categorias";
+import { CATEGORIAS, iconoCategoria, colorCategoria } from "./categorias";
 import { obtenerPatron, crearPatron, actualizarPatron, adjuntarCertificadoPatron, obtenerSiguienteCodigoPatron } from "../../services/patrones";
 
 const num = (v) => (v === "" || v == null ? undefined : Number(v));
@@ -54,6 +59,7 @@ export default function PatronForm() {
   });
 
   const { fields, append, remove } = useFieldArray({ control, name: "incertidumbre.puntos" });
+  const codigoValor = watch("codigo");
   const modo = watch("incertidumbre.modo");
   const fecha = watch("calibracion.fecha");
   const periodicidad = watch("calibracion.periodicidadMeses");
@@ -170,7 +176,7 @@ export default function PatronForm() {
 
       <Box component="form" onSubmit={handleSubmit(onSubmit)} sx={{ display: "flex", flexDirection: "column", gap: 3 }}>
 
-        <AppCard title="Información general">
+        <AppCard title="Información general" icon={<BadgeOutlinedIcon />}>
           <Grid container spacing={2}>
             <Grid size={{ xs: 12, md: 3 }}>
               <TextField
@@ -181,6 +187,7 @@ export default function PatronForm() {
                   : codigoAutoGenerado ? "Generado automáticamente — puedes cambiarlo"
                   : "Editado manualmente"
                 }
+                slotProps={{ inputLabel: { shrink: !!codigoValor } }}
                 {...register("codigo", { onChange: () => setCodigoAutoGenerado(false) })}
               />
             </Grid>
@@ -188,11 +195,17 @@ export default function PatronForm() {
               <TextField fullWidth size="small" label="Nombre *" error={!!errors.nombre} helperText={errors.nombre && "Obligatorio"} {...register("nombre", { required: true })} />
             </Grid>
             <Grid size={{ xs: 12, md: 3 }}>
-              <TextField select fullWidth size="small" label="Estado" defaultValue="activo" {...register("estado")}>
-                <MenuItem value="activo">Activo</MenuItem>
-                <MenuItem value="en_calibracion">En calibración</MenuItem>
-                <MenuItem value="baja">Baja</MenuItem>
-              </TextField>
+              <Controller
+                name="estado"
+                control={control}
+                render={({ field }) => (
+                  <TextField select fullWidth size="small" label="Estado" {...field} value={field.value ?? "activo"}>
+                    <MenuItem value="activo">Activo</MenuItem>
+                    <MenuItem value="en_calibracion">En calibración</MenuItem>
+                    <MenuItem value="baja">Baja</MenuItem>
+                  </TextField>
+                )}
+              />
             </Grid>
             <Grid size={{ xs: 12, md: 8 }}>
               <TextField fullWidth size="small" label="Descripción" {...register("descripcion")} />
@@ -201,10 +214,23 @@ export default function PatronForm() {
               <TextField fullWidth size="small" label="Comentarios" multiline minRows={2} {...register("comentarios")} />
             </Grid>
             <Grid size={{ xs: 12, md: 4 }}>
-              <TextField select fullWidth size="small" label="Categoría" defaultValue="" {...register("categoria")}>
-                <MenuItem value="">—</MenuItem>
-                {CATEGORIAS.map((c) => <MenuItem key={c} value={c}>{c}</MenuItem>)}
-              </TextField>
+              <Controller
+                name="categoria"
+                control={control}
+                render={({ field }) => (
+                  <TextField select fullWidth size="small" label="Categoría" {...field} value={field.value ?? ""}>
+                    <MenuItem value="">—</MenuItem>
+                    {CATEGORIAS.map((c) => {
+                      const Icono = iconoCategoria(c);
+                      return (
+                        <MenuItem key={c} value={c} sx={{ display: "flex", gap: 1 }}>
+                          <Icono fontSize="small" sx={{ color: colorCategoria(c) }} /> {c}
+                        </MenuItem>
+                      );
+                    })}
+                  </TextField>
+                )}
+              />
             </Grid>
             <Grid size={{ xs: 12, md: 4 }}><TextField fullWidth size="small" label="Marca" {...register("marca")} /></Grid>
             <Grid size={{ xs: 12, md: 4 }}><TextField fullWidth size="small" label="Modelo" {...register("modelo")} /></Grid>
@@ -212,7 +238,7 @@ export default function PatronForm() {
           </Grid>
         </AppCard>
 
-        <AppCard title="Metrología">
+        <AppCard title="Metrología" icon={<SquareFootOutlinedIcon />}>
           <Grid container spacing={2}>
             <Grid size={{ xs: 6, md: 3 }}><TextField fullWidth size="small" label="Unidad" placeholder="mm, bar, °C…" {...register("unidad")} /></Grid>
             <Grid size={{ xs: 6, md: 5 }}><TextField fullWidth size="small" label="Intervalo de medición" placeholder="0–100 mm" {...register("intervaloMedicion")} /></Grid>
@@ -220,13 +246,19 @@ export default function PatronForm() {
           </Grid>
         </AppCard>
 
-        <AppCard title="Incertidumbre del certificado del patrón" subtitle="Es la U que informa el certificado del patrón, con su k. El motor usa u = U / k.">
+        <AppCard title="Incertidumbre del certificado del patrón" subtitle="Es la U que informa el certificado del patrón, con su k. El motor usa u = U / k." icon={<FunctionsOutlinedIcon />}>
           <Grid container spacing={2}>
             <Grid size={{ xs: 12, md: 4 }}>
-              <TextField select fullWidth size="small" label="Modo" defaultValue="fija" {...register("incertidumbre.modo")}>
-                <MenuItem value="fija">Fija (un valor)</MenuItem>
-                <MenuItem value="tabla">Tabla por punto</MenuItem>
-              </TextField>
+              <Controller
+                name="incertidumbre.modo"
+                control={control}
+                render={({ field }) => (
+                  <TextField select fullWidth size="small" label="Modo" {...field} value={field.value ?? "fija"}>
+                    <MenuItem value="fija">Fija (un valor)</MenuItem>
+                    <MenuItem value="tabla">Tabla por punto</MenuItem>
+                  </TextField>
+                )}
+              />
             </Grid>
             <Grid size={{ xs: 6, md: 4 }}><TextField fullWidth size="small" label="k" type="number" {...register("incertidumbre.k")} /></Grid>
             <Grid size={{ xs: 6, md: 4 }}><TextField fullWidth size="small" label="Unidad de U" placeholder="= unidad del patrón" {...register("incertidumbre.unidad")} /></Grid>
@@ -261,7 +293,7 @@ export default function PatronForm() {
           </Grid>
         </AppCard>
 
-        <AppCard title="Calibración y vigencia">
+        <AppCard title="Calibración y vigencia" icon={<VerifiedOutlinedIcon />}>
           <Grid container spacing={2}>
             <Grid size={{ xs: 12, md: 4 }}><TextField fullWidth size="small" label="Trazabilidad" placeholder="CENAM, NIST vía Fluke…" {...register("trazabilidad")} /></Grid>
             <Grid size={{ xs: 12, md: 4 }}><TextField fullWidth size="small" label="Laboratorio calibrante" {...register("calibracion.laboratorio")} /></Grid>
@@ -288,7 +320,7 @@ export default function PatronForm() {
           </Box>
         </AppCard>
 
-        <AppCard title="Operación">
+        <AppCard title="Operación" icon={<BuildOutlinedIcon />}>
           <Grid container spacing={2}>
             <Grid size={{ xs: 12 }}><TextField fullWidth size="small" label="Condiciones de referencia" placeholder="20 ± 1 °C, 45–55 % HR" {...register("condicionesReferencia")} /></Grid>
             <Grid size={{ xs: 12, md: 6 }}><TextField fullWidth size="small" multiline minRows={2} label="Manejo" {...register("manejo")} /></Grid>

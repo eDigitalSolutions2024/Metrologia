@@ -1,8 +1,8 @@
 import api, { ENDPOINTS } from "./api";
 
-export async function listarEquipos({ search = "", clienteId = "", categoria = "", page = 0, pageSize = 10 } = {}) {
+export async function listarEquipos({ search = "", clienteId = "", categoria = "", incluirInactivos = false, page = 0, pageSize = 10 } = {}) {
   const { data } = await api.get(ENDPOINTS.EQUIPOS, {
-    params: { search, clienteId, categoria, page, pageSize },
+    params: { search, clienteId, categoria, incluirInactivos, page, pageSize },
   });
   return { items: data.data, total: data.total };
 }
@@ -20,6 +20,11 @@ export async function actualizarEquipo(id, payload) {
 }
 export async function eliminarEquipo(id) {
   const { data } = await api.delete(`${ENDPOINTS.EQUIPOS}/${id}`);
+  return data.data;
+}
+
+export async function reactivarEquipo(id) {
+  const { data } = await api.patch(`${ENDPOINTS.EQUIPOS}/${id}/reactivar`);
   return data.data;
 }
 

@@ -59,6 +59,7 @@ export default function CotizacionImprimir() {
         <b>RFC:</b><span>{cliente.rfc || "—"}</span>
         <b>Vigencia:</b><span>{formatDate(cotizacion.vigencia)}</span>
         <b>Vendedor:</b><span>{cotizacion.creadoPor?.nombre || "—"}</span>
+        {cotizacion.ordenCompra && (<><b>Orden de Compra:</b><span>{cotizacion.ordenCompra}</span></>)}
       </Box>
 
       <div className="rep-band">INFORMACIÓN DE LA COTIZACIÓN</div>
@@ -67,6 +68,9 @@ export default function CotizacionImprimir() {
           <tr>
             <th style={{ width: 55 }}>Cant.</th>
             <th style={{ textAlign: "left" }}>Descripción</th>
+            <th style={{ width: 90 }}>Marca</th>
+            <th style={{ width: 90 }}>Modelo</th>
+            <th style={{ width: 90 }}>Tiempo entrega</th>
             <th style={{ width: 100 }}>P. Unitario</th>
             <th style={{ width: 100 }}>P. Total</th>
           </tr>
@@ -76,6 +80,9 @@ export default function CotizacionImprimir() {
             <tr key={i}>
               <td>{it.cantidad}</td>
               <td style={{ textAlign: "left" }}>{it.descripcion}</td>
+              <td>{it.marca || "—"}</td>
+              <td>{it.modelo || "—"}</td>
+              <td>{it.tiempoEntrega || "—"}</td>
               <td>{formatCurrency(it.precioUnitario)}</td>
               <td>{formatCurrency(it.cantidad * it.precioUnitario)}</td>
             </tr>

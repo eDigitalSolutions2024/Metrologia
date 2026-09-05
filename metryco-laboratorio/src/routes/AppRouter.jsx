@@ -7,6 +7,7 @@ import GuestRoute from "../core/auth/GuestRoute";
 import VerCertificado from "../pages/Publico/VerCertificado";
 import CertificadosPage from "../pages/Certificados/CertificadosPage";
 import InformeCalibracion from "../pages/Certificados/InformeCalibracion";
+import InformeCalibracionPreview from "../pages/Certificados/InformeCalibracionPreview";
 import InformeReporteCertificados from "../pages/Certificados/InformeReporteCertificados";
 import CotizacionImprimir from "../pages/Cotizaciones/CotizacionImprimir";
 import ReporteServicioImprimir from "../pages/Reportes/imprimir/ReporteServicioImprimir";
@@ -57,6 +58,14 @@ export default function AppRouter() {
         element={
           <ProtectedRoute>
             <InformeCalibracion />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/informe/asignacion/:asignacionId/preview"
+        element={
+          <ProtectedRoute>
+            <InformeCalibracionPreview />
           </ProtectedRoute>
         }
       />

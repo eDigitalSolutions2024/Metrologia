@@ -10,6 +10,7 @@ import VisibilityOutlinedIcon from "@mui/icons-material/VisibilityOutlined";
 import FileDownloadOutlinedIcon from "@mui/icons-material/FileDownloadOutlined";
 import InsertChartOutlinedIcon from "@mui/icons-material/InsertChartOutlined";
 import HourglassEmptyOutlinedIcon from "@mui/icons-material/HourglassEmptyOutlined";
+import DescriptionOutlinedIcon from "@mui/icons-material/DescriptionOutlined";
 
 import AppButton from "../../shared/components/AppButton";
 import AppTable from "../../shared/components/AppTable";
@@ -159,6 +160,18 @@ function ConsultarTab() {
     { field: "fechaCaptura", headerName: "Fecha Captura", renderCell: (a) => (a.fechaCalibracion ? formatDate(a.fechaCalibracion) : "—") },
     { field: "tecnico", headerName: "Técnico", renderCell: (a) => a.tecnicoEjecutor?.nombre || a.tecnicoAsignado?.nombre || "—" },
     { field: "idClienteInterno", headerName: "ID Cliente", renderCell: (a) => a.equipo?.idInterno || "—" },
+    {
+      field: "portada",
+      headerName: "Portada",
+      align: "center",
+      renderCell: (a) => (
+        <Tooltip title="Ver / descargar hoja del equipo (vista previa)">
+          <IconButton size="small" onClick={() => window.open(`/informe/asignacion/${a._id}/preview`, "_blank")}>
+            <DescriptionOutlinedIcon fontSize="small" sx={{ color: "secondary.main" }} />
+          </IconButton>
+        </Tooltip>
+      ),
+    },
     {
       field: "grafica",
       headerName: "Gráfica",

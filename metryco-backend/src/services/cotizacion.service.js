@@ -101,7 +101,7 @@ async function obtener(id) {
 }
 
 async function crear(datos, usuarioId) {
-  const { cliente, razonSocial, contacto, vigencia, items, observaciones, moneda, ivaPorcentaje } = datos;
+  const { cliente, razonSocial, contacto, vigencia, ordenCompra, items, observaciones, moneda, ivaPorcentaje } = datos;
 
   if (!mongoose.isValidObjectId(cliente)) {
     throw new AppError("Cliente inválido", 400);
@@ -122,6 +122,7 @@ async function crear(datos, usuarioId) {
     contacto: contacto || undefined,
     razonSocial: razonSocial || undefined,
     vigencia,
+    ordenCompra: ordenCompra || undefined,
     items,
     observaciones,
     moneda: moneda || "MXN",
@@ -132,8 +133,9 @@ async function crear(datos, usuarioId) {
 }
 
 async function actualizar(id, datos) {
-  const { cliente, razonSocial, contacto, vigencia, items, observaciones, status, moneda, ivaPorcentaje } = datos;
+  const { cliente, razonSocial, contacto, vigencia, ordenCompra, items, observaciones, status, moneda, ivaPorcentaje } = datos;
   const cambios = {};
+  if (ordenCompra !== undefined) cambios.ordenCompra = ordenCompra;
 
   if (cliente) {
     if (!mongoose.isValidObjectId(cliente)) throw new AppError("Cliente inválido", 400);

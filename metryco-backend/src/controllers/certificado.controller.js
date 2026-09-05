@@ -1,6 +1,10 @@
 const asyncHandler = require("../utils/asyncHandler");
 const service = require("../services/certificado.service");
 
+const previsualizar = asyncHandler(async (req, res) => {
+  res.json({ success: true, data: await service.previsualizar(req.params.asignacionId) });
+});
+
 const listar = asyncHandler(async (req, res) => {
   const { search = "", clienteId = "", estado = "", page = 0, pageSize = 10 } = req.query;
   const { items, total } = await service.listar({
@@ -63,5 +67,5 @@ const descargarPdf = asyncHandler(async (req, res) => {
 
 module.exports = {
   listar, obtener, exportar, emitir, actualizar, cambiarEstado, adjuntarPdf,
-  anular, regenerarToken, qrPng, qrSvg, descargarPdf, porReporte,
+  anular, regenerarToken, qrPng, qrSvg, descargarPdf, porReporte, previsualizar,
 };

@@ -344,6 +344,35 @@ const MODELOS = [
       },
     ],
   },
+  {
+    magnitud: "par_torsional", tipoInstrumento: "torquimetro",
+    nombre: "Torquímetro — error de indicación",
+    mensurando: "Error de indicación del torquímetro en cada punto de calibración",
+    unidad: "N·m",
+    normaReferencia: "JCGM 100:2008 (GUM); EURAMET cg-14 (calibración de instrumentos de medición de par estático)",
+    contribuciones: [
+      resolucion("N·m", "Torquímetro digital: a = resolución/2. Con carátula/aguja: a = división de escala/2."),
+      repetibilidad("N·m"),
+      certPatron("N·m", "Certificado del brazo/celda de torque patrón utilizado en el punto."),
+      derivaPatron("N·m"),
+      temperatura("N·m", "Coeficiente de temperatura del sensor de par × desviación respecto a la temperatura de referencia."),
+      {
+        fuente: "Excentricidad / desalineación del eje de aplicación", simbolo: "δM_exc",
+        tipo: "B", modo: "semiamplitud", distribucion: "rectangular", valorSugerido: 0, unidad: "N·m",
+        ayuda: "Efecto de no aplicar la fuerza exactamente perpendicular al brazo de palanca (desalineación angular).",
+      },
+      {
+        fuente: "Longitud efectiva del brazo de palanca", simbolo: "δM_L",
+        tipo: "B", modo: "semiamplitud", distribucion: "rectangular", valorSugerido: 0, unidad: "N·m",
+        ayuda: "Incertidumbre de la longitud real del brazo (medición directa o del punto de aplicación de la fuerza patrón).",
+      },
+      {
+        fuente: "Histéresis (ciclo aplicación/liberación de carga)", simbolo: "δM_hist",
+        tipo: "B", modo: "semiamplitud", distribucion: "rectangular", valorSugerido: 0, unidad: "N·m",
+        ayuda: "Diferencia entre lectura al aplicar carga creciente vs. decreciente en el mismo punto.",
+      },
+    ],
+  },
 ];
 
 /* ------------------------------------------------------------------ */

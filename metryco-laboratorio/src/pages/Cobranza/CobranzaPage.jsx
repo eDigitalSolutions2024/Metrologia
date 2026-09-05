@@ -139,9 +139,15 @@ function NuevoRegistroDialog({ open, onClose, onCreated, prefill }) {
               <Grid size={{ xs: 12, sm: 6 }}>
                 <FormControl fullWidth size="small">
                   <InputLabel>Días de Pago</InputLabel>
-                  <Select label="Días de Pago" defaultValue={30} {...register("diasPago")} sx={{ borderRadius: 2 }}>
-                    {DIAS_PAGO_OPCIONES.map((d) => <MenuItem key={d} value={d}>{d === 0 ? "Contado" : `${d} días`}</MenuItem>)}
-                  </Select>
+                  <Controller
+                    name="diasPago"
+                    control={control}
+                    render={({ field }) => (
+                      <Select label="Días de Pago" {...field} value={field.value ?? 30} sx={{ borderRadius: 2 }}>
+                        {DIAS_PAGO_OPCIONES.map((d) => <MenuItem key={d} value={d}>{d === 0 ? "Contado" : `${d} días`}</MenuItem>)}
+                      </Select>
+                    )}
+                  />
                 </FormControl>
               </Grid>
               <Grid size={{ xs: 12 }}>

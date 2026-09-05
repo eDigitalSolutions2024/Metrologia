@@ -27,6 +27,11 @@ export async function eliminarPatron(id) {
   return data.data;
 }
 
+export async function eliminarPatronPermanente(id) {
+  const { data } = await api.delete(`${ENDPOINTS.PATRONES}/${id}/permanente`);
+  return data.data;
+}
+
 export async function obtenerSiguienteCodigoPatron() {
   const { data } = await api.get(`${ENDPOINTS.PATRONES}/siguiente-codigo`);
   return data.data.codigo;

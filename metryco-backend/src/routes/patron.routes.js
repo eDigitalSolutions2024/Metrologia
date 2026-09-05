@@ -23,6 +23,7 @@ router.get("/:id/qr.svg", c.qrSvg);
 router.post("/", requireRole("admin", "coordinador"), validate(crearPatronSchema), c.crear);
 router.put("/:id", requireRole("admin", "coordinador"), validate(actualizarPatronSchema), c.actualizar);
 router.post("/:id/certificado", requireRole("admin", "coordinador"), pdfPatron, c.adjuntarPdf);
-router.delete("/:id", requireRole("admin", "coordinador"), auditar("patron_eliminado", "Patron"), c.eliminar);
+router.delete("/:id", requireRole("admin", "coordinador"), auditar("patron_dado_de_baja", "Patron"), c.eliminar);
+router.delete("/:id/permanente", requireRole("admin", "coordinador"), auditar("patron_eliminado", "Patron"), c.eliminarPermanente);
 
 module.exports = router;

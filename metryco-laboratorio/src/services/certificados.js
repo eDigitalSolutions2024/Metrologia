@@ -20,6 +20,11 @@ export async function obtenerCertificado(id) {
   return data.data;
 }
 
+export async function previsualizarCertificado(asignacionId) {
+  const { data } = await api.get(`${ENDPOINTS.CERTIFICADOS}/preview/${asignacionId}`);
+  return data.data;
+}
+
 export async function listarCertificadosPorReporte(reporteId) {
   const { data } = await api.get(`${ENDPOINTS.CERTIFICADOS}/por-reporte/${reporteId}`);
   return data.data;

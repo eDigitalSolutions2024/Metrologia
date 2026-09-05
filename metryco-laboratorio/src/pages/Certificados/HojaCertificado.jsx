@@ -173,9 +173,14 @@ export default function HojaCertificado({ cert, ultima = true }) {
           <Typography sx={{ fontSize: 10.5, color: "#666", fontStyle: "italic" }}>Calibration Certificate</Typography>
         </Box>
       </Box>
-      <Typography sx={{ textAlign: "center", fontWeight: 800, fontSize: 18, color: "#1a9c3e", mb: 0.5 }}>
+      <Typography sx={{ textAlign: "center", fontWeight: 800, fontSize: 18, color: cert.preview ? "#b45309" : "#1a9c3e", mb: 0.5 }}>
         {cert.folio}
       </Typography>
+      {cert.preview && (
+        <Typography sx={{ textAlign: "center", fontSize: 10.5, color: "#b45309", fontWeight: 700, mb: 1 }}>
+          VISTA PREVIA — sin folio ni QR hasta que Calidad autorice y se emita el certificado
+        </Typography>
+      )}
 
       {/* ---------- Customer Information ---------- */}
       <Banda>Customer Information</Banda>

@@ -12,14 +12,15 @@ export default function AppInput({ label, error, helperText, type, onClick, slot
       error={!!error}
       helperText={error?.message || helperText}
       onClick={isDate ? (e) => { e.target.showPicker?.(); onClick?.(e); } : onClick}
-      // El valor de estos campos suele llegar por react-hook-form vía
-      // reset() (ediciones, datos cargados async) en vez de un onChange del
-      // usuario — MUI no se entera de eso y el label se queda sin "encoger",
-      // quedando superpuesto sobre el texto ya cargado. Forzar shrink:true
-      // lo evita siempre (el label queda arriba desde el inicio, aun vacío).
+      // Los inputs nativos type="date" siempre muestran su propio formato
+      // (dd/mm/aaaa) aunque no tengan valor, así que su label debe quedar
+      // arriba desde el inicio o se superpone — eso sí se fuerza siempre.
+      // El resto de los campos usa el comportamiento normal de MUI (sube al
+      // enfocar o si hay valor); el caller puede forzarlo puntualmente
+      // pasando su propio slotProps.inputLabel (ej. un valor autogenerado).
       slotProps={{
         ...slotProps,
-        inputLabel: { shrink: true, ...slotProps?.inputLabel },
+        inputLabel: isDate ? { shrink: true, ...slotProps?.inputLabel } : slotProps?.inputLabel,
       }}
       sx={{
         "& .MuiOutlinedInput-root": {

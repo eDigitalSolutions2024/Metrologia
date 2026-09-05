@@ -6,7 +6,6 @@ import {
 } from "@mui/material";
 import SearchIcon from "@mui/icons-material/Search";
 import AddIcon from "@mui/icons-material/Add";
-import EditOutlinedIcon from "@mui/icons-material/EditOutlined";
 import VisibilityOutlinedIcon from "@mui/icons-material/VisibilityOutlined";
 import FileDownloadOutlinedIcon from "@mui/icons-material/FileDownloadOutlined";
 import ReceiptLongOutlinedIcon from "@mui/icons-material/ReceiptLongOutlined";
@@ -16,7 +15,12 @@ import { DeleteOutlined as DeleteOutlineIcon } from "@mui/icons-material";
 import AppButton from "../../shared/components/AppButton";
 import AppTable from "../../shared/components/AppTable";
 import PageHeader from "../../shared/components/PageHeader";
+import StatCard from "../../shared/components/StatCard";
 import RequestQuoteOutlinedIcon from "@mui/icons-material/RequestQuoteOutlined";
+import PendingActionsOutlinedIcon from "@mui/icons-material/PendingActionsOutlined";
+import CheckCircleOutlineIcon from "@mui/icons-material/CheckCircleOutlineOutlined";
+import HighlightOffOutlinedIcon from "@mui/icons-material/HighlightOffOutlined";
+import PaidOutlinedIcon from "@mui/icons-material/PaidOutlined";
 import ConfirmDialog from "../../shared/components/ConfirmDialog";
 import CotizacionDialog from "./CotizacionDialog";
 import { formatDate } from "../../shared/utils/formatDate";
@@ -68,8 +72,9 @@ export default function CotizacionesPage() {
   const [error, setError] = useState("");
   const [reloadKey, setReloadKey] = useState(0);
 
-  const [dialogAbierto, setDialogAbierto] = useState(false);
-  const [cotizacionEditando, setCotizacionEditando] = useState(null);
+  const editarIdInicial = searchParams.get("editar");
+  const [dialogAbierto, setDialogAbierto] = useState(!!editarIdInicial);
+  const [cotizacionEditando, setCotizacionEditando] = useState(editarIdInicial);
   const [duplicarDesde, setDuplicarDesde] = useState(null);
 
   const debouncedSearch = useDebounce(search, 400);
@@ -88,12 +93,7 @@ export default function CotizacionesPage() {
   }, []);
 
   useEffect(() => {
-    const editarId = searchParams.get("editar");
-    if (editarId) {
-      setCotizacionEditando(editarId);
-      setDialogAbierto(true);
-      setSearchParams({}, { replace: true });
-    }
+    if (editarIdInicial) setSearchParams({}, { replace: true });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -131,6 +131,7 @@ export default function CotizacionesPage() {
   const totalAprobado = rows
     .filter((c) => c.status === "aprobada" || c.status === "facturada")
     .reduce((s, c) => s + c.total, 0);
+  const cuenta = (status) => rows.filter((c) => c.status === status).length;
 
   const handleEliminar = async () => {
     const target = deleteTarget;
@@ -271,12 +272,7 @@ export default function CotizacionesPage() {
       <PageHeader
         icon={<RequestQuoteOutlinedIcon />}
         title="Cotizaciones"
-        subtitle={
-          <>
-            {totalCount} registros · Aprobadas + Facturadas (esta página):{" "}
-            <Box component="span" sx={{ fontWeight: 700, color: "secondary.main" }}>{formatCurrency(totalAprobado)}</Box>
-          </>
-        }
+        subtitle={`${totalCount} registros en total`}
         actions={
           <AppButton startIcon={<AddIcon />} onClick={abrirNueva} sx={{ borderRadius: 2 }}>
             Nueva Cotización
@@ -285,6 +281,13 @@ export default function CotizacionesPage() {
       />
 
       {error && <Alert severity="error" sx={{ mb: 2, borderRadius: 2 }}>{error}</Alert>}
+
+      <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", sm: "repeat(2,1fr)", md: "repeat(4,1fr)" }, gap: 2.5, mb: 3.5 }}>
+        <StatCard label="Pendientes (página)" value={cuenta("pendiente")} icon={<PendingActionsOutlinedIcon />} color="#D97706" />
+        <StatCard label="Aprobadas (página)" value={cuenta("aprobada")} icon={<CheckCircleOutlineIcon />} color="#16A34A" />
+        <StatCard label="Rechazadas (página)" value={cuenta("rechazada")} icon={<HighlightOffOutlinedIcon />} color="#DC2626" />
+        <StatCard label="Aprobado + Facturado" value={formatCurrency(totalAprobado)} icon={<PaidOutlinedIcon />} color="#0F766E" />
+      </Box>
 
       <Box sx={{ display: "flex", gap: 2, mb: 2, flexWrap: "wrap" }}>
         <FormControl size="small" sx={{ minWidth: 140 }}>

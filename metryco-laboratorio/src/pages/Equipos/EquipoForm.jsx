@@ -5,14 +5,21 @@ import {
   Box, Typography, Grid, MenuItem, Select, FormControl, InputLabel, Chip, Alert,
 } from "@mui/material";
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
+import BadgeOutlinedIcon from "@mui/icons-material/BadgeOutlined";
+import BuildOutlinedIcon from "@mui/icons-material/BuildOutlined";
+import PaymentsOutlinedIcon from "@mui/icons-material/PaymentsOutlined";
+import ChatBubbleOutlineOutlinedIcon from "@mui/icons-material/ChatBubbleOutlineOutlined";
+import StraightenOutlinedIcon from "@mui/icons-material/StraightenOutlined";
 
 import AppButton from "../../shared/components/AppButton";
 import AppCard from "../../shared/components/AppCard";
 import AppInput from "../../shared/components/AppInput";
+import PageHeader from "../../shared/components/PageHeader";
+import PrecisionManufacturingOutlinedIcon from "@mui/icons-material/PrecisionManufacturingOutlined";
 import { listarClientes } from "../../services/clientes";
 import { listarPatrones } from "../../services/patrones";
 import { obtenerEquipo, crearEquipo, actualizarEquipo, obtenerSiguienteIdInterno } from "../../services/equipos";
-import { CATEGORIAS } from "./categorias";
+import { CATEGORIAS, iconoCategoria, colorCategoria } from "./categorias";
 import { useAuth } from "../../core/auth/useAuth";
 
 // Refleja php/nequipo.php: el equipo pertenece a un cliente (empId) y se le
@@ -37,6 +44,7 @@ export default function EquipoForm() {
   });
 
   const clienteIdElegido = watch("clienteId");
+  const idInternoValor = watch("idInterno");
 
   // En alta (no edición): en cuanto se elige cliente, se muestra de una vez
   // el ID que le tocaría (prefijo del nombre del cliente + consecutivo) —
@@ -111,20 +119,21 @@ export default function EquipoForm() {
 
   return (
     <Box>
-      <Box sx={{ display: "flex", alignItems: "center", gap: 2, mb: 3 }}>
-        <AppButton variant="outlined" startIcon={<ArrowBackIcon />} onClick={() => navigate("/equipos")} sx={{ borderRadius: 2 }}>
-          Regresar
-        </AppButton>
-        <Box>
-          <Typography variant="h5" fontWeight={700}>{isEdit ? "Edición de Equipo" : "Nuevo Equipo"}</Typography>
-          <Typography variant="body2" color="text.secondary">Equipo del cliente sujeto a calibración</Typography>
-        </Box>
-      </Box>
+      <PageHeader
+        icon={<PrecisionManufacturingOutlinedIcon />}
+        title={isEdit ? "Edición de Equipo" : "Nuevo Equipo"}
+        subtitle="Equipo del cliente sujeto a calibración"
+        actions={
+          <AppButton variant="outlined" startIcon={<ArrowBackIcon />} onClick={() => navigate("/equipos")} sx={{ borderRadius: 2 }}>
+            Regresar
+          </AppButton>
+        }
+      />
 
       {error && <Alert severity="error" sx={{ mb: 2, borderRadius: 2 }} onClose={() => setError("")}>{error}</Alert>}
 
       <Box component="form" onSubmit={handleSubmit(onSubmit)}>
-        <AppCard title="Identificación" sx={{ mb: 3 }}>
+        <AppCard title="Identificación" icon={<BadgeOutlinedIcon />} sx={{ mb: 3 }}>
           <Grid container spacing={2}>
             <Grid size={{ xs: 12, md: 3 }}>
               <AppInput
@@ -137,6 +146,7 @@ export default function EquipoForm() {
                   : "Editado manualmente"
                 }
                 error={errors.idInterno}
+                slotProps={{ inputLabel: { shrink: !!idInternoValor } }}
                 {...register("idInterno", {
                   onChange: () => setIdAutoGenerado(false),
                 })}
@@ -165,7 +175,14 @@ export default function EquipoForm() {
                   <FormControl fullWidth size="small">
                     <InputLabel>Categoría</InputLabel>
                     <Select label="Categoría" {...field} value={field.value ?? ""} sx={{ borderRadius: 2 }}>
-                      {CATEGORIAS.map((c) => <MenuItem key={c} value={c}>{c}</MenuItem>)}
+                      {CATEGORIAS.map((c) => {
+                        const Icono = iconoCategoria(c);
+                        return (
+                          <MenuItem key={c} value={c} sx={{ display: "flex", gap: 1 }}>
+                            <Icono fontSize="small" sx={{ color: colorCategoria(c) }} /> {c}
+                          </MenuItem>
+                        );
+                      })}
                     </Select>
                   </FormControl>
                 )}
@@ -174,7 +191,7 @@ export default function EquipoForm() {
           </Grid>
         </AppCard>
 
-        <AppCard title="Datos Técnicos" sx={{ mb: 3 }}>
+        <AppCard title="Datos Técnicos" icon={<StraightenOutlinedIcon />} sx={{ mb: 3 }}>
           <Grid container spacing={2}>
             <Grid size={{ xs: 12, md: 4 }}>
               <AppInput label="Marca" {...register("marca")} />
@@ -209,7 +226,11 @@ export default function EquipoForm() {
           </Grid>
         </AppCard>
 
-        <AppCard title={verCosto ? "Costo y comentarios" : "Comentarios"} sx={{ mb: 3 }}>
+        <AppCard
+          title={verCosto ? "Costo y comentarios" : "Comentarios"}
+          icon={verCosto ? <PaymentsOutlinedIcon /> : <ChatBubbleOutlineOutlinedIcon />}
+          sx={{ mb: 3 }}
+        >
           <Grid container spacing={2}>
             {verCosto && (
               <>
@@ -227,7 +248,10 @@ export default function EquipoForm() {
           </Grid>
         </AppCard>
 
-        <AppCard title="Patrones a utilizar" sx={{ mb: 3 }}>
+        <AppCard title="Patrones a utilizar" icon={<BuildOutlinedIcon />} sx={{ mb: 3 }}>
+          <Typography variant="caption" color="text.secondary" sx={{ display: "block", mb: 2 }}>
+            Opcional — se sugieren automáticamente al asignar este equipo a un reporte, y se pueden ajustar ahí.
+          </Typography>
           <Controller
             name="patrones"
             control={control}

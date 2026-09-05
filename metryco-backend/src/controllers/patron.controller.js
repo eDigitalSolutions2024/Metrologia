@@ -29,6 +29,10 @@ const eliminar = asyncHandler(async (req, res) => {
   res.json({ success: true, data: await service.eliminar(req.params.id) });
 });
 
+const eliminarPermanente = asyncHandler(async (req, res) => {
+  res.json({ success: true, data: await service.eliminarPermanente(req.params.id) });
+});
+
 const adjuntarPdf = asyncHandler(async (req, res) => {
   res.json({ success: true, data: await service.adjuntarPdf(req.params.id, req.file, req.user) });
 });
@@ -56,6 +60,6 @@ const qrSvg = asyncHandler(async (req, res) => {
 });
 
 module.exports = {
-  listar, obtener, crear, actualizar, eliminar, adjuntarPdf, porVencer,
+  listar, obtener, crear, actualizar, eliminar, eliminarPermanente, adjuntarPdf, porVencer,
   adjuntarCertificado, descargarCertificado, qrPng, qrSvg, siguienteCodigo,
 };
