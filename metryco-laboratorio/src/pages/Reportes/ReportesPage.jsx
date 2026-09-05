@@ -26,6 +26,8 @@ import FactCheckOutlinedIcon from "@mui/icons-material/FactCheckOutlined";
 import { formatDate } from "../../shared/utils/formatDate";
 import { listarClientes } from "../../services/clientes";
 import { listarReportes, crearReporte } from "../../services/reportes";
+import { listarContactos } from "../../services/contactos";
+import { listarCotizaciones } from "../../services/cotizaciones";
 import { useAuth } from "../../core/auth/useAuth";
 
 const STATUS = {
@@ -220,6 +222,10 @@ export default function ReportesPage() {
 function NuevoReporteDialog({ open, onClose, onDone }) {
   const [clientes, setClientes] = useState([]);
   const [cliente, setCliente] = useState("");
+  const [contactos, setContactos] = useState([]);
+  const [contacto, setContacto] = useState("");
+  const [cotizaciones, setCotizaciones] = useState([]);
+  const [cotizacion, setCotizacion] = useState("");
   const [oc, setOc] = useState("");
   const [obs, setObs] = useState("");
   const [error, setError] = useState("");
@@ -228,14 +234,27 @@ function NuevoReporteDialog({ open, onClose, onDone }) {
   useEffect(() => {
     if (!open) return;
     setCliente(""); setOc(""); setObs(""); setError("");
+    setContactos([]); setContacto(""); setCotizaciones([]); setCotizacion("");
     listarClientes({ pageSize: 200 }).then(({ items }) => setClientes(items)).catch(() => {});
   }, [open]);
+
+  useEffect(() => {
+    setContacto(""); setCotizacion("");
+    if (!cliente) { setContactos([]); setCotizaciones([]); return; }
+    listarContactos(cliente).then(setContactos).catch(() => setContactos([]));
+    listarCotizaciones({ clienteId: cliente, pageSize: 100 })
+      .then(({ items }) => setCotizaciones(items))
+      .catch(() => setCotizaciones([]));
+  }, [cliente]);
 
   const crear = async () => {
     if (!cliente) { setError("Elige un cliente."); return; }
     setSaving(true); setError("");
     try {
-      const r = await crearReporte({ cliente, ordenCompra: oc || undefined, observaciones: obs || undefined });
+      const r = await crearReporte({
+        cliente, contacto: contacto || undefined, cotizacion: cotizacion || undefined,
+        ordenCompra: oc || undefined, observaciones: obs || undefined,
+      });
       onDone(r);
     } catch (e) {
       setError(e?.response?.data?.message || "No se pudo crear el reporte.");
@@ -250,6 +269,22 @@ function NuevoReporteDialog({ open, onClose, onDone }) {
         <Box sx={{ display: "flex", flexDirection: "column", gap: 2, mt: 0.5 }}>
           <TextField select fullWidth size="small" label="Cliente" value={cliente} onChange={(e) => setCliente(e.target.value)}>
             {clientes.map((c) => <MenuItem key={c._id} value={c._id}>{c.nombre}</MenuItem>)}
+          </TextField>
+          <TextField
+            select fullWidth size="small" label="Contacto (opcional)" value={contacto}
+            onChange={(e) => setContacto(e.target.value)} disabled={!cliente}
+            helperText={cliente && contactos.length === 0 ? "Este cliente no tiene contactos registrados" : ""}
+          >
+            <MenuItem value="">— Sin especificar —</MenuItem>
+            {contactos.map((c) => <MenuItem key={c._id} value={c._id}>{c.nombre}</MenuItem>)}
+          </TextField>
+          <TextField
+            select fullWidth size="small" label="Cotización (opcional)" value={cotizacion}
+            onChange={(e) => setCotizacion(e.target.value)} disabled={!cliente}
+            helperText={cliente && cotizaciones.length === 0 ? "Este cliente no tiene cotizaciones registradas" : ""}
+          >
+            <MenuItem value="">— Sin especificar —</MenuItem>
+            {cotizaciones.map((c) => <MenuItem key={c._id} value={c._id}>{c.folio}</MenuItem>)}
           </TextField>
           <TextField fullWidth size="small" label="Orden de compra (opcional)" value={oc} onChange={(e) => setOc(e.target.value)} />
           <TextField fullWidth size="small" label="Observaciones (opcional)" multiline minRows={2} value={obs} onChange={(e) => setObs(e.target.value)} />
