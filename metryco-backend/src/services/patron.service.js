@@ -1,7 +1,6 @@
 const fs = require("fs");
 const path = require("path");
 const Patron = require("../models/Patron");
-const Counter = require("../models/Counter");
 const AppError = require("../utils/AppError");
 const escapeRegex = require("../utils/escapeRegex");
 const { crearEvento } = require("../utils/historial");
@@ -10,19 +9,25 @@ const qr = require("../utils/qr");
 
 /**
  * Código consecutivo global (no hay "cliente" en Patrón): "PAT-001", "PAT-002"...
- * Solo se usa cuando no se captura uno propio.
+ * Solo se usa cuando no se captura uno propio. Se calcula a partir del mayor
+ * consecutivo que YA EXISTE (incluyendo códigos capturados a mano) — un
+ * contador aparte se podía desincronizar de la realidad.
  */
 async function siguienteCodigo() {
-  for (let intento = 0; intento < 20; intento++) {
-    const counter = await Counter.findByIdAndUpdate(
-      "PAT-CODIGO",
-      { $inc: { seq: 1 } },
-      { new: true, upsert: true }
-    );
-    const codigo = `PAT-${String(counter.seq).padStart(3, "0")}`;
-    if (!(await Patron.exists({ codigo }))) return codigo;
+  const regex = /^PAT-(\d+)$/;
+  const existentes = await Patron.find({ codigo: regex }).select("codigo");
+  const maxActual = existentes.reduce((max, p) => {
+    const n = parseInt(p.codigo.match(regex)[1], 10);
+    return n > max ? n : max;
+  }, 0);
+
+  let siguiente = maxActual + 1;
+  let codigo = `PAT-${String(siguiente).padStart(3, "0")}`;
+  while (await Patron.exists({ codigo })) {
+    siguiente++;
+    codigo = `PAT-${String(siguiente).padStart(3, "0")}`;
   }
-  throw new AppError("No se pudo generar un código único, intenta capturarlo manualmente", 500);
+  return codigo;
 }
 
 function urlInterna(id) {

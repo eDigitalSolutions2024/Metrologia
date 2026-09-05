@@ -1,7 +1,6 @@
 const mongoose = require("mongoose");
 const Equipo = require("../models/Equipo");
 const Cliente = require("../models/Cliente");
-const Counter = require("../models/Counter");
 const AppError = require("../utils/AppError");
 const escapeRegex = require("../utils/escapeRegex");
 const qr = require("../utils/qr");
@@ -32,23 +31,32 @@ function prefijoDesdeNombre(nombre = "") {
  * ID interno consecutivo por CLIENTE (no global), con prefijo ligado a su
  * nombre para que sea identificable a simple vista: "AB-001", "AB-002"...
  * Solo se usa cuando el usuario no captura uno propio (código de activo del
- * cliente) — el contador es atómico así que es seguro con concurrencia.
+ * cliente).
+ *
+ * Se calcula a partir del MAYOR consecutivo que YA EXISTE con ese mismo
+ * prefijo (incluyendo códigos capturados a mano, no solo los auto-generados
+ * antes) — un contador aparte se podía desincronizar de la realidad si
+ * alguien capturaba un código manual; así siempre sigue la secuencia real.
  */
 async function siguienteIdInterno(clienteId) {
   const cliente = await Cliente.findById(clienteId).select("nombre nombreComercial");
   const prefijo = prefijoDesdeNombre(cliente?.nombreComercial || cliente?.nombre);
+  const regex = new RegExp(`^${prefijo}-(\\d+)$`);
 
-  for (let intento = 0; intento < 20; intento++) {
-    const counter = await Counter.findByIdAndUpdate(
-      `EQ-${clienteId}`,
-      { $inc: { seq: 1 } },
-      { new: true, upsert: true }
-    );
-    const idInterno = `${prefijo}-${String(counter.seq).padStart(3, "0")}`;
-    // Por si alguien ya había capturado ese mismo código a mano antes.
-    if (!(await Equipo.exists({ cliente: clienteId, idInterno }))) return idInterno;
+  const existentes = await Equipo.find({ cliente: clienteId, idInterno: regex }).select("idInterno");
+  const maxActual = existentes.reduce((max, e) => {
+    const n = parseInt(e.idInterno.match(regex)[1], 10);
+    return n > max ? n : max;
+  }, 0);
+
+  let siguiente = maxActual + 1;
+  let idInterno = `${prefijo}-${String(siguiente).padStart(3, "0")}`;
+  // Por si dos altas se cruzan justo entre el cálculo y el guardado real.
+  while (await Equipo.exists({ cliente: clienteId, idInterno })) {
+    siguiente++;
+    idInterno = `${prefijo}-${String(siguiente).padStart(3, "0")}`;
   }
-  throw new AppError("No se pudo generar un ID interno único, intenta capturarlo manualmente", 500);
+  return idInterno;
 }
 
 function urlInterna(id) {
