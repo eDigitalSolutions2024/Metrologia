@@ -133,6 +133,16 @@ export function crearTheme(coloresMarca = COLORES_MARCA_DEFAULT) {
       },
     },
 
+    // Sin esto, el label de CUALQUIER TextField/Select del sistema (no solo
+    // AppInput) se queda sin "encoger" cuando el valor llega vía
+    // react-hook-form reset() en vez de un onChange del usuario (editar un
+    // registro, datos autogenerados, etc.) — queda superpuesto letra sobre
+    // letra con el valor. Se fuerza aquí, a nivel de tema, para que ningún
+    // formulario del sistema pueda tener este bug otra vez.
+    MuiInputLabel: {
+      defaultProps: { shrink: true },
+    },
+
     MuiOutlinedInput: {
       styleOverrides: {
         root: {
@@ -145,6 +155,13 @@ export function crearTheme(coloresMarca = COLORES_MARCA_DEFAULT) {
           "& .MuiOutlinedInput-notchedOutline": { borderColor: "var(--mui-palette-divider)" },
           "&:hover .MuiOutlinedInput-notchedOutline": { borderColor: "var(--mui-palette-text-disabled)" },
           "&.Mui-focused": { boxShadow: `0 0 0 4px rgba(${rgbSecundario},.12)` },
+          // El autocompletado de Chrome/Edge pinta su propio fondo claro sin
+          // importar el tema oscuro, dejando el label casi ilegible encima.
+          "& input:-webkit-autofill, & input:-webkit-autofill:hover, & input:-webkit-autofill:focus": {
+            WebkitTextFillColor: "var(--mui-palette-text-primary)",
+            WebkitBoxShadow: "0 0 0px 1000px var(--mui-palette-background-paper) inset",
+            transition: "background-color 600000s ease-in-out 0s",
+          },
         },
       },
     },
