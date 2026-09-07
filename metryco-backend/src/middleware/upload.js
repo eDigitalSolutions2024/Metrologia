@@ -166,6 +166,39 @@ const importarPerformance = (req, res, next) => {
   });
 };
 
+// --- Importación de plantillas de incertidumbre desde Word/Excel ---
+// Igual que arriba: solo se lee en memoria, la IA la interpreta y se
+// descarta — el archivo en sí nunca se guarda.
+const MIME_DOCUMENTO = [
+  ...MIME_HOJA_CALCULO,
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+];
+
+function soloDocumentoOficina(_req, file, cb) {
+  const ext = path.extname(file.originalname).toLowerCase();
+  if (MIME_DOCUMENTO.includes(file.mimetype) || [".csv", ".xls", ".xlsx", ".docx"].includes(ext)) {
+    return cb(null, true);
+  }
+  cb(new AppError("Solo se permiten archivos Word (.docx) o Excel (.xlsx, .xls)", 400));
+}
+
+const subirDocumentoOficina = multer({
+  storage: multer.memoryStorage(),
+  fileFilter: soloDocumentoOficina,
+  limits: { fileSize: 8 * 1024 * 1024, files: 1 },
+}).single("archivo");
+
+const importarPlantillaIncertidumbre = (req, res, next) => {
+  subirDocumentoOficina(req, res, (err) => {
+    if (err instanceof multer.MulterError) {
+      const msg = err.code === "LIMIT_FILE_SIZE" ? "El archivo supera el tamaño máximo (8 MB)" : err.message;
+      return next(new AppError(msg, 400));
+    }
+    if (err) return next(err);
+    next();
+  });
+};
+
 module.exports = {
   pdfCertificado,
   pdfPatron,
@@ -177,4 +210,5 @@ module.exports = {
   grafica, destinoGraficas,
   adjuntoCotizacion, destinoAdjuntosCotizacion,
   importarPerformance,
+  importarPlantillaIncertidumbre,
 };

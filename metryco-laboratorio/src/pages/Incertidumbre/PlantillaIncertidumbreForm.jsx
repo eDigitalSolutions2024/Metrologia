@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { useNavigate, useParams, useLocation } from "react-router-dom";
 import { useForm, Controller, useFieldArray } from "react-hook-form";
 import {
   Box, Typography, Grid, MenuItem, Select, FormControl, InputLabel, Alert,
@@ -8,6 +8,7 @@ import {
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
 import AddIcon from "@mui/icons-material/Add";
 import DeleteOutlineIcon from "@mui/icons-material/DeleteOutlined";
+import AutoAwesomeOutlinedIcon from "@mui/icons-material/AutoAwesomeOutlined";
 
 import AppButton from "../../shared/components/AppButton";
 import AppCard from "../../shared/components/AppCard";
@@ -32,13 +33,17 @@ const contribucionVacia = () => ({
 export default function PlantillaIncertidumbreForm() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const location = useLocation();
   const isEdit = !!id;
+  const importado = location.state?.importado; // viene de "Importar Word/Excel" en el listado
+  const nombreArchivoImportado = location.state?.nombreArchivo;
 
   const [loading, setLoading] = useState(isEdit);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [magnitudes, setMagnitudes] = useState([]);
   const [unidadTocada, setUnidadTocada] = useState(false);
+  const [avisoImportacion, setAvisoImportacion] = useState(null); // { advertencias, textoExtraido, aplicada }
 
   const { register, control, handleSubmit, reset, watch, setValue, formState: { errors } } = useForm({
     defaultValues: {
@@ -59,6 +64,67 @@ export default function PlantillaIncertidumbreForm() {
   useEffect(() => {
     listarMagnitudes().then(setMagnitudes).catch(() => setMagnitudes([]));
   }, []);
+
+  // Precarga con lo que trajo "Importar Word/Excel" (ver PlantillasIncertidumbrePage).
+  // Se espera a que el catálogo de magnitudes esté cargado para poder mapear
+  // el texto libre que devolvió la IA a las claves reales del sistema.
+  useEffect(() => {
+    if (isEdit || !importado || avisoImportacion || magnitudes.length === 0) return;
+
+    const { modo, plantilla, advertencias = [] } = importado;
+    const avisos = [...advertencias];
+
+    if (modo !== "ia" || !plantilla) {
+      setAvisoImportacion({ aplicada: false, avisos, textoExtraido: importado.textoExtraido });
+      return;
+    }
+
+    const normaliza = (s) => String(s ?? "").trim().toLowerCase();
+    const magnitudEncontrada = magnitudes.find(
+      (m) => normaliza(m.clave) === normaliza(plantilla.magnitud) || normaliza(m.nombre) === normaliza(plantilla.magnitud)
+    );
+    if (plantilla.magnitud && !magnitudEncontrada) {
+      avisos.push(`La IA sugirió la magnitud "${plantilla.magnitud}", que no existe en el catálogo — elígela manualmente.`);
+    }
+    const tipos = magnitudEncontrada?.tipos || [];
+    const tipoEncontrado = tipos.find(
+      (t) => normaliza(t.clave) === normaliza(plantilla.tipoInstrumento) || normaliza(t.nombre) === normaliza(plantilla.tipoInstrumento)
+    );
+    if (plantilla.tipoInstrumento && magnitudEncontrada && !tipoEncontrado) {
+      avisos.push(`La IA sugirió el instrumento "${plantilla.tipoInstrumento}", que no existe en esa magnitud — elígelo manualmente.`);
+    }
+
+    const reglaValida = REGLAS.includes(plantilla.criterioAceptacion?.regla) ? plantilla.criterioAceptacion.regla : "simple";
+
+    reset({
+      magnitud: magnitudEncontrada?.clave || "",
+      tipoInstrumento: tipoEncontrado?.clave || "",
+      nombre: plantilla.nombre || "",
+      mensurando: plantilla.mensurando || "",
+      unidad: plantilla.unidad || "",
+      normaReferencia: plantilla.normaReferencia || "JCGM 100:2008 (GUM); EA-4/02",
+      nivelConfianza: plantilla.nivelConfianza || "95.45%",
+      rangoTipico: plantilla.rangoTipico || "",
+      notas: plantilla.notas || "",
+      activo: true,
+      criterioEmp: plantilla.criterioAceptacion?.emp ?? "",
+      criterioRegla: reglaValida,
+      contribuciones: plantilla.contribuciones?.length
+        ? plantilla.contribuciones.map((c) => ({
+            fuente: c.fuente || "", simbolo: c.simbolo || "",
+            tipo: TIPOS.includes(c.tipo) ? c.tipo : "B",
+            modo: MODOS.includes(c.modo) ? c.modo : "semiamplitud",
+            distribucion: DISTRIBUCIONES.includes(c.distribucion) ? c.distribucion : "rectangular",
+            valorSugerido: c.valorSugerido ?? 0, k: c.k ?? 2, n: c.n ?? "",
+            divisorManual: c.divisorManual ?? "", coefSensibilidad: c.coefSensibilidad ?? 1,
+            gradosLibertad: c.gradosLibertad ?? "", unidad: c.unidad || "", ayuda: c.ayuda || "",
+            obligatoria: false,
+          }))
+        : [contribucionVacia()],
+    });
+    if (plantilla.unidad) setUnidadTocada(true);
+    setAvisoImportacion({ aplicada: true, avisos });
+  }, [importado, magnitudes, isEdit, avisoImportacion, reset]);
 
   // La unidad se propone sola a partir del catálogo (unidadSugerida del tipo
   // de instrumento elegido) — se puede seguir editando a mano si hace falta.
@@ -144,6 +210,41 @@ export default function PlantillaIncertidumbreForm() {
       </Box>
 
       {error && <Alert severity="error" sx={{ mb: 2, borderRadius: 2 }} onClose={() => setError("")}>{error}</Alert>}
+
+      {avisoImportacion && (
+        <Alert
+          severity={avisoImportacion.aplicada ? "info" : "warning"}
+          icon={<AutoAwesomeOutlinedIcon fontSize="inherit" />}
+          sx={{ mb: 2, borderRadius: 2 }}
+          onClose={() => setAvisoImportacion(null)}
+        >
+          {avisoImportacion.aplicada ? (
+            <>
+              <Typography variant="body2" fontWeight={700}>
+                Plantilla generada por IA {nombreArchivoImportado && `a partir de "${nombreArchivoImportado}"`} — revisa cada campo antes de guardar.
+              </Typography>
+            </>
+          ) : (
+            <Typography variant="body2" fontWeight={700}>
+              No se pudo interpretar el archivo automáticamente{nombreArchivoImportado && ` ("${nombreArchivoImportado}")`}. Captúrala a mano con el texto de abajo como referencia.
+            </Typography>
+          )}
+          {avisoImportacion.avisos?.map((a, i) => (
+            <Typography key={i} variant="caption" sx={{ display: "block", mt: 0.25 }}>· {a}</Typography>
+          ))}
+          {avisoImportacion.textoExtraido && (
+            <Box
+              sx={{
+                mt: 1.5, p: 1.5, borderRadius: 2, bgcolor: "background.paper", border: "1px solid",
+                borderColor: "divider", maxHeight: 220, overflow: "auto", whiteSpace: "pre-wrap",
+                fontSize: 12.5, fontFamily: "monospace",
+              }}
+            >
+              {avisoImportacion.textoExtraido}
+            </Box>
+          )}
+        </Alert>
+      )}
 
       <Box component="form" onSubmit={handleSubmit(onSubmit)}>
         <AppCard title="Información General" sx={{ mb: 3 }}>

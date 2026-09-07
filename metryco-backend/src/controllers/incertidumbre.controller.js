@@ -1,7 +1,9 @@
 const asyncHandler = require("../utils/asyncHandler");
+const AppError = require("../utils/AppError");
 const modelos = require("../services/modeloIncertidumbre.service");
 const calculos = require("../services/calculoIncertidumbre.service");
 const asistente = require("../services/asistente.service");
+const { extraerTexto } = require("../utils/extraerDocumento");
 
 /* ---------- Modelos / plantillas ---------- */
 const listarModelos = asyncHandler(async (req, res) => {
@@ -18,6 +20,16 @@ const actualizarModelo = asyncHandler(async (req, res) => {
 });
 const eliminarModelo = asyncHandler(async (req, res) => {
   res.json({ success: true, data: await modelos.eliminar(req.params.id) });
+});
+
+// Sube un Word/Excel con un presupuesto de incertidumbre "tal cual lo usan"
+// y la IA lo interpreta para precargar el formulario de plantilla nueva.
+// No guarda nada en la base de datos — el técnico revisa y da Guardar.
+const importarModelo = asyncHandler(async (req, res) => {
+  if (!req.file) throw new AppError("Selecciona un archivo Word (.docx) o Excel (.xlsx/.xls)", 400);
+  const texto = await extraerTexto(req.file.buffer, req.file.originalname);
+  const data = await asistente.interpretarPlantillaIncertidumbre({ texto, nombreArchivo: req.file.originalname });
+  res.json({ success: true, data });
 });
 
 /* ---------- Cálculos ejecutados ---------- */
@@ -58,7 +70,7 @@ const asistir = asyncHandler(async (req, res) => {
 });
 
 module.exports = {
-  listarModelos, obtenerModelo, crearModelo, actualizarModelo, eliminarModelo,
+  listarModelos, obtenerModelo, crearModelo, actualizarModelo, eliminarModelo, importarModelo,
   listarCalculos, obtenerCalculo, crearCalculo, recalcular, revisar, aprobar, preview,
   asistir,
 };

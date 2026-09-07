@@ -30,6 +30,19 @@ export async function eliminarModelo(id) {
   return data.data;
 }
 
+// Sube un Word (.docx) o Excel (.xlsx/.xls) con un presupuesto de
+// incertidumbre "tal cual lo usan" y la IA lo interpreta. No guarda nada:
+// devuelve { modo: "ia"|"sin_ia", plantilla, advertencias, textoExtraido? }
+// para precargar el formulario de plantilla nueva.
+export async function importarModelo(archivo) {
+  const form = new FormData();
+  form.append("archivo", archivo);
+  const { data } = await api.post(`${base}/modelos/importar`, form, {
+    headers: { "Content-Type": "multipart/form-data" },
+  });
+  return data.data;
+}
+
 /* ---- Motor determinístico (preview en vivo, no persiste) ---- */
 export async function previewIncertidumbre(payload) {
   const { data } = await api.post(`${base}/preview`, payload);

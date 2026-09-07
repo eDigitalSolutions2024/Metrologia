@@ -2,6 +2,7 @@ const { Router } = require("express");
 const auth = require("../middleware/auth");
 const requireRole = require("../middleware/requireRole");
 const validate = require("../middleware/validate");
+const { importarPlantillaIncertidumbre } = require("../middleware/upload");
 const { crearModeloSchema, actualizarModeloSchema } = require("../schemas/incertidumbre.schema");
 const c = require("../controllers/incertidumbre.controller");
 
@@ -10,6 +11,13 @@ router.use(auth);
 
 /* Plantillas / modelos de presupuesto de incertidumbre */
 router.get("/modelos", c.listarModelos);
+// Antes de "/modelos/:id" — si no, Express la confundiría con un id.
+router.post(
+  "/modelos/importar",
+  requireRole("admin", "coordinador"),
+  importarPlantillaIncertidumbre,
+  c.importarModelo
+);
 router.get("/modelos/:id", c.obtenerModelo);
 router.post("/modelos", requireRole("admin", "coordinador"), validate(crearModeloSchema), c.crearModelo);
 router.put("/modelos/:id", requireRole("admin", "coordinador"), validate(actualizarModeloSchema), c.actualizarModelo);

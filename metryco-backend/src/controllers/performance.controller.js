@@ -35,8 +35,8 @@ const calcularPunto = asyncHandler(async (req, res) => {
 // el técnico los revisa en el formulario antes de confirmar.
 const importar = asyncHandler(async (req, res) => {
   if (!req.file) throw new AppError("No se recibió ningún archivo", 400);
-  const puntos = await service.importarArchivo(req.file.buffer, req.file.originalname);
-  res.json({ success: true, data: puntos });
+  const data = await service.importarArchivo(req.file.buffer, req.file.originalname);
+  res.json({ success: true, data });
 });
 
 module.exports = { listar, obtener, crear, actualizar, eliminar, calcularPunto, importar };

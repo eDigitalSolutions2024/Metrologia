@@ -9,11 +9,12 @@ import AddIcon from "@mui/icons-material/Add";
 import EditOutlinedIcon from "@mui/icons-material/EditOutlined";
 import DeleteOutlineIcon from "@mui/icons-material/DeleteOutlined";
 import RuleFolderOutlinedIcon from "@mui/icons-material/RuleFolderOutlined";
+import UploadFileOutlinedIcon from "@mui/icons-material/UploadFileOutlined";
 
 import AppButton from "../../shared/components/AppButton";
 import AppTable from "../../shared/components/AppTable";
 import PageHeader from "../../shared/components/PageHeader";
-import { listarModelos, eliminarModelo } from "../../services/incertidumbre";
+import { listarModelos, eliminarModelo, importarModelo } from "../../services/incertidumbre";
 
 // Administración de plantillas de presupuesto de incertidumbre (ModeloIncertidumbre):
 // magnitud -> tipo de instrumento, con sus contribuciones GUM/EA-4/02 predefinidas.
@@ -25,6 +26,7 @@ export default function PlantillasIncertidumbrePage() {
   const [error, setError] = useState("");
   const [aEliminar, setAEliminar] = useState(null);
   const [eliminando, setEliminando] = useState(false);
+  const [importando, setImportando] = useState(false);
 
   const cargar = () => {
     setLoading(true);
@@ -40,6 +42,21 @@ export default function PlantillasIncertidumbrePage() {
     const texto = `${m.nombre} ${m.magnitud} ${m.tipoInstrumento}`.toLowerCase();
     return texto.includes(search.toLowerCase());
   });
+
+  const onArchivoSeleccionado = async (e) => {
+    const archivo = e.target.files?.[0];
+    e.target.value = ""; // permite volver a elegir el mismo archivo después
+    if (!archivo) return;
+    setImportando(true); setError("");
+    try {
+      const resultado = await importarModelo(archivo);
+      navigate("/incertidumbre/plantillas/nueva", { state: { importado: resultado, nombreArchivo: archivo.name } });
+    } catch (err) {
+      setError(err?.response?.data?.message || "No se pudo leer el archivo.");
+    } finally {
+      setImportando(false);
+    }
+  };
 
   const confirmarEliminar = async () => {
     setEliminando(true);
@@ -99,9 +116,21 @@ export default function PlantillasIncertidumbrePage() {
         title="Plantillas de Incertidumbre"
         subtitle={`${filtrados.length} plantillas (magnitud → tipo de instrumento)`}
         actions={
-          <AppButton startIcon={<AddIcon />} onClick={() => navigate("/incertidumbre/plantillas/nueva")} sx={{ borderRadius: 2 }}>
-            Nueva Plantilla
-          </AppButton>
+          <>
+            <AppButton
+              component="label"
+              variant="outlined"
+              loading={importando}
+              startIcon={<UploadFileOutlinedIcon />}
+              sx={{ borderRadius: 2 }}
+            >
+              Importar Word/Excel
+              <input type="file" accept=".docx,.xlsx,.xls" hidden onChange={onArchivoSeleccionado} />
+            </AppButton>
+            <AppButton startIcon={<AddIcon />} onClick={() => navigate("/incertidumbre/plantillas/nueva")} sx={{ borderRadius: 2 }}>
+              Nueva Plantilla
+            </AppButton>
+          </>
         }
       />
 

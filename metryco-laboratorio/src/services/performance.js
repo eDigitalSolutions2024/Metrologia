@@ -27,6 +27,9 @@ export async function eliminarPerformance(id) {
   return data.data;
 }
 
+// data: { puntos, modo: "columnas"|"ia", advertencias: [] } — "ia" significa
+// que el archivo no traía los encabezados esperados y una IA interpretó la
+// tabla; el técnico debe revisar los valores antes de guardar.
 export async function importarPuntosPerformance(archivo) {
   const form = new FormData();
   form.append("archivo", archivo);

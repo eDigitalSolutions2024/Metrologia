@@ -90,9 +90,11 @@ export default function PerformanceForm() {
     if (!archivo) return;
     setImportando(true); setError(""); setImportInfo("");
     try {
-      const puntosImportados = await importarPuntosPerformance(archivo);
+      const { puntos: puntosImportados, modo, advertencias } = await importarPuntosPerformance(archivo);
       replace(puntosImportados.map(puntoDesdeBackend));
-      setImportInfo(`${puntosImportados.length} punto(s) importado(s) de "${archivo.name}". Revísalos antes de guardar.`);
+      const origen = modo === "ia" ? "interpretado por IA (el archivo no traía los encabezados esperados)" : `de "${archivo.name}"`;
+      const avisos = advertencias?.length ? ` · ${advertencias.join(" ")}` : "";
+      setImportInfo(`${puntosImportados.length} punto(s) importado(s), ${origen}. Revísalos antes de guardar.${avisos}`);
     } catch (err) {
       setError(err?.response?.data?.message || "No se pudo importar el archivo.");
     } finally {

@@ -96,6 +96,13 @@ function filasDesdeCsv(buffer) {
   return parseCsvSync(buffer, { columns: false, skip_empty_lines: true, trim: true, bom: true });
 }
 
+/** Vuelca las filas crudas a texto tabulado, para dárselo a la IA como contexto. */
+function filasATexto(filas) {
+  return filas
+    .map((fila) => fila.map((v) => (v == null ? "" : String(v))).join("\t"))
+    .join("\n");
+}
+
 async function importarArchivo(buffer, nombreArchivo = "") {
   const esCsv = /\.csv$/i.test(nombreArchivo);
   const filas = esCsv ? filasDesdeCsv(buffer) : await filasDesdeExcel(buffer);
@@ -103,30 +110,46 @@ async function importarArchivo(buffer, nombreArchivo = "") {
   if (!filas.length) throw new AppError("El archivo está vacío", 400);
 
   const columnas = filas[0].map((h) => ALIAS_COLUMNA[normalizarEncabezado(h)] || null);
-  if (!columnas.some(Boolean)) {
-    throw new AppError(
-      "No se reconocen las columnas. Usa los encabezados: Prueba, Nominal, Unidad, Escala Total, %RDG, %FS, Unidades, Incertidumbre",
-      400
-    );
+
+  // Encabezados reconocidos directamente: camino rápido, sin gastar IA.
+  if (columnas.some(Boolean)) {
+    const puntos = filas
+      .slice(1)
+      .filter((fila) => fila.some((v) => v !== undefined && v !== null && String(v).trim() !== ""))
+      .map((fila) => {
+        const punto = {};
+        columnas.forEach((campo, i) => {
+          if (!campo) return;
+          const valor = fila[i];
+          if (valor === undefined || valor === null || String(valor).trim() === "") return;
+          punto[campo] = campo === "prueba" || campo === "unidad" ? String(valor).trim() : Number(valor);
+        });
+        return punto;
+      });
+    if (puntos.length) return { puntos: normalizarPuntos(puntos), modo: "columnas", advertencias: [] };
   }
 
-  const puntos = filas
-    .slice(1)
-    .filter((fila) => fila.some((v) => v !== undefined && v !== null && String(v).trim() !== ""))
-    .map((fila) => {
-      const punto = {};
-      columnas.forEach((campo, i) => {
-        if (!campo) return;
-        const valor = fila[i];
-        if (valor === undefined || valor === null || String(valor).trim() === "") return;
-        punto[campo] = campo === "prueba" || campo === "unidad" ? String(valor).trim() : Number(valor);
-      });
-      return punto;
-    });
+  // Encabezados no reconocidos (formato libre) -> se le pide a la IA que
+  // interprete la tabla. Si no hay IA configurada o falla, se informa en vez
+  // de fallar en silencio con datos inventados.
+  const asistente = require("./asistente.service");
+  const { modo, puntos: puntosIa, advertencias } = await asistente.interpretarFilasPerformance({
+    texto: filasATexto(filas),
+  });
+  if (modo === "ia" && puntosIa.length) {
+    const limpios = puntosIa.filter((p) => Number.isFinite(Number(p.nominal)));
+    if (limpios.length) return { puntos: normalizarPuntos(limpios), modo: "ia", advertencias };
+  }
 
-  if (!puntos.length) throw new AppError("No se encontraron filas de datos en el archivo", 400);
-
-  return normalizarPuntos(puntos);
+  throw new AppError(
+    [
+      "No se reconocen las columnas del archivo.",
+      "Usa los encabezados Prueba, Nominal, Unidad, Escala Total, %RDG, %FS, Unidades, Incertidumbre,",
+      "o revisa que la tabla tenga al menos una columna de valores nominales.",
+      ...advertencias,
+    ].join(" "),
+    400
+  );
 }
 
 async function listar({ search = "", magnitud = "", page = 0, pageSize = 10 }) {

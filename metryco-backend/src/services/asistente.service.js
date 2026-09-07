@@ -41,7 +41,7 @@ Responde SIEMPRE en JSON válido con esta forma exacta:
 }
 No incluyas nada fuera del JSON.`;
 
-async function llamarModelo(userContent) {
+async function llamarModelo(userContent, { system = SYSTEM_PROMPT, maxTokens = 1100 } = {}) {
   const res = await fetch(API_URL, {
     method: "POST",
     headers: {
@@ -51,8 +51,8 @@ async function llamarModelo(userContent) {
     },
     body: JSON.stringify({
       model: MODELO_IA,
-      max_tokens: 1100,
-      system: SYSTEM_PROMPT,
+      max_tokens: maxTokens,
+      system,
       messages: [{ role: "user", content: userContent }],
     }),
   });
@@ -182,4 +182,135 @@ async function asistir({ contexto = {}, pregunta = "" } = {}) {
   }
 }
 
-module.exports = { asistir, DISCLAIMER };
+/**
+ * ----------------------------------------------------------------------
+ *  Interpretación de archivos (Word/Excel) subidos por el usuario -> JSON
+ * ----------------------------------------------------------------------
+ *  Mismo principio que el asistente de arriba: la IA solo LEE e INTERPRETA
+ *  el documento para dejar los campos precargados; el técnico siempre
+ *  revisa y confirma antes de guardar. Sin ANTHROPIC_API_KEY configurada
+ *  no hay heurística razonable para un documento de formato libre, así que
+ *  se avisa claramente en vez de inventar una plantilla.
+ */
+
+const PLANTILLA_SYSTEM_PROMPT = `Eres un asistente metrológico. Un laboratorio te da el texto plano extraído de un documento (Word o Excel) que contiene UN presupuesto de incertidumbre de calibración (método GUM / EA-4/02). Tu trabajo es interpretarlo y devolver los datos estructurados para precargar un formulario. NO inventes datos que no estén en el texto: si un campo no aparece, omítelo (no pongas 0 ni un valor inventado).
+
+Responde SIEMPRE en JSON válido con esta forma exacta (usa null u omite lo que no encuentres):
+{
+  "magnitud": "dimensional|presion|masa|flujo|electrica|mecanica|temperatura|volumen|... (una palabra, minúsculas, la que mejor describa lo medido)",
+  "tipoInstrumento": "ej. micrometro, manometro, balanza, vernier...",
+  "nombre": "nombre corto para la plantilla, ej. 'Micrómetro exterior 0-25 mm'",
+  "mensurando": "qué se mide, ej. 'Error de indicación del micrómetro'",
+  "unidad": "unidad del mensurando, ej. mm",
+  "normaReferencia": "si se menciona, si no omite (default JCGM 100:2008 (GUM); EA-4/02)",
+  "nivelConfianza": "ej. 95.45%",
+  "rangoTipico": "ej. 0-25 mm",
+  "criterioAceptacion": { "emp": <numero o null>, "regla": "simple|guard_band_U|guard_band_2U" },
+  "notas": "cualquier observación relevante que no encaje en otro campo",
+  "contribuciones": [
+    {
+      "fuente": "nombre de la fuente de incertidumbre, ej. Resolución del instrumento",
+      "simbolo": "ej. δx_res (si aparece)",
+      "tipo": "A|B",
+      "modo": "semiamplitud|desviacion_std|incertidumbre_std|certificado",
+      "distribucion": "normal|rectangular|triangular|forma_u",
+      "valorSugerido": <numero o null>,
+      "k": <numero o null>,
+      "divisorManual": <numero o null>,
+      "coefSensibilidad": <numero o null>,
+      "gradosLibertad": <numero o null>,
+      "unidad": "unidad de esta contribución",
+      "ayuda": "nota corta si el documento explica cómo se obtuvo"
+    }
+  ],
+  "advertencias": [ "cosas ambiguas, en otro idioma, con datos incompletos, etc." ]
+}
+No incluyas nada fuera del JSON. Si el texto claramente NO es un presupuesto de incertidumbre, responde con "contribuciones": [] y explica en "advertencias".`;
+
+async function interpretarPlantillaIncertidumbre({ texto, nombreArchivo = "" } = {}) {
+  if (!process.env.ANTHROPIC_API_KEY) {
+    return {
+      modo: "sin_ia",
+      plantilla: null,
+      advertencias: [
+        "La interpretación automática no está activa en este servidor (falta configurar ANTHROPIC_API_KEY).",
+        "Se extrajo el texto del archivo para que lo copies a mano mientras se activa.",
+      ],
+      textoExtraido: texto,
+    };
+  }
+
+  const userContent = [
+    `Archivo: ${nombreArchivo || "(sin nombre)"}`,
+    "",
+    "Texto extraído del documento:",
+    "-----",
+    texto,
+    "-----",
+  ].join("\n");
+
+  try {
+    const respuesta = await llamarModelo(userContent, { system: PLANTILLA_SYSTEM_PROMPT, maxTokens: 2200 });
+    const json = parseJsonLaxo(respuesta);
+    if (!json) {
+      return {
+        modo: "sin_ia",
+        plantilla: null,
+        advertencias: ["La IA no devolvió una plantilla reconocible. Revisa el archivo o captúrala a mano."],
+        textoExtraido: texto,
+      };
+    }
+    const { advertencias, ...plantilla } = json;
+    return {
+      modo: "ia",
+      plantilla,
+      advertencias: Array.isArray(advertencias) ? advertencias : [],
+      nota: "Plantilla generada por IA a partir de tu archivo — revisa cada campo antes de guardar.",
+    };
+  } catch (err) {
+    return {
+      modo: "sin_ia",
+      plantilla: null,
+      advertencias: [`La IA no respondió (${err.message}). Captura la plantilla a mano con el texto extraído como referencia.`],
+      textoExtraido: texto,
+    };
+  }
+}
+
+const PERFORMANCE_SYSTEM_PROMPT = `Eres un asistente que interpreta una tabla de puntos de prueba de un instrumento (calibración/performance) que viene de un Word o Excel con encabezados que no siguen un formato fijo (pueden estar en otro idioma, abreviados, en otro orden, con columnas de más).
+
+Devuelve SIEMPRE JSON válido con esta forma exacta:
+{
+  "puntos": [
+    {
+      "prueba": "texto o null",
+      "nominal": <numero>,
+      "unidad": "texto o null",
+      "escalaTotal": <numero o null>,
+      "porcentajeRdg": <numero o null>,
+      "porcentajeFs": <numero o null>,
+      "unidades": <numero o null>,
+      "incertidumbre": <numero o null>
+    }
+  ],
+  "advertencias": [ "columnas que no pudiste ubicar, filas ambiguas, etc." ]
+}
+"nominal" es el único campo obligatorio por punto; si una fila no tiene un valor nominal identificable, descártala. No inventes números que no estén en el texto. No incluyas nada fuera del JSON.`;
+
+async function interpretarFilasPerformance({ texto } = {}) {
+  if (!process.env.ANTHROPIC_API_KEY) {
+    return { modo: "sin_ia", puntos: [], advertencias: ["La interpretación automática no está activa (falta ANTHROPIC_API_KEY)."] };
+  }
+  try {
+    const respuesta = await llamarModelo(texto, { system: PERFORMANCE_SYSTEM_PROMPT, maxTokens: 1800 });
+    const json = parseJsonLaxo(respuesta);
+    if (!json || !Array.isArray(json.puntos)) {
+      return { modo: "sin_ia", puntos: [], advertencias: ["La IA no devolvió puntos reconocibles."] };
+    }
+    return { modo: "ia", puntos: json.puntos, advertencias: Array.isArray(json.advertencias) ? json.advertencias : [] };
+  } catch (err) {
+    return { modo: "sin_ia", puntos: [], advertencias: [`La IA no respondió (${err.message}).`] };
+  }
+}
+
+module.exports = { asistir, DISCLAIMER, interpretarPlantillaIncertidumbre, interpretarFilasPerformance };
