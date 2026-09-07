@@ -4,8 +4,8 @@ const Asignacion = require("../models/Asignacion");
 const Cliente = require("../models/Cliente");
 const AppError = require("../utils/AppError");
 const escapeRegex = require("../utils/escapeRegex");
-const { siguienteFolio } = require("../utils/folio");
 const { crearEvento } = require("../utils/historial");
+const { prefijoDesdeNombre } = require("../utils/prefijoCliente");
 const configuracionService = require("./configuracion.service");
 
 async function listar({ search = "", status = "todos", clienteId = "", mes = "", anio = "", page = 0, pageSize = 10 }) {
@@ -72,12 +72,41 @@ async function obtener(id) {
   return { reporte, asignaciones };
 }
 
+/**
+ * Folio del Reporte con las siglas del cliente para que sea identificable a
+ * simple vista: "REP-IE-2026-0001" en vez de un REP-2026-#### genérico donde
+ * no se distingue de quién es. Igual criterio que idInterno (Equipo), código
+ * (Patrón) y Orden de Compra (Cotización): se calcula del MAYOR consecutivo
+ * REAL ya usado con ese mismo prefijo, no de un contador aparte.
+ */
+async function siguienteFolioReporte(clienteDoc) {
+  const prefijo = prefijoDesdeNombre(clienteDoc.nombreComercial || clienteDoc.nombre, "REP");
+  const anio = new Date().getFullYear();
+  const base = `REP-${prefijo}-${anio}`;
+  const regex = new RegExp(`^${base}-(\\d+)$`);
+
+  const existentes = await Reporte.find({ folio: regex }).select("folio");
+  const maxActual = existentes.reduce((max, r) => {
+    const n = parseInt(r.folio.match(regex)[1], 10);
+    return n > max ? n : max;
+  }, 0);
+
+  let siguiente = maxActual + 1;
+  let folio = `${base}-${String(siguiente).padStart(4, "0")}`;
+  while (await Reporte.exists({ folio })) {
+    siguiente++;
+    folio = `${base}-${String(siguiente).padStart(4, "0")}`;
+  }
+  return folio;
+}
+
 async function crear(datos, reqUser) {
   const { cliente } = datos;
   if (!mongoose.isValidObjectId(cliente)) throw new AppError("Cliente inválido", 400);
-  if (!(await Cliente.exists({ _id: cliente }))) throw new AppError("Cliente no encontrado", 404);
+  const clienteDoc = await Cliente.findById(cliente).select("nombre nombreComercial");
+  if (!clienteDoc) throw new AppError("Cliente no encontrado", 404);
 
-  const folio = await siguienteFolio("REP");
+  const folio = await siguienteFolioReporte(clienteDoc);
   const evento = await crearEvento(reqUser, "reporte_creado", { folio });
 
   return Reporte.create({
@@ -112,6 +141,33 @@ async function actualizar(id, datos, reqUser) {
     if (!["admin", "coordinador"].includes(reqUser?.rol)) {
       throw new AppError("Solo Admin o Coordinador pueden cambiar el estatus del reporte", 403);
     }
+
+    // No se puede marcar "terminado"/"entregado" con asignaciones a medias:
+    // evita reportes cerrados cuyo certificado nunca fue autorizado por
+    // Calidad, o marcados como entregados sin que el equipo haya salido.
+    if (["terminado", "entregado"].includes(datos.status)) {
+      const asignaciones = await Asignacion.find({ reporte: id }).select("equipo estados");
+      if (!asignaciones.length) {
+        throw new AppError("Este reporte no tiene asignaciones — no se puede finalizar", 409);
+      }
+      const sinAutorizar = asignaciones.filter((a) => a.estados.certificado !== "autorizado");
+      if (sinAutorizar.length) {
+        throw new AppError(
+          `Hay ${sinAutorizar.length} asignación(es) sin certificado autorizado por Calidad — no se puede finalizar el reporte`,
+          409
+        );
+      }
+      if (datos.status === "entregado") {
+        const sinEntregar = asignaciones.filter((a) => a.estados.entrega !== "entregado");
+        if (sinEntregar.length) {
+          throw new AppError(
+            `Hay ${sinEntregar.length} asignación(es) sin marcar como entregadas — no se puede cerrar el reporte como entregado`,
+            409
+          );
+        }
+      }
+    }
+
     cambios.status = datos.status;
     reporte.historial.push(
       await crearEvento(reqUser, "reporte_status", { de: reporte.status, a: datos.status })

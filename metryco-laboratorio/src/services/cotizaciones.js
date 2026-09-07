@@ -7,6 +7,11 @@ export async function listarCotizaciones({ search = "", status = "todos", mes = 
   return { items: data.data, total: data.total };
 }
 
+export async function obtenerSiguienteOrdenCompra(clienteId) {
+  const { data } = await api.get(`${ENDPOINTS.COTIZACIONES}/siguiente-oc`, { params: { cliente: clienteId } });
+  return data.data.ordenCompra;
+}
+
 export async function obtenerCotizacion(id) {
   const { data } = await api.get(`${ENDPOINTS.COTIZACIONES}/${id}`);
   return data.data;

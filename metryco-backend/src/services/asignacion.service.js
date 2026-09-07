@@ -138,7 +138,19 @@ async function actualizar(id, datos, reqUser) {
   if (!a) throw new AppError("Asignación no encontrada", 404);
 
   if (datos.tecnicoAsignado !== undefined) a.tecnicoAsignado = datos.tecnicoAsignado || undefined;
-  if (Array.isArray(datos.patrones)) a.patrones = datos.patrones.filter(oid);
+  if (Array.isArray(datos.patrones)) {
+    const patrones = datos.patrones.filter(oid);
+    if (patrones.length) {
+      const vencido = await Patron.findOne({
+        _id: { $in: patrones },
+        "calibracion.vencimiento": { $lt: new Date() },
+      }).select("codigo nombre");
+      if (vencido) {
+        throw new AppError(`El patrón ${vencido.codigo} (${vencido.nombre}) está vencido y no puede usarse`, 409);
+      }
+    }
+    a.patrones = patrones;
+  }
   if (datos.performance !== undefined) a.performance = datos.performance || undefined;
   if (datos.fechaCalibracion) a.fechaCalibracion = datos.fechaCalibracion;
   if (datos.factura !== undefined) a.factura = datos.factura;
@@ -186,6 +198,25 @@ async function cambiarEstado(id, { dominio, valor, motivo }, reqUser) {
   }
   if (dominio === "certificado" && valor === "rechazado" && !motivo?.trim()) {
     throw new AppError("Indica el motivo del rechazo", 400);
+  }
+  if (dominio === "certificado" && valor === "autorizado") {
+    const CalculoIncertidumbre = require("../models/CalculoIncertidumbre");
+    const hayCalculoAprobado = await CalculoIncertidumbre.exists({ asignacion: a._id, estado: "aprobado" });
+    if (!hayCalculoAprobado) {
+      throw new AppError(
+        "No se puede autorizar: esta asignación no tiene ningún cálculo de incertidumbre aprobado",
+        409
+      );
+    }
+  }
+  // No se puede entregar el equipo sin que Calidad haya autorizado su
+  // certificado: evita devolver equipo con una calibración todavía sin
+  // validar (o de plano rechazada).
+  if (dominio === "entrega" && valor === "entregado" && a.estados.certificado !== "autorizado") {
+    throw new AppError(
+      "No se puede marcar como entregado: el certificado de esta asignación aún no está autorizado por Calidad",
+      409
+    );
   }
 
   const anterior = a.estados[dominio];

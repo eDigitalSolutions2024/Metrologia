@@ -38,6 +38,26 @@ async function obtener(id) {
   return cliente;
 }
 
+// El "Contacto Principal" del alta/edición vive embebido en Cliente.contacto,
+// pero los selects de Cotización/Reporte solo leen la colección Contacto
+// (son los que se pueden referenciar por ObjectId). Sin esto, el contacto
+// capturado al dar de alta el cliente nunca aparecía en esos desplegables.
+async function sincronizarContactoPrincipal(clienteId, contacto) {
+  if (!contacto?.nombre?.trim()) return;
+  await Contacto.findOneAndUpdate(
+    { cliente: clienteId, esPrincipal: true },
+    {
+      cliente: clienteId,
+      esPrincipal: true,
+      nombre: contacto.nombre.trim(),
+      telefono: contacto.telefono || "",
+      correo: contacto.correo || "",
+      status: "activo",
+    },
+    { upsert: true }
+  );
+}
+
 async function crear(datos) {
   const { password, ...resto } = datos;
   if (!password || password.length < 8) {
@@ -45,7 +65,9 @@ async function crear(datos) {
   }
 
   const passwordHash = await bcrypt.hash(password, 10);
-  return Cliente.create({ ...resto, passwordHash });
+  const cliente = await Cliente.create({ ...resto, passwordHash });
+  await sincronizarContactoPrincipal(cliente._id, resto.contacto);
+  return cliente;
 }
 
 async function actualizar(id, datos) {
@@ -64,6 +86,11 @@ async function actualizar(id, datos) {
     runValidators: true,
   });
   if (!cliente) throw new AppError("Cliente no encontrado", 404);
+
+  if (datos.contacto !== undefined) {
+    await sincronizarContactoPrincipal(id, datos.contacto);
+  }
+
   return cliente;
 }
 

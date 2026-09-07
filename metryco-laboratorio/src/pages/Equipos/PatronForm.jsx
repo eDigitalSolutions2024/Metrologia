@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { useForm, useFieldArray, Controller } from "react-hook-form";
 import {
-  Box, Typography, Grid, MenuItem, TextField, IconButton, Button, Alert, Chip, Divider,
+  Box, Typography, Grid, MenuItem, TextField, IconButton, Button, Alert, Chip, Divider, Autocomplete,
 } from "@mui/material";
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
 import AddIcon from "@mui/icons-material/Add";
@@ -19,7 +19,7 @@ import AppButton from "../../shared/components/AppButton";
 import AppCard from "../../shared/components/AppCard";
 import PageHeader from "../../shared/components/PageHeader";
 import StraightenOutlinedIcon from "@mui/icons-material/StraightenOutlined";
-import { CATEGORIAS, iconoCategoria, colorCategoria } from "./categorias";
+import { CATEGORIAS, iconoCategoria, colorCategoria, unidadesSugeridas } from "./categorias";
 import { obtenerPatron, crearPatron, actualizarPatron, adjuntarCertificadoPatron, obtenerSiguienteCodigoPatron } from "../../services/patrones";
 
 const num = (v) => (v === "" || v == null ? undefined : Number(v));
@@ -60,6 +60,8 @@ export default function PatronForm() {
 
   const { fields, append, remove } = useFieldArray({ control, name: "incertidumbre.puntos" });
   const codigoValor = watch("codigo");
+  const categoriaElegida = watch("categoria");
+  const opcionesUnidades = unidadesSugeridas(categoriaElegida);
   const modo = watch("incertidumbre.modo");
   const fecha = watch("calibracion.fecha");
   const periodicidad = watch("calibracion.periodicidadMeses");
@@ -240,7 +242,25 @@ export default function PatronForm() {
 
         <AppCard title="Metrología" icon={<SquareFootOutlinedIcon />}>
           <Grid container spacing={2}>
-            <Grid size={{ xs: 6, md: 3 }}><TextField fullWidth size="small" label="Unidad" placeholder="mm, bar, °C…" {...register("unidad")} /></Grid>
+            <Grid size={{ xs: 6, md: 3 }}>
+              <Controller
+                name="unidad"
+                control={control}
+                render={({ field: { onChange, onBlur, value, ref } }) => (
+                  <Autocomplete
+                    freeSolo
+                    options={opcionesUnidades}
+                    value={value ?? ""}
+                    onChange={(_, val) => onChange(val ?? "")}
+                    onInputChange={(_, val) => onChange(val)}
+                    onBlur={onBlur}
+                    renderInput={(params) => (
+                      <TextField {...params} inputRef={ref} label="Unidad" size="small" placeholder="mm, bar, °C…" />
+                    )}
+                  />
+                )}
+              />
+            </Grid>
             <Grid size={{ xs: 6, md: 5 }}><TextField fullWidth size="small" label="Intervalo de medición" placeholder="0–100 mm" {...register("intervaloMedicion")} /></Grid>
             <Grid size={{ xs: 12, md: 4 }}><TextField fullWidth size="small" label="Resolución" {...register("resolucion")} /></Grid>
           </Grid>

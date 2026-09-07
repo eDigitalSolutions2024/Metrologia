@@ -13,6 +13,7 @@ const router = Router();
 router.use(auth, requireRole("admin", "coordinador", "ventas"));
 
 router.get("/", cotizacionController.listar);
+router.get("/siguiente-oc", cotizacionController.siguienteOrdenCompra);
 router.get("/:id/imprimir", cotizacionController.paraImprimir);
 router.get("/:id", cotizacionController.obtener);
 router.post("/", validate(crearCotizacionSchema), cotizacionController.crear);

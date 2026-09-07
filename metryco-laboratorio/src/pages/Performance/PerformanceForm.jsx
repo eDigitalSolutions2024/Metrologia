@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { useForm, useFieldArray } from "react-hook-form";
-import { Box, Typography, Grid, IconButton, Tooltip, Button, Divider, Alert } from "@mui/material";
+import { useForm, useFieldArray, Controller } from "react-hook-form";
+import { Box, Typography, Grid, IconButton, Tooltip, Button, Divider, Alert, Autocomplete, TextField } from "@mui/material";
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
 import AddIcon from "@mui/icons-material/Add";
 import DeleteOutlineIcon from "@mui/icons-material/DeleteOutlined";
@@ -11,6 +11,12 @@ import AppButton from "../../shared/components/AppButton";
 import AppCard from "../../shared/components/AppCard";
 import AppInput from "../../shared/components/AppInput";
 import { obtenerPerformance, crearPerformance, actualizarPerformance, importarPuntosPerformance } from "../../services/performance";
+import { UNIDADES_POR_CATEGORIA } from "../Equipos/categorias";
+
+// Sin selector de categoría en este formulario (a diferencia de Equipos/
+// Patrones), así que se ofrece el catálogo completo de unidades como
+// sugerencia — el campo sigue siendo texto libre.
+const TODAS_LAS_UNIDADES = [...new Set(Object.values(UNIDADES_POR_CATEGORIA).flat())].sort();
 
 const PUNTO_VACIO = {
   prueba: "", nominal: "", unidad: "", escala: "", rdg: "", fs: "", unidades: "", incertidumbre: "",
@@ -205,7 +211,22 @@ export default function PerformanceForm() {
                   <AppInput label="Nominal" size="small" onBlur={() => recalcularFila(index)} {...register(`puntos.${index}.nominal`)} />
                 </Grid>
                 <Grid size={{ xs: 6, sm: 3, md: 1 }}>
-                  <AppInput label="Unidad" size="small" {...register(`puntos.${index}.unidad`)} />
+                  <Controller
+                    name={`puntos.${index}.unidad`}
+                    control={control}
+                    render={({ field: { onChange, onBlur, value, ref } }) => (
+                      <Autocomplete
+                        freeSolo
+                        size="small"
+                        options={TODAS_LAS_UNIDADES}
+                        value={value ?? ""}
+                        onChange={(_, val) => onChange(val ?? "")}
+                        onInputChange={(_, val) => onChange(val)}
+                        onBlur={onBlur}
+                        renderInput={(params) => <TextField {...params} inputRef={ref} label="Unidad" size="small" />}
+                      />
+                    )}
+                  />
                 </Grid>
                 <Grid size={{ xs: 6, sm: 3, md: 1.2 }}>
                   <AppInput label="Esc. Total" size="small" onBlur={() => recalcularFila(index)} {...register(`puntos.${index}.escala`)} />

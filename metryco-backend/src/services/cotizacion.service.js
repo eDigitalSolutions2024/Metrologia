@@ -8,6 +8,7 @@ const Reporte = require("../models/Reporte");
 const AppError = require("../utils/AppError");
 const configuracionService = require("./configuracion.service");
 const { destinoAdjuntosCotizacion } = require("../middleware/upload");
+const { prefijoDesdeNombre } = require("../utils/prefijoCliente");
 
 function redondear(n) {
   return Math.round(n * 100) / 100;
@@ -31,6 +32,37 @@ async function generarFolio() {
     { new: true, upsert: true }
   );
   return `COT-${year}-${String(counter.seq).padStart(3, "0")}`;
+}
+
+/**
+ * Sugerencia de Orden de Compra para cuando el cliente no trae ya la suya:
+ * "OC-<prefijo del cliente>-<año>-<consecutivo>", ej. "OC-IE-2026-001".
+ * Igual que idInterno/código de Equipo/Patrón, el consecutivo se calcula del
+ * MAYOR folio real ya usado por ese cliente (no un contador aparte), para no
+ * desincronizarse si alguien más adelante captura una OC manual.
+ */
+async function siguienteOrdenCompra(clienteId) {
+  const cliente = await Cliente.findById(clienteId).select("nombre nombreComercial");
+  if (!cliente) throw new AppError("Cliente no encontrado", 404);
+
+  const prefijo = prefijoDesdeNombre(cliente.nombreComercial || cliente.nombre, "OC");
+  const anio = new Date().getFullYear();
+  const base = `OC-${prefijo}-${anio}`;
+  const regex = new RegExp(`^${base}-(\\d+)$`);
+
+  const existentes = await Cotizacion.find({ cliente: clienteId, ordenCompra: regex }).select("ordenCompra");
+  const maxActual = existentes.reduce((max, c) => {
+    const n = parseInt(c.ordenCompra.match(regex)[1], 10);
+    return n > max ? n : max;
+  }, 0);
+
+  let siguiente = maxActual + 1;
+  let ordenCompra = `${base}-${String(siguiente).padStart(3, "0")}`;
+  while (await Cotizacion.exists({ ordenCompra })) {
+    siguiente++;
+    ordenCompra = `${base}-${String(siguiente).padStart(3, "0")}`;
+  }
+  return ordenCompra;
 }
 
 async function listar({ search = "", status = "todos", mes = "", anio = "", clienteId = "", page = 0, pageSize = 10 }) {
@@ -249,5 +281,5 @@ async function eliminarAdjunto(id, adjuntoId) {
 
 module.exports = {
   listar, obtener, crear, actualizar, eliminar, paraImprimir,
-  subirAdjunto, archivoAdjuntoStream, eliminarAdjunto,
+  subirAdjunto, archivoAdjuntoStream, eliminarAdjunto, siguienteOrdenCompra,
 };

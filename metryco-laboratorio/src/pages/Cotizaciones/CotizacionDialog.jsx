@@ -5,6 +5,7 @@ import {
   Dialog, DialogTitle, DialogContent, DialogActions, Box, Typography, Grid,
   IconButton, Table, TableHead, TableRow, TableCell, TableBody, Paper, Chip,
   MenuItem, Select, FormControl, InputLabel, Alert, CircularProgress,
+  Autocomplete, TextField,
 } from "@mui/material";
 import { AddCircleOutlined as AddCircleOutlineIcon } from "@mui/icons-material";
 import { DeleteOutlined as DeleteOutlineIcon } from "@mui/icons-material";
@@ -19,6 +20,8 @@ import ContentCopyOutlinedIcon from "@mui/icons-material/ContentCopyOutlined";
 import PersonOutlineIcon from "@mui/icons-material/PersonOutlineOutlined";
 import TuneOutlinedIcon from "@mui/icons-material/TuneOutlined";
 import ListAltOutlinedIcon from "@mui/icons-material/ListAltOutlined";
+import CheckCircleOutlineIcon from "@mui/icons-material/CheckCircleOutlineOutlined";
+import HighlightOffOutlinedIcon from "@mui/icons-material/HighlightOffOutlined";
 
 import AppButton from "../../shared/components/AppButton";
 import AppInput from "../../shared/components/AppInput";
@@ -29,9 +32,11 @@ import { formatDate } from "../../shared/utils/formatDate";
 import { listarClientes } from "../../services/clientes";
 import { listarRazonesSociales } from "../../services/razonesSociales";
 import { listarContactos } from "../../services/contactos";
+import { listarEquipos } from "../../services/equipos";
 import {
   obtenerCotizacion, crearCotizacion, actualizarCotizacion,
   subirAdjuntoCotizacion, fetchAdjuntoCotizacionBlob, eliminarAdjuntoCotizacion,
+  obtenerSiguienteOrdenCompra,
 } from "../../services/cotizaciones";
 import { pedirRefrescoAlertas } from "../../shared/utils/alertasBus";
 
@@ -74,6 +79,7 @@ export default function CotizacionDialog({ open, cotizacionId, duplicarDesdeId, 
   const [clientes, setClientes] = useState([]);
   const [razonesSociales, setRazonesSociales] = useState([]);
   const [contactosCliente, setContactosCliente] = useState([]);
+  const [equiposCliente, setEquiposCliente] = useState([]);
   const [cotizacionData, setCotizacionData] = useState(null); // folio, status, reporte ligado — solo lectura
   const [loadingData, setLoadingData] = useState(true);
   const [submitError, setSubmitError] = useState("");
@@ -81,8 +87,10 @@ export default function CotizacionDialog({ open, cotizacionId, duplicarDesdeId, 
   const [adjuntos, setAdjuntos] = useState([]);
   const [subiendoAdjunto, setSubiendoAdjunto] = useState(false);
 
+  const [ocAutoGenerada, setOcAutoGenerada] = useState(true);
+
   const {
-    register, control, handleSubmit, watch, reset, getValues,
+    register, control, handleSubmit, watch, reset, getValues, setValue,
     formState: { errors, isSubmitting },
   } = useForm({ defaultValues: DEFAULT_VALUES });
 
@@ -94,6 +102,18 @@ export default function CotizacionDialog({ open, cotizacionId, duplicarDesdeId, 
   const subtotal = items.reduce((sum, i) => sum + (Number(i.cantidad) * Number(i.precioUnitario) || 0), 0);
   const ivaCalc = subtotal * (Number(ivaPorcentaje || 0) / 100);
   const total = subtotal + ivaCalc;
+
+  // Sugiere una Orden de Compra "OC-<prefijo del cliente>-<año>-<consecutivo>"
+  // cuando el cliente ya está confirmado y el campo sigue sin tocar a mano —
+  // el usuario puede sobreescribirla libremente (es la OC real del cliente).
+  useEffect(() => {
+    if (isEdit || !pasoClienteConfirmado || !clienteSeleccionado || !ocAutoGenerada) return;
+    let cancelado = false;
+    obtenerSiguienteOrdenCompra(clienteSeleccionado)
+      .then((oc) => { if (!cancelado) setValue("ordenCompra", oc); })
+      .catch(() => {});
+    return () => { cancelado = true; };
+  }, [isEdit, pasoClienteConfirmado, clienteSeleccionado, ocAutoGenerada, setValue]);
 
   useEffect(() => {
     if (!open) return;
@@ -130,6 +150,7 @@ export default function CotizacionDialog({ open, cotizacionId, duplicarDesdeId, 
           setCotizacionData(cotizacion);
           setAdjuntos(cotizacion.adjuntos || []);
           setPasoClienteConfirmado(true);
+          setOcAutoGenerada(false);
         } else if (duplicarDesdeId && cotizacion) {
           // Duplicar: mismo cliente/partidas/moneda, sin folio/adjuntos/vigencia
           // — se captura como una cotización nueva desde cero.
@@ -150,11 +171,13 @@ export default function CotizacionDialog({ open, cotizacionId, duplicarDesdeId, 
           setCotizacionData(null);
           setAdjuntos([]);
           setPasoClienteConfirmado(true);
+          setOcAutoGenerada(true);
         } else {
           reset(DEFAULT_VALUES);
           setCotizacionData(null);
           setAdjuntos([]);
           setPasoClienteConfirmado(false);
+          setOcAutoGenerada(true);
         }
       } catch {
         if (!cancelado) setSubmitError("No se pudieron cargar los datos de la cotización.");
@@ -176,6 +199,17 @@ export default function CotizacionDialog({ open, cotizacionId, duplicarDesdeId, 
     listarContactos(clienteSeleccionado)
       .then((lista) => { if (!cancelado) setContactosCliente(lista); })
       .catch(() => { if (!cancelado) setContactosCliente([]); });
+    return () => { cancelado = true; };
+  }, [clienteSeleccionado]);
+
+  // Equipos ya registrados del cliente — se sugieren como partidas (evita
+  // volver a escribir marca/modelo/descripción si ya se calibró antes).
+  useEffect(() => {
+    if (!clienteSeleccionado) { setEquiposCliente([]); return; }
+    let cancelado = false;
+    listarEquipos({ clienteId: clienteSeleccionado, pageSize: 500 })
+      .then(({ items }) => { if (!cancelado) setEquiposCliente(items); })
+      .catch(() => { if (!cancelado) setEquiposCliente([]); });
     return () => { cancelado = true; };
   }, [clienteSeleccionado]);
 
@@ -232,6 +266,21 @@ export default function CotizacionDialog({ open, cotizacionId, duplicarDesdeId, 
       setAdjuntos(cot.adjuntos || []);
     } catch {
       setSubmitError("No se pudo eliminar el archivo.");
+    }
+  };
+
+  const [cambiandoStatus, setCambiandoStatus] = useState(false);
+  const cambiarStatus = async (status) => {
+    setCambiandoStatus(true);
+    setSubmitError("");
+    try {
+      const actualizada = await actualizarCotizacion(cotizacionId, { status });
+      setCotizacionData((prev) => ({ ...prev, status: actualizada.status }));
+      pedirRefrescoAlertas();
+    } catch (err) {
+      setSubmitError(err.response?.data?.message || "No se pudo cambiar el estatus de la cotización.");
+    } finally {
+      setCambiandoStatus(false);
     }
   };
 
@@ -311,6 +360,22 @@ export default function CotizacionDialog({ open, cotizacionId, duplicarDesdeId, 
                     }
                   >
                     <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap" }}>
+                      {cotizacionData.status === "pendiente" && (
+                        <>
+                          <AppButton
+                            type="button" size="small" startIcon={<CheckCircleOutlineIcon />}
+                            disabled={cambiandoStatus} onClick={() => cambiarStatus("aprobada")} sx={{ borderRadius: 2 }}
+                          >
+                            Aprobar
+                          </AppButton>
+                          <AppButton
+                            type="button" size="small" variant="outlined" color="error" startIcon={<HighlightOffOutlinedIcon />}
+                            disabled={cambiandoStatus} onClick={() => cambiarStatus("rechazada")} sx={{ borderRadius: 2 }}
+                          >
+                            Rechazar
+                          </AppButton>
+                        </>
+                      )}
                       {cotizacionData.reporte && (
                         <AppButton type="button" size="small" variant="outlined" startIcon={<FactCheckOutlinedIcon />}
                           onClick={() => { onClose(); navigate(`/reportes/${cotizacionData.reporte._id}`); }}
@@ -444,7 +509,12 @@ export default function CotizacionDialog({ open, cotizacionId, duplicarDesdeId, 
                       </FormControl>
                     </Grid>
                     <Grid size={{ xs: 12, md: 3 }}>
-                      <AppInput label="Orden de Compra" {...register("ordenCompra")} placeholder="Ej: OC-2026-045" />
+                      <AppInput
+                        label="Orden de Compra"
+                        helperText={ocAutoGenerada ? "Sugerida — puedes cambiarla por la OC real del cliente" : undefined}
+                        {...register("ordenCompra", { onChange: () => setOcAutoGenerada(false) })}
+                        placeholder="Ej: OC-2026-045"
+                      />
                     </Grid>
                   </Grid>
                 </AppCard>
@@ -470,11 +540,52 @@ export default function CotizacionDialog({ open, cotizacionId, duplicarDesdeId, 
                       {fields.map((field, idx) => (
                         <TableRow key={field.id}>
                           <TableCell>
-                            <AppInput {...register(`items.${idx}.descripcion`, { required: true })} placeholder="Ej: Calibración de vernier" />
+                            <Controller
+                              name={`items.${idx}.descripcion`}
+                              control={control}
+                              rules={{ required: true }}
+                              render={({ field: rhf }) => (
+                                <Autocomplete
+                                  freeSolo
+                                  options={equiposCliente}
+                                  getOptionLabel={(opt) =>
+                                    typeof opt === "string" ? opt : `Calibración de ${[opt.marca, opt.modelo].filter(Boolean).join(" ")} (${opt.idInterno})`
+                                  }
+                                  value={rhf.value ?? ""}
+                                  onChange={(_, val) => {
+                                    if (val && typeof val === "object") {
+                                      rhf.onChange(`Calibración de ${[val.marca, val.modelo].filter(Boolean).join(" ")} (${val.idInterno})`);
+                                      setValue(`items.${idx}.marca`, val.marca || "");
+                                      setValue(`items.${idx}.modelo`, val.modelo || "");
+                                    } else {
+                                      rhf.onChange(val ?? "");
+                                    }
+                                  }}
+                                  onInputChange={(_, val, reason) => { if (reason !== "reset") rhf.onChange(val); }}
+                                  onBlur={rhf.onBlur}
+                                  renderInput={(params) => (
+                                    <TextField {...params} inputRef={rhf.ref} placeholder="Ej: Calibración de vernier" />
+                                  )}
+                                />
+                              )}
+                            />
                             <Box sx={{ display: "flex", gap: 1, mt: 1.25 }}>
-                              <AppInput label="Marca" {...register(`items.${idx}.marca`)} size="small" fullWidth />
-                              <AppInput label="Modelo" {...register(`items.${idx}.modelo`)} size="small" fullWidth />
-                              <AppInput label="Tiempo de entrega" {...register(`items.${idx}.tiempoEntrega`)} size="small" fullWidth />
+                              <AppInput
+                                label="Marca" size="small" fullWidth
+                                slotProps={{ inputLabel: { shrink: !!items[idx]?.marca } }}
+                                {...register(`items.${idx}.marca`)}
+                              />
+                              <AppInput
+                                label="Modelo" size="small" fullWidth
+                                slotProps={{ inputLabel: { shrink: !!items[idx]?.modelo } }}
+                                {...register(`items.${idx}.modelo`)}
+                              />
+                              <AppInput
+                                label="Tiempo de entrega" size="small" fullWidth
+                                placeholder="Ej: 3 días hábiles"
+                                slotProps={{ inputLabel: { shrink: !!items[idx]?.tiempoEntrega } }}
+                                {...register(`items.${idx}.tiempoEntrega`)}
+                              />
                             </Box>
                           </TableCell>
                           <TableCell>

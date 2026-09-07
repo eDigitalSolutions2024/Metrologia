@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { useForm, Controller } from "react-hook-form";
 import {
-  Box, Typography, Grid, MenuItem, Select, FormControl, InputLabel, Chip, Alert,
+  Box, Typography, Grid, MenuItem, Select, FormControl, InputLabel, Chip, Alert, Autocomplete, TextField,
 } from "@mui/material";
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
 import BadgeOutlinedIcon from "@mui/icons-material/BadgeOutlined";
@@ -19,7 +19,7 @@ import PrecisionManufacturingOutlinedIcon from "@mui/icons-material/PrecisionMan
 import { listarClientes } from "../../services/clientes";
 import { listarPatrones } from "../../services/patrones";
 import { obtenerEquipo, crearEquipo, actualizarEquipo, obtenerSiguienteIdInterno } from "../../services/equipos";
-import { CATEGORIAS, iconoCategoria, colorCategoria } from "./categorias";
+import { CATEGORIAS, iconoCategoria, colorCategoria, unidadesSugeridas } from "./categorias";
 import { useAuth } from "../../core/auth/useAuth";
 
 // Refleja php/nequipo.php: el equipo pertenece a un cliente (empId) y se le
@@ -45,6 +45,8 @@ export default function EquipoForm() {
 
   const clienteIdElegido = watch("clienteId");
   const idInternoValor = watch("idInterno");
+  const categoriaElegida = watch("categoria");
+  const opcionesUnidades = unidadesSugeridas(categoriaElegida);
 
   // En alta (no edición): en cuanto se elige cliente, se muestra de una vez
   // el ID que le tocaría (prefijo del nombre del cliente + consecutivo) —
@@ -130,6 +132,10 @@ export default function EquipoForm() {
         }
       />
 
+      <Typography variant="caption" color="text.secondary" sx={{ display: "block", mb: 2 }}>
+        Los campos marcados con * son obligatorios.
+      </Typography>
+
       {error && <Alert severity="error" sx={{ mb: 2, borderRadius: 2 }} onClose={() => setError("")}>{error}</Alert>}
 
       <Box component="form" onSubmit={handleSubmit(onSubmit)}>
@@ -159,8 +165,8 @@ export default function EquipoForm() {
                 rules={{ required: true }}
                 render={({ field }) => (
                   <FormControl fullWidth size="small" error={!!errors.clienteId}>
-                    <InputLabel>Cliente</InputLabel>
-                    <Select label="Cliente" {...field} value={field.value ?? ""} sx={{ borderRadius: 2 }}>
+                    <InputLabel>Cliente *</InputLabel>
+                    <Select label="Cliente *" {...field} value={field.value ?? ""} sx={{ borderRadius: 2 }}>
                       {clientes.map((c) => <MenuItem key={c._id} value={c._id}>{c.nombre}</MenuItem>)}
                     </Select>
                   </FormControl>
@@ -197,19 +203,43 @@ export default function EquipoForm() {
               <AppInput label="Marca" {...register("marca")} />
             </Grid>
             <Grid size={{ xs: 12, md: 4 }}>
-              <AppInput label="Modelo" error={errors.modelo} {...register("modelo", { required: "Obligatorio" })} />
+              <AppInput label="Modelo *" error={errors.modelo} {...register("modelo", { required: "Obligatorio" })} />
             </Grid>
             <Grid size={{ xs: 12, md: 4 }}>
-              <AppInput label="Serie" error={errors.serie} {...register("serie", { required: "Obligatorio" })} />
+              <AppInput label="Serie *" error={errors.serie} {...register("serie", { required: "Obligatorio" })} />
             </Grid>
             <Grid size={{ xs: 12 }}>
-              <AppInput label="Descripción" error={errors.descripcion} {...register("descripcion", { required: "Obligatorio" })} />
+              <AppInput label="Descripción *" error={errors.descripcion} {...register("descripcion", { required: "Obligatorio" })} />
             </Grid>
             <Grid size={{ xs: 12, md: 3 }}>
-              <AppInput label="Unidades" error={errors.unidades} {...register("unidades", { required: "Obligatorio" })} />
+              <Controller
+                name="unidades"
+                control={control}
+                rules={{ required: "Obligatorio" }}
+                render={({ field: { onChange, onBlur, value, ref } }) => (
+                  <Autocomplete
+                    freeSolo
+                    options={opcionesUnidades}
+                    value={value ?? ""}
+                    onChange={(_, val) => onChange(val ?? "")}
+                    onInputChange={(_, val) => onChange(val)}
+                    onBlur={onBlur}
+                    renderInput={(params) => (
+                      <TextField
+                        {...params}
+                        inputRef={ref}
+                        label="Unidades *"
+                        size="small"
+                        error={!!errors.unidades}
+                        helperText={errors.unidades?.message}
+                      />
+                    )}
+                  />
+                )}
+              />
             </Grid>
             <Grid size={{ xs: 12, md: 3 }}>
-              <AppInput label="División mínima" error={errors.divMinima} {...register("divMinima", { required: "Obligatorio" })} />
+              <AppInput label="División mínima *" error={errors.divMinima} {...register("divMinima", { required: "Obligatorio" })} />
             </Grid>
             <Grid size={{ xs: 12, md: 3 }}>
               <AppInput label="Rango" {...register("rango")} />
@@ -267,7 +297,15 @@ export default function EquipoForm() {
                     <Box sx={{ display: "flex", gap: 0.5, flexWrap: "wrap" }}>
                       {selected.map((val) => {
                         const p = patrones.find((pat) => pat._id === val);
-                        return <Chip key={val} label={p ? `${p.codigo} — ${p.descripcion}` : val} size="small" />;
+                        return (
+                          <Chip
+                            key={val}
+                            label={p ? `${p.codigo} — ${p.descripcion}` : val}
+                            size="small"
+                            onMouseDown={(e) => e.stopPropagation()}
+                            onDelete={() => field.onChange(selected.filter((v) => v !== val))}
+                          />
+                        );
                       })}
                     </Box>
                   )}

@@ -436,7 +436,7 @@ export default function IncertidumbrePage() {
         <Box
           sx={{
             width: { xs: "100%", lg: 380 }, flexShrink: 0, position: { lg: "sticky" }, top: { lg: 96 },
-            height: { xs: 520, lg: "calc(100vh - 120px)" }, maxHeight: { lg: "calc(100vh - 120px)" },
+            height: 680, maxHeight: 680,
           }}
         >
           <AsistentePanel contexto={contexto} onAgregarComponente={agregarDesdeAsistente} />

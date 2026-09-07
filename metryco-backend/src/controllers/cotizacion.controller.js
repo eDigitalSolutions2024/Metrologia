@@ -1,6 +1,11 @@
 const asyncHandler = require("../utils/asyncHandler");
 const cotizacionService = require("../services/cotizacion.service");
 
+const siguienteOrdenCompra = asyncHandler(async (req, res) => {
+  const ordenCompra = await cotizacionService.siguienteOrdenCompra(req.query.cliente);
+  res.json({ success: true, data: { ordenCompra } });
+});
+
 const listar = asyncHandler(async (req, res) => {
   const { search = "", status = "todos", mes = "", anio = "", clienteId = "", page = 0, pageSize = 10 } = req.query;
   const { items, total } = await cotizacionService.listar({
@@ -54,5 +59,5 @@ const eliminarAdjunto = asyncHandler(async (req, res) => {
 
 module.exports = {
   listar, obtener, crear, actualizar, eliminar, paraImprimir,
-  subirAdjunto, descargarAdjunto, eliminarAdjunto,
+  subirAdjunto, descargarAdjunto, eliminarAdjunto, siguienteOrdenCompra,
 };

@@ -16,6 +16,7 @@ import LocalShippingOutlined from "@mui/icons-material/LocalShippingOutlined";
 import WorkspacePremiumOutlinedIcon from "@mui/icons-material/WorkspacePremiumOutlined";
 import InsertChartOutlinedIcon from "@mui/icons-material/InsertChartOutlined";
 import UploadFileOutlinedIcon from "@mui/icons-material/UploadFileOutlined";
+import ReportProblemOutlinedIcon from "@mui/icons-material/ReportProblemOutlined";
 
 import AppButton from "../../shared/components/AppButton";
 import PageHeader from "../../shared/components/PageHeader";
@@ -417,6 +418,18 @@ export default function ReporteDetallePage() {
               </Box>
 
               <StateTracker estados={a.estados} />
+
+              {a.estados?.entrega === "entregado" && a.estados?.certificado !== "autorizado" && (
+                <Tooltip title="El equipo ya fue entregado pero su certificado no está autorizado por Calidad (fue rechazado o anulado después de la entrega). Revisa este caso manualmente.">
+                  <Alert
+                    icon={<ReportProblemOutlinedIcon fontSize="small" />}
+                    severity="warning"
+                    sx={{ mt: 1, py: 0, "& .MuiAlert-message": { fontSize: 12.5 } }}
+                  >
+                    Entregado con certificado sin autorizar — requiere revisión.
+                  </Alert>
+                </Tooltip>
+              )}
 
               {(a.patrones || []).length > 0 && (
                 <Box sx={{ display: "flex", gap: 0.5, mt: 1.25, flexWrap: "wrap" }}>

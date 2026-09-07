@@ -45,3 +45,26 @@ export function iconoCategoria(categoria) {
 export function colorCategoria(categoria) {
   return CATEGORIA_INFO[categoria]?.color || "#64748B";
 }
+
+// Unidades típicas por categoría — solo son sugerencias para el Autocomplete
+// de "Unidades" (Equipos/Patrones); el campo sigue siendo texto libre, así
+// que no restringe nada que ya esté guardado ni obliga a elegir de la lista.
+export const UNIDADES_POR_CATEGORIA = {
+  Presion: ["psi", "bar", "kPa", "MPa", "kg/cm²", "mmHg", "inHg", "Pa"],
+  Fuerza: ["N", "kN", "kgf", "lbf"],
+  Masa: ["g", "kg", "mg", "lb", "oz", "ton"],
+  Flujo: ["L/min", "m³/h", "GPM", "L/s"],
+  Peso: ["g", "kg", "mg", "lb", "ton"],
+  Electrica: ["V", "A", "Ω", "W", "Hz", "mA", "kΩ", "MΩ"],
+  Mecanica: ["N·m", "rpm", "mm", "N"],
+  Dimensional: ["mm", "cm", "m", "in", "µm"],
+  Temperatura: ["°C", "°F", "K"],
+  "Temperatura y Humedad": ["°C", "°F", "%HR"],
+  PH: ["pH"],
+  "Par Torsional": ["N·m", "kgf·cm", "lbf·in", "lbf·ft"],
+  Volumen: ["mL", "L", "m³", "gal"],
+};
+
+export function unidadesSugeridas(categoria) {
+  return UNIDADES_POR_CATEGORIA[categoria] || [];
+}

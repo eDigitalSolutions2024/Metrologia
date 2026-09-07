@@ -69,7 +69,7 @@ function NuevoRegistroDialog({ open, onClose, onCreated, prefill }) {
   };
 
   return (
-    <Dialog open={open} onClose={cerrar} fullWidth maxWidth="sm">
+    <Dialog open={open} onClose={cerrar} fullWidth maxWidth="md">
       <DialogTitle sx={{ fontWeight: 700 }}>
         {prefill ? `Generar factura — Cotización ${prefill.folio}` : "Nuevo Registro de Cuenta por Cobrar"}
       </DialogTitle>
@@ -174,7 +174,7 @@ function AplicarPagoDialog({ target, onClose, onConfirm }) {
   return (
     <Dialog open={!!target} onClose={onClose} fullWidth maxWidth="xs">
       <DialogTitle>Aplicar pago — {target?.folio}</DialogTitle>
-      <DialogContent>
+      <DialogContent sx={{ pt: "20px !important" }}>
         <AppDatePicker label="Fecha pagada" value={fechaPagada} onChange={setFechaPagada} />
       </DialogContent>
       <DialogActions sx={{ px: 3, pb: 2 }}>
