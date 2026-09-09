@@ -235,7 +235,7 @@ export default function IncertidumbrePage() {
       <PageHeader
         icon={<InsightsOutlinedIcon />}
         title="Análisis de Incertidumbre"
-        subtitle="Método GUM (JCGM 100:2008) · EA-4/02 — motor determinístico, mismos datos = mismo resultado"
+        subtitle="Uso avanzado: editar contribuciones a mano, recalcular o cálculos sueltos. Lo normal es capturar la incertidumbre desde «Iniciar calibración» en el Reporte. Método GUM (JCGM 100:2008) · EA-4/02."
         actions={
           <AppButton
             variant="outlined"

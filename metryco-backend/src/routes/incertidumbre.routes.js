@@ -36,5 +36,12 @@ router.post("/calculos", c.crearCalculo);
 router.patch("/calculos/:id/recalcular", c.recalcular);
 router.patch("/calculos/:id/revisar", c.revisar);
 router.patch("/calculos/:id/aprobar", c.aprobar);
+// Aprobar en bloque todos los cálculos de una asignación (Calidad) — mismo
+// rol que autoriza el certificado en asignacion.service.js.
+router.patch(
+  "/calculos/aprobar-por-asignacion/:asignacionId",
+  requireRole("admin", "coordinador"),
+  c.aprobarPorAsignacion
+);
 
 module.exports = router;

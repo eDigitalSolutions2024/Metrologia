@@ -17,6 +17,10 @@ import WorkspacePremiumOutlinedIcon from "@mui/icons-material/WorkspacePremiumOu
 import InsertChartOutlinedIcon from "@mui/icons-material/InsertChartOutlined";
 import UploadFileOutlinedIcon from "@mui/icons-material/UploadFileOutlined";
 import ReportProblemOutlinedIcon from "@mui/icons-material/ReportProblemOutlined";
+import PlayCircleOutlineIcon from "@mui/icons-material/PlayCircleOutlineOutlined";
+import VerifiedOutlinedIcon from "@mui/icons-material/VerifiedOutlined";
+import EditOutlinedIcon from "@mui/icons-material/EditOutlined";
+import DeleteOutlineIcon from "@mui/icons-material/DeleteOutlined";
 
 import AppButton from "../../shared/components/AppButton";
 import PageHeader from "../../shared/components/PageHeader";
@@ -24,16 +28,18 @@ import { formatDate } from "../../shared/utils/formatDate";
 import FactCheckOutlinedIcon from "@mui/icons-material/FactCheckOutlined";
 import {
   obtenerReporte, actualizarReporte, agregarComentarioReporte,
-  crearAsignacion, actualizarAsignacion, cambiarEstadoAsignacion,
+  crearAsignacion, actualizarAsignacion, cambiarEstadoAsignacion, eliminarAsignacion,
   subirGraficaAsignacion, fetchGraficaAsignacionBlob,
 } from "../../services/reportes";
 import { listarEquipos } from "../../services/equipos";
 import { obtenerDirectorio } from "../../services/usuarios";
 import { listarPatrones } from "../../services/patrones";
 import { listarPerformance } from "../../services/performance";
-import { listarCertificadosPorReporte } from "../../services/certificados";
+import { listarCertificadosPorReporte, emitirCertificado, cambiarEstadoCertificado } from "../../services/certificados";
+import { aprobarCalculosPorAsignacion } from "../../services/incertidumbre";
 import { direccionCliente } from "./imprimir/shared";
 import { useAuth } from "../../core/auth/useAuth";
+import CapturarCalibracionDialog from "./CapturarCalibracionDialog";
 
 const EST_CALIBRACION = { pendiente: "Pendiente", en_proceso: "En proceso", terminada: "Terminada" };
 const EST_ENTREGA = { pendiente: "Pendiente", entregado: "Entregado" };
@@ -126,6 +132,12 @@ export default function ReporteDetallePage() {
   const [comentario, setComentario] = useState("");
   const [rechazoTarget, setRechazoTarget] = useState(null);
   const [certificadoPorAsignacion, setCertificadoPorAsignacion] = useState({});
+  const [calibracionTarget, setCalibracionTarget] = useState(null);
+  const [aprobando, setAprobando] = useState(null);
+  const [editarTarget, setEditarTarget] = useState(null);
+  const [eliminarTarget, setEliminarTarget] = useState(null);
+  const [eliminando, setEliminando] = useState(false);
+  const [emitirTarget, setEmitirTarget] = useState(null);
 
   const cargar = useCallback(() => {
     setLoading(true);
@@ -230,6 +242,56 @@ export default function ReporteDetallePage() {
       setError("No se pudo cambiar el estado.")
     );
   };
+
+  // Aprueba de un jalón todos los cálculos de incertidumbre de la asignación
+  // y autoriza el certificado — reemplaza aprobar cálculo por cálculo y
+  // luego cambiar el <Select> de Certificado a mano.
+  const aprobarYAutorizar = async (a) => {
+    setAprobando(a._id);
+    try {
+      await aprobarCalculosPorAsignacion(a._id);
+      await cambiarEstadoAsignacion(a._id, { dominio: "certificado", valor: "autorizado" });
+      cargar();
+    } catch (e) {
+      setError(e?.response?.data?.message || "No se pudo aprobar y autorizar.");
+    } finally {
+      setAprobando(null);
+    }
+  };
+
+  // Calidad revisa el certificado ya emitido (en revisión) y lo aprueba →
+  // pasa a "vigente" (el certificado oficial). Si algo está mal, se rechaza
+  // con motivo (botón aparte) y regresa al técnico a re-calibrar.
+  const aprobarCertificado = async (certId) => {
+    if (!certId) return;
+    setAprobando(certId);
+    try {
+      await cambiarEstadoCertificado(certId, "vigente");
+      cargar();
+    } catch (e) {
+      setError(e?.response?.data?.message || "No se pudo aprobar el certificado.");
+    } finally {
+      setAprobando(null);
+    }
+  };
+
+  const confirmarEliminarAsignacion = async () => {
+    if (!eliminarTarget) return;
+    setEliminando(true);
+    try {
+      await eliminarAsignacion(eliminarTarget._id);
+      setEliminarTarget(null);
+      cargar();
+    } catch (e) {
+      setError(e?.response?.data?.message || "No se pudo quitar la asignación.");
+    } finally {
+      setEliminando(false);
+    }
+  };
+
+  // Editar/quitar solo tiene sentido mientras nada haya arrancado.
+  const asignacionEditable = (a) =>
+    a.estados?.calibracion === "pendiente" && a.estados?.certificado === "sin_generar";
 
   if (loading && !data) {
     return <Box sx={{ p: 4 }}><Typography color="text.secondary">Cargando…</Typography></Box>;
@@ -414,6 +476,20 @@ export default function ReporteDetallePage() {
                       <Avatar sx={{ width: 24, height: 24, fontSize: 11, bgcolor: "secondary.main" }}>{tecnico.nombre.charAt(0)}</Avatar>
                     </Tooltip>
                   )}
+                  {puedeAsignar && asignacionEditable(a) && (
+                    <>
+                      <Tooltip title="Editar asignación (técnico, patrones, Performance)">
+                        <IconButton size="small" onClick={() => setEditarTarget(a)}>
+                          <EditOutlinedIcon fontSize="small" sx={{ color: "secondary.main" }} />
+                        </IconButton>
+                      </Tooltip>
+                      <Tooltip title="Quitar asignación">
+                        <IconButton size="small" onClick={() => setEliminarTarget(a)}>
+                          <DeleteOutlineIcon fontSize="small" sx={{ color: "error.main" }} />
+                        </IconButton>
+                      </Tooltip>
+                    </>
+                  )}
                 </Box>
               </Box>
 
@@ -443,6 +519,79 @@ export default function ReporteDetallePage() {
               )}
 
               <Box sx={{ display: "flex", gap: 1.5, mt: 1.5, flexWrap: "wrap", alignItems: "flex-start" }}>
+                {/* Capturar / editar la calibración — solo antes de que arranque el certificado */}
+                {puedeOperarAsignacion && a.estados?.certificado === "sin_generar" && (
+                  <AppButton
+                    type="button" variant="outlined" size="small" startIcon={<PlayCircleOutlineIcon />}
+                    onClick={() => setCalibracionTarget(a)}
+                    sx={{ borderRadius: 2, height: 40 }}
+                  >
+                    {a.estados?.calibracion === "pendiente"
+                      ? "Iniciar calibración"
+                      : a.estados?.calibracion === "en_proceso"
+                      ? "Continuar calibración"
+                      : "Editar calibración"}
+                  </AppButton>
+                )}
+
+                {/* Calidad: aprobar los cálculos y autorizar */}
+                {puedeCertificado && a.estados?.calibracion === "terminada" && a.estados?.certificado === "sin_generar" && (
+                  <AppButton
+                    type="button" variant="contained" color="success" size="small" startIcon={<VerifiedOutlinedIcon />}
+                    loading={aprobando === a._id}
+                    onClick={() => aprobarYAutorizar(a)}
+                    sx={{ borderRadius: 2, height: 40 }}
+                  >
+                    Aprobar y autorizar certificado
+                  </AppButton>
+                )}
+
+                {/* Calidad: emitir el documento del certificado */}
+                {puedeCertificado && a.estados?.certificado === "autorizado" && !certificadoPorAsignacion[a._id] && (
+                  <AppButton
+                    type="button" variant="contained" size="small" startIcon={<WorkspacePremiumOutlinedIcon />}
+                    onClick={() => setEmitirTarget(a)}
+                    sx={{ borderRadius: 2, height: 40 }}
+                  >
+                    Emitir certificado
+                  </AppButton>
+                )}
+
+                {certificadoPorAsignacion[a._id] && (
+                  <AppButton
+                    type="button" variant="outlined" size="small" startIcon={<PictureAsPdfOutlinedIcon />}
+                    onClick={() => window.open(`/informe/certificado/${certificadoPorAsignacion[a._id]}`, "_blank")}
+                    sx={{ borderRadius: 2, height: 40 }}
+                  >
+                    Ver certificado (PDF)
+                  </AppButton>
+                )}
+
+                {/* Calidad: revisar el certificado emitido → aprobarlo (vigente) */}
+                {puedeCertificado && a.estados?.certificado === "en_revision" && certificadoPorAsignacion[a._id] && (
+                  <AppButton
+                    type="button" variant="contained" color="success" size="small" startIcon={<VerifiedOutlinedIcon />}
+                    loading={aprobando === certificadoPorAsignacion[a._id]}
+                    onClick={() => aprobarCertificado(certificadoPorAsignacion[a._id])}
+                    sx={{ borderRadius: 2, height: 40 }}
+                  >
+                    Aprobar certificado
+                  </AppButton>
+                )}
+
+                {/* Calidad: algo está mal → rechazar con motivo, regresa al técnico */}
+                {puedeCertificado &&
+                  (a.estados?.certificado === "en_revision" ||
+                    (a.estados?.certificado === "autorizado" && !certificadoPorAsignacion[a._id])) && (
+                    <AppButton
+                      type="button" variant="outlined" color="error" size="small" startIcon={<ReportProblemOutlinedIcon />}
+                      onClick={() => onCambiarEstado(a._id, "certificado", "rechazado")}
+                      sx={{ borderRadius: 2, height: 40 }}
+                    >
+                      Rechazar
+                    </AppButton>
+                  )}
+
                 <FormControl size="small" sx={{ minWidth: 130 }} disabled={!puedeOperarAsignacion}>
                   <InputLabel>Calibración</InputLabel>
                   <Select label="Calibración" value={a.estados?.calibracion} onChange={(e) => onCambiarEstado(a._id, "calibracion", e.target.value)}>
@@ -456,21 +605,12 @@ export default function ReporteDetallePage() {
                   </Select>
                 </FormControl>
                 <Box>
-                  <Box sx={{ display: "flex", gap: 0.5, alignItems: "center" }}>
-                    <FormControl size="small" sx={{ minWidth: 140 }} disabled={!puedeCertificado}>
-                      <InputLabel>Certificado</InputLabel>
-                      <Select label="Certificado" value={a.estados?.certificado} onChange={(e) => onCambiarEstado(a._id, "certificado", e.target.value)}>
-                        {Object.entries(EST_CERTIFICADO).map(([k, v]) => <MenuItem key={k} value={k}>{v}</MenuItem>)}
-                      </Select>
-                    </FormControl>
-                    {certificadoPorAsignacion[a._id] && (
-                      <Tooltip title="Descargar certificado de este equipo (PDF separado)">
-                        <IconButton size="small" onClick={() => window.open(`/informe/certificado/${certificadoPorAsignacion[a._id]}`, "_blank")}>
-                          <PictureAsPdfOutlinedIcon fontSize="small" sx={{ color: "error.main" }} />
-                        </IconButton>
-                      </Tooltip>
-                    )}
-                  </Box>
+                  <FormControl size="small" sx={{ minWidth: 140 }} disabled={!puedeCertificado}>
+                    <InputLabel>Certificado</InputLabel>
+                    <Select label="Certificado" value={a.estados?.certificado} onChange={(e) => onCambiarEstado(a._id, "certificado", e.target.value)}>
+                      {Object.entries(EST_CERTIFICADO).map(([k, v]) => <MenuItem key={k} value={k}>{v}</MenuItem>)}
+                    </Select>
+                  </FormControl>
                   {a.motivoRechazo && (
                     <Typography variant="caption" color="error.main" sx={{ display: "block", mt: 0.5, maxWidth: 200 }}>
                       {a.motivoRechazo}
@@ -555,7 +695,214 @@ export default function ReporteDetallePage() {
           cambiarEstadoAsignacion(rechazoTarget, { dominio: "certificado", valor: "rechazado", motivo }).then(cargar);
           setRechazoTarget(null);
         }} />
+
+      <CapturarCalibracionDialog
+        open={!!calibracionTarget}
+        asignacion={calibracionTarget}
+        onClose={() => setCalibracionTarget(null)}
+        onDone={() => { setCalibracionTarget(null); cargar(); }}
+      />
+
+      <EditarAsignacionDialog
+        open={!!editarTarget}
+        asignacion={editarTarget}
+        onClose={() => setEditarTarget(null)}
+        onDone={() => { setEditarTarget(null); cargar(); }}
+      />
+
+      <EmitirCertificadoDialog
+        open={!!emitirTarget}
+        asignacion={emitirTarget}
+        onClose={() => setEmitirTarget(null)}
+        onDone={() => { setEmitirTarget(null); cargar(); }}
+      />
+
+      <Dialog open={!!eliminarTarget} onClose={() => setEliminarTarget(null)} maxWidth="xs" fullWidth>
+        <DialogTitle sx={{ fontWeight: 700 }}>Quitar asignación</DialogTitle>
+        <DialogContent>
+          <Typography variant="body2">
+            ¿Quitar <b>{eliminarTarget?.equipo?.idInterno}</b> ({eliminarTarget?.equipo?.marca} {eliminarTarget?.equipo?.modelo}) de este reporte?
+          </Typography>
+          <Typography variant="caption" color="text.secondary" sx={{ display: "block", mt: 1 }}>
+            Solo se puede mientras la calibración no haya arrancado. Se puede volver a asignar después.
+          </Typography>
+        </DialogContent>
+        <DialogActions sx={{ px: 3, pb: 2 }}>
+          <Button onClick={() => setEliminarTarget(null)}>Cancelar</Button>
+          <Button color="error" variant="contained" disabled={eliminando} onClick={confirmarEliminarAsignacion} sx={{ borderRadius: 2 }}>
+            Quitar
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Box>
+  );
+}
+
+// Editar una asignación ya creada (mientras no haya arrancado): cambiar
+// técnico, patrones o Performance sin tener que quitarla y rehacerla.
+function EditarAsignacionDialog({ open, asignacion, onClose, onDone }) {
+  const [tecnicos, setTecnicos] = useState([]);
+  const [patronesDisp, setPatronesDisp] = useState([]);
+  const [performanceDisp, setPerformanceDisp] = useState([]);
+  const [tecnicoAsignado, setTecnicoAsignado] = useState("");
+  const [patrones, setPatrones] = useState([]);
+  const [performance, setPerformance] = useState("");
+  const [error, setError] = useState("");
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    if (!open) return;
+    obtenerDirectorio().then((l) => setTecnicos(l.filter((u) => u.rol === "tecnico"))).catch(() => {});
+    listarPatrones({ soloVigentes: "true", pageSize: 200 }).then(({ items }) => setPatronesDisp(items)).catch(() => {});
+    listarPerformance({ pageSize: 200 }).then(({ items }) => setPerformanceDisp(items)).catch(() => {});
+  }, [open]);
+
+  useEffect(() => {
+    if (!open || !asignacion) return;
+    setError("");
+    setTecnicoAsignado(asignacion.tecnicoAsignado?._id || asignacion.tecnicoAsignado || "");
+    setPerformance(asignacion.performance?._id || asignacion.performance || "");
+    setPatrones((asignacion.patrones || []).map((p) => (typeof p === "string" ? { _id: p, codigo: p, nombre: "" } : p)));
+  }, [open, asignacion]);
+
+  // Al llegar el catálogo de patrones, cambia los del asignación por los
+  // objetos completos (para que se vean bien las etiquetas).
+  useEffect(() => {
+    if (!patronesDisp.length || !asignacion) return;
+    const ids = new Set((asignacion.patrones || []).map((p) => p._id || p));
+    setPatrones(patronesDisp.filter((p) => ids.has(p._id)));
+  }, [patronesDisp, asignacion]);
+
+  const guardar = async () => {
+    setSaving(true); setError("");
+    try {
+      await actualizarAsignacion(asignacion._id, {
+        tecnicoAsignado: tecnicoAsignado || undefined,
+        patrones: patrones.map((p) => p._id),
+        performance: performance || undefined,
+      });
+      onDone();
+    } catch (e) {
+      setError(e?.response?.data?.message || "No se pudo guardar la asignación.");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth>
+      <DialogTitle sx={{ fontWeight: 700 }}>
+        Editar asignación{asignacion ? ` — ${asignacion.equipo?.idInterno}` : ""}
+      </DialogTitle>
+      <DialogContent sx={{ display: "flex", flexDirection: "column", gap: 2, pt: 1 }}>
+        {error && <Alert severity="error" sx={{ borderRadius: 2 }}>{error}</Alert>}
+        <FormControl size="small" fullWidth>
+          <InputLabel>Técnico</InputLabel>
+          <Select label="Técnico" value={tecnicoAsignado} onChange={(e) => setTecnicoAsignado(e.target.value)}>
+            <MenuItem value="">Sin asignar</MenuItem>
+            {tecnicos.map((t) => <MenuItem key={t._id} value={t._id}>{t.nombre}</MenuItem>)}
+          </Select>
+        </FormControl>
+        <Autocomplete
+          multiple size="small" options={patronesDisp} value={patrones}
+          getOptionLabel={(p) => `${p.codigo}${p.nombre ? ` — ${p.nombre}` : ""}`}
+          isOptionEqualToValue={(x, y) => x._id === y._id}
+          onChange={(_, v) => setPatrones(v)}
+          renderInput={(params) => <TextField {...params} label="Patrón" />}
+        />
+        <FormControl size="small" fullWidth>
+          <InputLabel>Performance</InputLabel>
+          <Select label="Performance" value={performance} onChange={(e) => setPerformance(e.target.value)}>
+            <MenuItem value="">Ninguna</MenuItem>
+            {performanceDisp.map((p) => <MenuItem key={p._id} value={p._id}>{p.nombre}</MenuItem>)}
+          </Select>
+        </FormControl>
+        <Typography variant="caption" color="text.secondary">
+          El equipo no se cambia aquí — si es el equipo equivocado, quita la asignación y crea otra.
+        </Typography>
+      </DialogContent>
+      <DialogActions sx={{ px: 3, pb: 2 }}>
+        <Button onClick={onClose}>Cancelar</Button>
+        <Button variant="contained" disabled={saving} onClick={guardar} sx={{ borderRadius: 2 }}>Guardar</Button>
+      </DialogActions>
+    </Dialog>
+  );
+}
+
+// Emitir el certificado de UNA asignación desde su tarjeta, sin ir a la
+// pantalla de Certificados. Razón/tipo/temp/humedad ya vienen de la
+// calibración (los hereda certificado.service.js), aquí solo vigencia y firmas.
+function EmitirCertificadoDialog({ open, asignacion, onClose, onDone }) {
+  const { user } = useAuth();
+  const [usuarios, setUsuarios] = useState([]);
+  const [vigencia, setVigencia] = useState("");
+  const [revisadoPor, setRevisadoPor] = useState("");
+  const [autorizadoPor, setAutorizadoPor] = useState("");
+  const [error, setError] = useState("");
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    if (!open) return;
+    setError(""); setRevisadoPor(user?.id || ""); setAutorizadoPor("");
+    obtenerDirectorio().then(setUsuarios).catch(() => setUsuarios([]));
+    const base = asignacion?.fechaCalibracion ? new Date(asignacion.fechaCalibracion) : new Date();
+    base.setFullYear(base.getFullYear() + 1);
+    setVigencia(base.toISOString().slice(0, 10));
+  }, [open, asignacion, user?.id]);
+
+  const emitir = async () => {
+    setSaving(true); setError("");
+    try {
+      await emitirCertificado({
+        asignacion: asignacion._id,
+        vigencia: vigencia || undefined,
+        revisadoPor: revisadoPor || undefined,
+        autorizadoPor: autorizadoPor || undefined,
+      });
+      onDone();
+    } catch (e) {
+      setError(e?.response?.data?.message || "No se pudo emitir el certificado.");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <Dialog open={open} onClose={onClose} maxWidth="xs" fullWidth>
+      <DialogTitle sx={{ fontWeight: 700 }}>
+        Emitir certificado{asignacion ? ` — ${asignacion.equipo?.idInterno}` : ""}
+      </DialogTitle>
+      <DialogContent sx={{ display: "flex", flexDirection: "column", gap: 2, pt: 1 }}>
+        {error && <Alert severity="error" sx={{ borderRadius: 2 }}>{error}</Alert>}
+        <Typography variant="caption" color="text.secondary">
+          Equipo, cliente, patrones y datos del servicio se copian tal cual de la calibración.
+        </Typography>
+        <TextField
+          type="date" size="small" label="Vigencia"
+          helperText="Sugerida a 1 año de la calibración"
+          value={vigencia} onChange={(e) => setVigencia(e.target.value)}
+          slotProps={{ inputLabel: { shrink: true } }}
+        />
+        <FormControl size="small" fullWidth>
+          <InputLabel>Revisó (aprobación técnica)</InputLabel>
+          <Select label="Revisó (aprobación técnica)" value={revisadoPor} onChange={(e) => setRevisadoPor(e.target.value)}>
+            <MenuItem value="">— Sin especificar —</MenuItem>
+            {usuarios.map((u) => <MenuItem key={u._id} value={u._id}>{u.nombre}</MenuItem>)}
+          </Select>
+        </FormControl>
+        <FormControl size="small" fullWidth>
+          <InputLabel>Autorizó (calidad)</InputLabel>
+          <Select label="Autorizó (calidad)" value={autorizadoPor} onChange={(e) => setAutorizadoPor(e.target.value)}>
+            <MenuItem value="">— Sin especificar —</MenuItem>
+            {usuarios.map((u) => <MenuItem key={u._id} value={u._id}>{u.nombre}</MenuItem>)}
+          </Select>
+        </FormControl>
+      </DialogContent>
+      <DialogActions sx={{ px: 3, pb: 2 }}>
+        <Button onClick={onClose}>Cancelar</Button>
+        <Button variant="contained" disabled={saving} onClick={emitir} sx={{ borderRadius: 2 }}>Emitir</Button>
+      </DialogActions>
+    </Dialog>
   );
 }
 

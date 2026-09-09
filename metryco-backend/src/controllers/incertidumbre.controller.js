@@ -58,6 +58,13 @@ const aprobar = asyncHandler(async (req, res) => {
   res.json({ success: true, data: await calculos.aprobar(req.params.id, req.user) });
 });
 
+// Aprueba de un jalón todos los cálculos calculados/revisados de una
+// asignación — usado por "Aprobar y autorizar certificado" en el detalle
+// del Reporte, para no aprobar punto por punto.
+const aprobarPorAsignacion = asyncHandler(async (req, res) => {
+  res.json({ success: true, data: await calculos.aprobarPorAsignacion(req.params.asignacionId, req.user) });
+});
+
 // Cálculo determinístico SIN persistir — para la vista previa "en vivo".
 const preview = asyncHandler(async (req, res) => {
   res.json({ success: true, data: await calculos.preview(req.body) });
@@ -71,6 +78,6 @@ const asistir = asyncHandler(async (req, res) => {
 
 module.exports = {
   listarModelos, obtenerModelo, crearModelo, actualizarModelo, eliminarModelo, importarModelo,
-  listarCalculos, obtenerCalculo, crearCalculo, recalcular, revisar, aprobar, preview,
+  listarCalculos, obtenerCalculo, crearCalculo, recalcular, revisar, aprobar, aprobarPorAsignacion, preview,
   asistir,
 };

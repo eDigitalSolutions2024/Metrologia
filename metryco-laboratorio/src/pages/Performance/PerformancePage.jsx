@@ -56,8 +56,8 @@ export default function PerformancePage() {
     <Box>
       <PageHeader
         icon={<SpeedOutlinedIcon />}
-        title="Performance"
-        subtitle={`${total} plantillas de puntos de prueba para calibración`}
+        title="Plantillas de Tolerancia"
+        subtitle={`${total} plantillas de puntos de prueba y EMP. Se eligen al asignar un equipo y precargan los puntos en "Iniciar calibración".`}
         actions={
           <AppButton startIcon={<AddIcon />} onClick={() => navigate("/performance/nuevo")} sx={{ borderRadius: 2 }}>
             Nuevo Performance

@@ -1,11 +1,14 @@
 import { useEffect, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { useForm, useFieldArray, Controller } from "react-hook-form";
-import { Box, Typography, Grid, IconButton, Tooltip, Button, Divider, Alert, Autocomplete, TextField } from "@mui/material";
+import { Box, Typography, Grid, IconButton, Tooltip, Button, Alert, Autocomplete, TextField, Chip } from "@mui/material";
+import { useTheme } from "@mui/material/styles";
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
 import AddIcon from "@mui/icons-material/Add";
 import DeleteOutlineIcon from "@mui/icons-material/DeleteOutlined";
 import UploadFileIcon from "@mui/icons-material/UploadFileOutlined";
+import AutoAwesomeOutlinedIcon from "@mui/icons-material/AutoAwesomeOutlined";
+import CalculateOutlinedIcon from "@mui/icons-material/CalculateOutlined";
 
 import AppButton from "../../shared/components/AppButton";
 import AppCard from "../../shared/components/AppCard";
@@ -70,6 +73,7 @@ function puntoAlBackend(p) {
 export default function PerformanceForm() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const theme = useTheme();
   const isEdit = !!id;
   const [loading, setLoading] = useState(isEdit);
   const [saving, setSaving] = useState(false);
@@ -169,50 +173,77 @@ export default function PerformanceForm() {
           </Grid>
         </AppCard>
 
-        <AppCard
-          title="Puntos de Prueba"
-          action={
-            <>
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept=".csv,.xls,.xlsx"
-                hidden
-                onChange={onArchivoSeleccionado}
-              />
-              <Button
-                type="button"
-                size="small"
-                startIcon={<UploadFileIcon />}
-                onClick={() => fileInputRef.current?.click()}
-                disabled={importando}
-                sx={{ borderRadius: 2 }}
-              >
-                {importando ? "Importando…" : "Importar Excel/CSV"}
-              </Button>
-            </>
-          }
-          sx={{ mb: 3 }}
-        >
+        <AppCard title="Puntos de Prueba" sx={{ mb: 3 }}>
+          {/* Importar destaca arriba de todo: es la forma más rápida de capturar */}
+          <Box
+            sx={{
+              display: "flex", alignItems: "center", gap: 2, flexWrap: "wrap",
+              p: 2, mb: 3, borderRadius: 3,
+              border: "1.5px dashed", borderColor: "secondary.main",
+              bgcolor: theme.palette.secondary.main + "0C",
+            }}
+          >
+            <Box sx={{
+              width: 46, height: 46, borderRadius: 2, display: "grid", placeItems: "center", flexShrink: 0,
+              bgcolor: theme.palette.secondary.main + "1F", color: "secondary.main",
+            }}>
+              <AutoAwesomeOutlinedIcon />
+            </Box>
+            <Box sx={{ flex: 1, minWidth: 240 }}>
+              <Typography variant="body2" fontWeight={700}>¿Ya tienes los puntos en un archivo?</Typography>
+              <Typography variant="caption" color="text.secondary" sx={{ display: "block" }}>
+                Sube tu Excel o CSV y se capturan solos. Si las columnas no vienen exactas, una IA las interpreta por ti.
+              </Typography>
+              <Typography variant="caption" color="text.secondary" sx={{ display: "block", opacity: 0.75, mt: 0.25 }}>
+                Columnas ideales: Prueba, Nominal, Unidad, Escala Total, %RDG, %FS, Unidades, Incertidumbre.
+              </Typography>
+            </Box>
+            <input ref={fileInputRef} type="file" accept=".csv,.xls,.xlsx" hidden onChange={onArchivoSeleccionado} />
+            <AppButton
+              type="button"
+              variant="contained"
+              startIcon={<UploadFileIcon />}
+              loading={importando}
+              onClick={() => fileInputRef.current?.click()}
+              sx={{ borderRadius: 2, flexShrink: 0 }}
+            >
+              Importar Excel/CSV
+            </AppButton>
+          </Box>
+
           {importInfo && (
             <Alert severity="success" sx={{ mb: 2, borderRadius: 2 }} onClose={() => setImportInfo("")}>
               {importInfo}
             </Alert>
           )}
-          <Typography variant="caption" color="text.secondary" sx={{ display: "block", mb: 2 }}>
-            Columnas esperadas: Prueba, Nominal, Unidad, Escala Total, %RDG, %FS, Unidades, Incertidumbre.
-          </Typography>
+
           {fields.map((field, index) => (
-            <Box key={field.id}>
-              {index > 0 && <Divider sx={{ my: 2 }} />}
-              <Grid container spacing={1.5} sx={{ alignItems: "flex-end" }}>
-                <Grid size={{ xs: 12, sm: 6, md: 2 }}>
+            <Box
+              key={field.id}
+              sx={{
+                p: 2, mb: 2, borderRadius: 3, border: "1px solid", borderColor: "divider",
+                position: "relative",
+              }}
+            >
+              <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", mb: 1.5 }}>
+                <Chip label={`Punto ${index + 1}`} size="small" color="secondary" variant="outlined" sx={{ fontWeight: 700 }} />
+                <Tooltip title="Quitar punto">
+                  <span>
+                    <IconButton type="button" size="small" onClick={() => remove(index)} disabled={fields.length === 1}>
+                      <DeleteOutlineIcon fontSize="small" sx={{ color: "error.main" }} />
+                    </IconButton>
+                  </span>
+                </Tooltip>
+              </Box>
+
+              <Grid container spacing={1.5}>
+                <Grid size={{ xs: 12, sm: 6, md: 3 }}>
                   <AppInput label="Prueba" size="small" {...register(`puntos.${index}.prueba`, { required: true })} />
                 </Grid>
-                <Grid size={{ xs: 6, sm: 3, md: 1.2 }}>
+                <Grid size={{ xs: 6, sm: 3, md: 1.5 }}>
                   <AppInput label="Nominal" size="small" onBlur={() => recalcularFila(index)} {...register(`puntos.${index}.nominal`)} />
                 </Grid>
-                <Grid size={{ xs: 6, sm: 3, md: 1 }}>
+                <Grid size={{ xs: 6, sm: 3, md: 1.3 }}>
                   <Controller
                     name={`puntos.${index}.unidad`}
                     control={control}
@@ -230,40 +261,38 @@ export default function PerformanceForm() {
                     )}
                   />
                 </Grid>
-                <Grid size={{ xs: 6, sm: 3, md: 1.2 }}>
+                <Grid size={{ xs: 6, sm: 3, md: 1.5 }}>
                   <AppInput label="Esc. Total" size="small" onBlur={() => recalcularFila(index)} {...register(`puntos.${index}.escala`)} />
                 </Grid>
-                <Grid size={{ xs: 6, sm: 3, md: 1 }}>
+                <Grid size={{ xs: 6, sm: 3, md: 1.3 }}>
                   <AppInput label="% Rdg" size="small" onBlur={() => recalcularFila(index)} {...register(`puntos.${index}.rdg`)} />
                 </Grid>
-                <Grid size={{ xs: 6, sm: 3, md: 1 }}>
+                <Grid size={{ xs: 6, sm: 3, md: 1.3 }}>
                   <AppInput label="% FS" size="small" onBlur={() => recalcularFila(index)} {...register(`puntos.${index}.fs`)} />
                 </Grid>
-                <Grid size={{ xs: 6, sm: 3, md: 1.1 }}>
+                <Grid size={{ xs: 6, sm: 3, md: 1.5 }}>
                   <AppInput label="Unidades" size="small" onBlur={() => recalcularFila(index)} {...register(`puntos.${index}.unidades`)} />
                 </Grid>
-                <Grid size={{ xs: 6, sm: 3, md: 1.2 }}>
+                <Grid size={{ xs: 6, sm: 3, md: 1.6 }}>
                   <AppInput label="Incert." size="small" onBlur={() => recalcularFila(index)} {...register(`puntos.${index}.incertidumbre`)} />
                 </Grid>
-                <Grid size={{ xs: 5, sm: 2.5, md: 0.9 }}>
-                  <Tooltip title="Quitar punto">
-                    <span>
-                      <IconButton type="button" size="small" onClick={() => remove(index)} disabled={fields.length === 1}>
-                        <DeleteOutlineIcon fontSize="small" sx={{ color: "error.main" }} />
-                      </IconButton>
-                    </span>
-                  </Tooltip>
-                </Grid>
-                <Grid size={{ xs: 6, sm: 3, md: 1.5 }}>
+              </Grid>
+
+              <Box sx={{ display: "flex", alignItems: "center", gap: 0.75, mt: 2, mb: 1 }}>
+                <CalculateOutlinedIcon sx={{ fontSize: 15, color: "text.secondary" }} />
+                <Typography variant="caption" color="text.secondary" fontWeight={600}>Tolerancias calculadas</Typography>
+              </Box>
+              <Grid container spacing={1.5} sx={{ bgcolor: "action.hover", borderRadius: 2, p: 1.5, mx: 0 }}>
+                <Grid size={{ xs: 6, sm: 3 }}>
                   <AppInput label="Mínimo" size="small" slotProps={{ input: { readOnly: true } }} {...register(`puntos.${index}.minimo`)} />
                 </Grid>
-                <Grid size={{ xs: 6, sm: 3, md: 1.5 }}>
+                <Grid size={{ xs: 6, sm: 3 }}>
                   <AppInput label="Mín. real" size="small" slotProps={{ input: { readOnly: true } }} {...register(`puntos.${index}.minimoReal`)} />
                 </Grid>
-                <Grid size={{ xs: 6, sm: 3, md: 1.5 }}>
+                <Grid size={{ xs: 6, sm: 3 }}>
                   <AppInput label="Máximo" size="small" slotProps={{ input: { readOnly: true } }} {...register(`puntos.${index}.maximo`)} />
                 </Grid>
-                <Grid size={{ xs: 6, sm: 3, md: 1.5 }}>
+                <Grid size={{ xs: 6, sm: 3 }}>
                   <AppInput label="Máx. real" size="small" slotProps={{ input: { readOnly: true } }} {...register(`puntos.${index}.maximoReal`)} />
                 </Grid>
               </Grid>
@@ -272,9 +301,13 @@ export default function PerformanceForm() {
 
           <Button
             type="button"
+            fullWidth
             startIcon={<AddIcon />}
             onClick={() => append(PUNTO_VACIO)}
-            sx={{ mt: 2, borderRadius: 2 }}
+            sx={{
+              borderRadius: 3, py: 1.25, border: "1.5px dashed", borderColor: "divider",
+              color: "text.secondary", "&:hover": { borderColor: "secondary.main", bgcolor: "transparent" },
+            }}
           >
             Agregar punto de prueba
           </Button>

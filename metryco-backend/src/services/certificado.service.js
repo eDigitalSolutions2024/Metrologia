@@ -144,6 +144,7 @@ async function emitir(datos, reqUser) {
   let clienteId;
   let reporteId;
   let asignacionId;
+  let asignacionDoc;
   let patronesDocs = [];
   let fechaCalibracion = datos.fechaCalibracion;
 
@@ -160,6 +161,7 @@ async function emitir(datos, reqUser) {
     equipoDoc = asig.equipo;
     patronesDocs = asig.patrones || [];
     asignacionId = asig._id;
+    asignacionDoc = asig;
     reporteId = asig.reporte;
     const rep = await Reporte.findById(asig.reporte).select("cliente");
     clienteId = rep?.cliente;
@@ -299,16 +301,19 @@ async function emitir(datos, reqUser) {
     fechaCalibracion,
     fechaEmision: datos.fechaEmision || new Date(),
     vigencia: datos.vigencia || undefined,
+    // Si no vienen explícitos, se toman de la asignación — ahí quedaron
+    // capturados al calibrar ("Iniciar calibración"), así que Emitir
+    // certificado ya no tiene que volver a preguntarlos.
     servicio: {
-      razon: datos.servicio?.razon,
-      tipo: datos.servicio?.tipo,
-      procedimiento: datos.servicio?.procedimiento,
+      razon: datos.servicio?.razon ?? asignacionDoc?.servicio?.razon,
+      tipo: datos.servicio?.tipo ?? asignacionDoc?.servicio?.tipo,
+      procedimiento: datos.servicio?.procedimiento ?? asignacionDoc?.servicio?.procedimiento,
     },
     condiciones: {
-      temperatura: datos.condiciones?.temperatura,
-      humedad: datos.condiciones?.humedad,
+      temperatura: datos.condiciones?.temperatura ?? asignacionDoc?.condiciones?.temperatura,
+      humedad: datos.condiciones?.humedad ?? asignacionDoc?.condiciones?.humedad,
     },
-    comentarios: datos.comentarios,
+    comentarios: datos.comentarios ?? asignacionDoc?.comentarios,
     revisadoPor,
     autorizadoPor,
     estado: "borrador",

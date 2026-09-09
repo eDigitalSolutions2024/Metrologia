@@ -34,6 +34,21 @@ const asignacionSchema = new Schema(
     // Cálculo(s) de incertidumbre GUM asociados a esta calibración.
     calculosIncertidumbre: [{ type: Schema.Types.ObjectId, ref: "CalculoIncertidumbre" }],
 
+    // Datos operativos del servicio, capturados al calibrar ("Iniciar
+    // calibración") — el certificado los toma de aquí por default al
+    // emitirse, para no volver a preguntarlos (ver certificado.service.js
+    // `emitir`). Mismas formas que Certificado.servicio/condiciones.
+    servicio: {
+      razon: String, // "Calibración", "Revisión", "Reparación", "Verificación"
+      tipo: String, // "Acreditado" | "No acreditado"
+      procedimiento: String,
+    },
+    condiciones: {
+      temperatura: Number, // °C
+      humedad: Number, // % HR
+    },
+    comentarios: String,
+
     estados: {
       calibracion: { type: String, enum: EST_CALIBRACION, default: "pendiente" },
       entrega: { type: String, enum: EST_ENTREGA, default: "pendiente" },

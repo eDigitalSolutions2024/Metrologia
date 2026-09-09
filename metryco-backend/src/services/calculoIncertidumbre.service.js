@@ -407,6 +407,22 @@ async function aprobar(id, reqUser) {
   return transicion(id, "aprobado", "aprobadoPor", ["calculado", "revisado"], reqUser);
 }
 
+// Aprueba de un jalón todos los cálculos de una asignación que ya están
+// calculados/revisados — evita aprobarlos uno por uno cuando son varios
+// puntos × condición (encontrado/dejado). Reutiliza `aprobar` tal cual, sin
+// duplicar la máquina de estados de `transicion`.
+async function aprobarPorAsignacion(asignacionId, reqUser) {
+  const calcs = await CalculoIncertidumbre.find({
+    asignacion: asignacionId,
+    estado: { $in: ["calculado", "revisado"] },
+  }).select("_id");
+  if (!calcs.length) {
+    throw new AppError("No hay cálculos pendientes de aprobar para esta asignación", 400);
+  }
+  await Promise.all(calcs.map((c) => aprobar(c._id, reqUser)));
+  return { aprobados: calcs.length };
+}
+
 async function transicion(id, estado, campoFirma, desde, reqUser) {
   const c = await CalculoIncertidumbre.findById(id);
   if (!c) throw new AppError("Cálculo de incertidumbre no encontrado", 404);
@@ -422,6 +438,6 @@ async function transicion(id, estado, campoFirma, desde, reqUser) {
 }
 
 module.exports = {
-  listar, obtener, crear, recalcular, revisar, aprobar, preview,
+  listar, obtener, crear, recalcular, revisar, aprobar, aprobarPorAsignacion, preview,
   contribucionesDesdeModelo, desviacionEstandarMuestral,
 };

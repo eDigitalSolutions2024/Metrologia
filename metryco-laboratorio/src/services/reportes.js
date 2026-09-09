@@ -60,6 +60,13 @@ export async function actualizarAsignacion(id, payload) {
   return data.data;
 }
 
+// Solo funciona si la calibración sigue en "pendiente" y sin certificado —
+// el backend lo valida y rechaza (409) si ya arrancó.
+export async function eliminarAsignacion(id) {
+  const { data } = await api.delete(`${ENDPOINTS.ASIGNACIONES}/${id}`);
+  return data.data;
+}
+
 export async function cambiarEstadoAsignacion(id, { dominio, valor, motivo }) {
   const { data } = await api.patch(`${ENDPOINTS.ASIGNACIONES}/${id}/estado`, { dominio, valor, motivo });
   return data.data;

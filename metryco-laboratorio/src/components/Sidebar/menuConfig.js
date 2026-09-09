@@ -78,13 +78,17 @@ const menu = [
         ],
       },
       {
-        title: "Performance",
+        // La calibración en sí (capturar lecturas, tolerancia e incertidumbre)
+        // ya se hace desde "Iniciar calibración" en el detalle del Reporte.
+        // Aquí solo viven los catálogos que alimentan ese flujo y la pantalla
+        // avanzada de incertidumbre para ajustes finos / cálculos sueltos.
+        title: "Calibración",
         icon: SpeedOutlinedIcon,
         roles: ADMIN_COORD_TECNICO,
         children: [
-          { title: "Consultar", path: "/performance", roles: ADMIN_COORD_TECNICO },
-          { title: "Incertidumbre", path: "/incertidumbre", roles: ADMIN_COORD_TECNICO },
+          { title: "Plantillas de Tolerancia", path: "/performance", roles: ADMIN_COORD_TECNICO },
           { title: "Plantillas de Incertidumbre", path: "/incertidumbre/plantillas", roles: ADMIN_COORD },
+          { title: "Análisis de Incertidumbre", path: "/incertidumbre", roles: ADMIN_COORD_TECNICO },
         ],
       },
       {

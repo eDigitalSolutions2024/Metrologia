@@ -154,6 +154,15 @@ async function actualizar(id, datos, reqUser) {
   if (datos.performance !== undefined) a.performance = datos.performance || undefined;
   if (datos.fechaCalibracion) a.fechaCalibracion = datos.fechaCalibracion;
   if (datos.factura !== undefined) a.factura = datos.factura;
+  // Datos del servicio capturados al calibrar — el certificado los hereda de
+  // aquí por default al emitirse (ver certificado.service.js `emitir`).
+  if (datos.servicio && typeof datos.servicio === "object") {
+    a.servicio = { ...(a.servicio?.toObject?.() || a.servicio || {}), ...datos.servicio };
+  }
+  if (datos.condiciones && typeof datos.condiciones === "object") {
+    a.condiciones = { ...(a.condiciones?.toObject?.() || a.condiciones || {}), ...datos.condiciones };
+  }
+  if (datos.comentarios !== undefined) a.comentarios = datos.comentarios;
 
   let evento = "asignacion_editada";
   if (datos.recoleccion && typeof datos.recoleccion === "object") {
@@ -264,9 +273,35 @@ async function cambiarEstado(id, { dominio, valor, motivo }, reqUser) {
   return a;
 }
 
+// Quitar una asignación mal capturada / para reasignar técnico — solo mientras
+// NADA haya arrancado: calibración pendiente y sin certificado. Si ya empezó,
+// se bloquea (para eso están rechazar/reabrir). Limpia cálculos y gráfica
+// huérfanos por si acaso.
 async function eliminar(id) {
-  const a = await Asignacion.findByIdAndDelete(id);
+  const a = await Asignacion.findById(id);
   if (!a) throw new AppError("Asignación no encontrada", 404);
+
+  if (a.estados?.calibracion !== "pendiente") {
+    throw new AppError(
+      "No se puede quitar: la calibración ya arrancó. Si hay que corregir, usa Rechazar/Reabrir.",
+      409
+    );
+  }
+  if (a.estados?.certificado !== "sin_generar") {
+    throw new AppError("No se puede quitar: la asignación ya tiene un certificado en curso.", 409);
+  }
+  const Certificado = require("../models/Certificado");
+  if (await Certificado.exists({ asignacion: a._id })) {
+    throw new AppError("No se puede quitar: la asignación ya tiene un certificado.", 409);
+  }
+
+  const CalculoIncertidumbre = require("../models/CalculoIncertidumbre");
+  await CalculoIncertidumbre.deleteMany({ asignacion: a._id });
+
+  const g = rutaGrafica(a);
+  if (g && fs.existsSync(g)) fs.unlink(g, () => {});
+
+  await Asignacion.deleteOne({ _id: a._id });
   return a;
 }
 

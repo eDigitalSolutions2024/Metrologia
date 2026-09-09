@@ -80,3 +80,10 @@ export async function aprobarCalculo(id) {
   const { data } = await api.patch(`${base}/calculos/${id}/aprobar`);
   return data.data;
 }
+
+// Aprueba de un jalón todos los cálculos calculados/revisados de una
+// asignación — usado por "Aprobar y autorizar certificado" en el Reporte.
+export async function aprobarCalculosPorAsignacion(asignacionId) {
+  const { data } = await api.patch(`${base}/calculos/aprobar-por-asignacion/${asignacionId}`);
+  return data.data; // { aprobados: number }
+}
