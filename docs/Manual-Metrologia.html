@@ -114,7 +114,7 @@
     <div class="sub">Guía paso a paso de todos los módulos. Escrita para que cualquier persona del laboratorio pueda usar el sistema sin ayuda.</div>
   </div>
   <div class="meta">
-    Versión del documento: 1.0 &nbsp;·&nbsp; Septiembre 2026<br>
+    Versión del documento: 1.1 &nbsp;·&nbsp; Septiembre 2026<br>
     Aplica a: Metrología (frontend) + API de Metrología (backend)<br>
     Uso interno del laboratorio
   </div>
@@ -137,7 +137,7 @@
     <li><a href="#s5">Clientes</a></li>
     <li><a href="#s6">Cotizaciones</a></li>
     <li><a href="#s7">Reportes de Servicio</a>
-      <ul><li>Crear un reporte</li><li>Asignar equipos</li><li>Seguimiento de estados</li><li>Mis Asignaciones</li><li>Exportar</li></ul>
+      <ul><li>Crear un reporte</li><li>Asignar equipos (y editar / quitar una asignación)</li><li>Iniciar calibración: capturar todo en un solo popup</li><li>Aprobar, autorizar y emitir el certificado desde la tarjeta</li><li>Seguimiento de estados</li><li>Mis Asignaciones</li><li>Exportar</li></ul>
     </li>
     <li><a href="#s8">Equipos</a>
       <ul><li>Alta de equipo</li><li>Consultar y etiqueta QR</li><li>Historial de certificados</li></ul>
@@ -145,12 +145,14 @@
     <li><a href="#s9">Patrones</a>
       <ul><li>Alta de patrón</li><li>Incertidumbre, deriva y calibración</li><li>Certificado del patrón</li></ul>
     </li>
-    <li><a href="#s10">Performance</a></li>
+    <li><a href="#s10">Plantillas de Tolerancia (Performance)</a>
+      <ul><li>Qué es y cómo se usa</li><li>Crear una plantilla a mano</li><li>Importar de Word / Excel con IA</li></ul>
+    </li>
     <li><a href="#s11">Incertidumbre</a>
-      <ul><li>Análisis de incertidumbre (GUM)</li><li>Plantillas de incertidumbre</li></ul>
+      <ul><li>Dónde se captura normalmente (en «Iniciar calibración»)</li><li>Análisis de incertidumbre (GUM) — uso avanzado</li><li>Plantillas de incertidumbre (a mano o importadas)</li></ul>
     </li>
     <li><a href="#s12">Certificados de Calibración</a>
-      <ul><li>Emitir un certificado</li><li>Informe imprimible</li><li>Verificación pública por QR</li></ul>
+      <ul><li>Aprobar, autorizar y emitir</li><li>Rechazar y pedir corrección</li><li>Informe imprimible</li><li>Verificación pública por QR</li></ul>
     </li>
     <li><a href="#s13">Calidad</a></li>
     <li><a href="#s14">Cuentas por Cobrar</a></li>
@@ -173,8 +175,9 @@
   <p>El flujo normal es este:</p>
   <p style="text-align:center; font-size:10.5pt; background:var(--suave); border:1px solid var(--linea); border-radius:8px; padding:12px">
     <strong>Cliente</strong> &nbsp;→&nbsp; <strong>Cotización</strong> &nbsp;→&nbsp; <strong>Reporte de Servicio</strong> &nbsp;→&nbsp; <strong>Asignación</strong> de equipo a un técnico
-    &nbsp;→&nbsp; <strong>Calibración</strong> + <strong>Incertidumbre</strong> &nbsp;→&nbsp; <strong>Certificado</strong> &nbsp;→&nbsp; <strong>Entrega</strong> &nbsp;→&nbsp; <strong>Cobranza</strong>
+    &nbsp;→&nbsp; <strong>Iniciar calibración</strong> (tolerancia + incertidumbre en un popup) &nbsp;→&nbsp; <strong>Aprobar / Autorizar</strong> &nbsp;→&nbsp; <strong>Certificado</strong> &nbsp;→&nbsp; <strong>Entrega</strong> &nbsp;→&nbsp; <strong>Cobranza</strong>
   </p>
+  <div class="box info">Desde septiembre 2026 todo el trabajo de un servicio se hace <strong>desde el detalle del Reporte</strong>: asignas el equipo con sus patrones y su plantilla, y ahí mismo capturas la calibración, apruebas y emites el certificado. Ya no hace falta entrar por separado a los módulos de Tolerancia (Performance) e Incertidumbre — esos quedan para ajustes avanzados.</div>
 
   <h3>Requisitos</h3>
   <ul>
@@ -190,7 +193,7 @@
     <tr><td><span class="role">Admin</span></td><td>Responsable del sistema</td><td>Todo, incluyendo <strong>Administración</strong> (usuarios, colores, permisos, auditoría).</td></tr>
     <tr><td><span class="role">Coordinador</span></td><td>Jefe de laboratorio</td><td>Todo lo operativo y comercial. <strong>No</strong> ve Administración.</td></tr>
     <tr><td><span class="role">Ventas</span></td><td>Área comercial</td><td>Clientes, Cotizaciones, Cuentas por Cobrar y consulta de Reportes/Equipos.</td></tr>
-    <tr><td><span class="role">Técnico</span></td><td>Quien calibra</td><td>Reportes y sus asignaciones, Equipos, Patrones (consulta), Performance e Incertidumbre.</td></tr>
+    <tr><td><span class="role">Técnico</span></td><td>Quien calibra</td><td>Reportes y sus asignaciones (ahí captura la calibración), Equipos, Patrones (consulta) y el grupo <strong>Calibración</strong> (Plantillas de Tolerancia, Plantillas de Incertidumbre y Análisis de Incertidumbre).</td></tr>
   </table>
   <div class="box info">El administrador puede cambiar en vivo qué rol ve cada opción desde <strong>Administración → Roles del Menú</strong>. Por eso dos laboratorios pueden tener el menú distinto.</div>
 </section>
@@ -398,7 +401,7 @@
     <li><b>2</b><strong>Estado del reporte</strong> (En proceso / Terminado…) y los botones <strong>PDF</strong>: Reporte de Servicio, Entrega de equipo, Entrega de certificados y Paquete de certificados.</li>
     <li><b>3</b><strong>Recolección de equipos</strong>: marca si cada equipo está en sitio / en laboratorio / recolectado, con notas de ubicación.</li>
     <li><b>4</b><strong>Selecciona el equipo a calibrar</strong>: aquí se crean las asignaciones (ver 7.4).</li>
-    <li><b>5</b><strong>Asignaciones</strong>: una tarjeta por equipo, con su barra de 3 pasos (Calibración → Entrega → Certificado) y sus selectores de estado.</li>
+    <li><b>5</b><strong>Asignaciones</strong>: una tarjeta por equipo, con su barra de 3 pasos (Calibración → Entrega → Certificado), los botones de acción según el momento (Iniciar calibración, Aprobar, Emitir, Ver PDF…) y, mientras la asignación no haya arrancado, los iconos de <strong>lápiz</strong> (editar) y <strong>bote</strong> (quitar) arriba a la derecha de la tarjeta.</li>
     <li><b>6</b><strong>Comentarios</strong> e <strong>Historial</strong> (quién hizo qué y cuándo).</li>
   </ul>
 
@@ -406,33 +409,73 @@
   <ol class="steps">
     <li>En <strong>"Selecciona el equipo a calibrar"</strong>, elige el <strong>Técnico</strong> que hará el trabajo.</li>
     <li>Elige el <strong>Equipo</strong> del cliente. Si no aparece, primero da de alta el equipo (ver sección 8) con ese cliente.</li>
-    <li>Elige el o los <strong>Patrones</strong> que se usarán. Si un patrón está <strong>vencido</strong>, el sistema avisa y no deja emitir el certificado con él.</li>
-    <li>Opcional: elige la <strong>plantilla de Performance</strong> a aplicar.</li>
+    <li>Elige el o los <strong>Patrones</strong> que se usarán. Si un patrón está <strong>vencido</strong>, el sistema avisa y no deja emitir el certificado con él. El patrón es lo que le da <strong>trazabilidad</strong> a la calibración: su <em>U</em> y su deriva entran solas al cálculo, y sus datos (laboratorio, N° de certificado, trazabilidad a CENAM/NIST) quedan copiados en el certificado.</li>
+    <li>Opcional: elige la <strong>plantilla de Tolerancia (Performance)</strong> a aplicar. Precarga los puntos de calibración con su EMP al iniciar la calibración.</li>
     <li>Clic en <strong>Asignar</strong>. Aparece una tarjeta nueva en <strong>Asignaciones</strong>.</li>
   </ol>
-  <div class="box warn">Un mismo equipo no se puede asignar dos veces al mismo reporte. Si necesitas "como se encontró" y "como se dejó", eso se maneja dentro del cálculo de incertidumbre, no con dos asignaciones.</div>
+  <div class="box warn">Un mismo equipo no se puede asignar dos veces al mismo reporte. Si necesitas "como se encontró" y "como se dejó", se maneja <strong>dentro del popup de Iniciar calibración</strong> (modo de captura), no con dos asignaciones.</div>
 
-  <h3>7.5 Llevar el seguimiento (los 3 estados)</h3>
-  <p>Cada asignación tiene tres selectores. Cámbialos conforme avanza el trabajo:</p>
+  <h4>Editar o quitar una asignación</h4>
+  <p>Si te equivocaste de técnico, de patrón o de plantilla, y la asignación <strong>todavía no arranca</strong> (Calibración en <em>Pendiente</em> y Certificado en <em>Sin generar</em>):</p>
+  <ul>
+    <li>El icono de <strong>lápiz</strong> de la tarjeta abre un cuadro para cambiar el <strong>técnico</strong>, los <strong>patrones</strong> y la <strong>plantilla</strong>.</li>
+    <li>El icono de <strong>bote de basura</strong> <strong>quita</strong> la asignación por completo.</li>
+  </ul>
+  <div class="box info">Si la calibración ya empezó o ya hay un certificado en curso, los iconos desaparecen y el sistema no deja borrar (para no perder trabajo). En ese caso, usa <strong>Rechazar</strong> el certificado (ver 12.2) para regresar la asignación y corregir.</div>
+
+  <h3>7.5 Iniciar calibración (capturar todo en un solo popup)</h3>
+  <p class="lead"><span class="role">Admin</span> <span class="role">Coordinador</span> <span class="role">Técnico</span></p>
+  <p>Este es el paso donde se hace la calibración. Un solo botón, un solo formulario: los datos del servicio, las condiciones ambientales, la plantilla de incertidumbre, los puntos de calibración y las lecturas. Ya <strong>no</strong> hay que entrar por separado a Tolerancia (Performance) ni a Análisis de Incertidumbre.</p>
+  <figure class="fig">
+    <div class="frame crop"><img src="manual-assets/iniciar-calibracion.png" alt="Popup Iniciar calibración"></div>
+    <figcaption><b>Popup «Iniciar calibración».</b> Cabe en una sola ventana con scroll. Si la asignación traía plantilla de Tolerancia, los puntos ya vienen cargados con su EMP.</figcaption>
+  </figure>
+  <ol class="steps">
+    <li>En la tarjeta de la asignación, clic en <strong>Iniciar calibración</strong>. (Si ya la empezaste, el botón dice <strong>Continuar</strong> o <strong>Editar calibración</strong>.)</li>
+    <li><strong>Datos del servicio</strong>: <strong>Razón</strong> (Calibración, Revisión, Reparación, Verificación), <strong>Tipo</strong> (Acreditado / No acreditado), <strong>Procedimiento</strong>. Vienen sugeridos desde la configuración del laboratorio; ajústalos si hace falta.</li>
+    <li><strong>Condiciones</strong>: <strong>Temperatura (°C)</strong> y <strong>Humedad (% HR)</strong> del momento de la calibración. Estos datos se guardan en la asignación y ya no se vuelven a pedir al emitir el certificado.</li>
+    <li><strong>Comentarios</strong> (opcional): notas que saldrán en el certificado.</li>
+    <li><strong>Magnitud → Tipo de instrumento → Plantilla de incertidumbre</strong>: la cascada carga las contribuciones típicas (resolución, patrón, deriva, repetibilidad…). Esas contribuciones las arma el motor desde la plantilla y el patrón; aquí no se editan a mano.</li>
+    <li><strong>Modo de captura</strong>: <strong>Único</strong> (una sola tanda de lecturas) o <strong>Como se encontró / Como se dejó</strong> (dos tandas por punto, para instrumentos que se ajustan).</li>
+    <li><strong>Puntos de calibración</strong>: por cada punto, el <strong>Nominal</strong>, la <strong>Unidad</strong>, el <strong>EMP (± tolerancia)</strong> y las <strong>Lecturas</strong> (separadas por espacio o coma). Un chip en vivo muestra <strong>PASA</strong> / <strong>NO PASA</strong> — es solo orientativo; el valor real lo calcula el sistema al guardar. Usa <strong>Agregar punto</strong> o el <strong>bote</strong> para ajustar la lista.</li>
+    <li>Clic en <strong>Guardar y enviar a revisión</strong>. El sistema crea un cálculo de incertidumbre por cada punto (y por cada condición), y la Calibración de la asignación pasa sola a <strong>Terminada</strong>.</li>
+  </ol>
+  <div class="box tip">Si un punto falla al guardar, el popup se queda abierto y te dice cuál, para reintentar solo ese. Los que sí se guardaron no se pierden.</div>
+  <div class="box info">Si la asignación no tiene patrón, el cálculo usa el valor genérico de la plantilla y el certificado no llevará trazabilidad por ese patrón. Asigna siempre el patrón antes de calibrar.</div>
+
+  <h3>7.6 Aprobar, autorizar y emitir el certificado (desde la tarjeta)</h3>
+  <p class="lead"><span class="role">Admin</span> <span class="role">Coordinador</span> (rol de calidad)</p>
+  <p>Los botones de la tarjeta van apareciendo según el estado. No hay que tocar los selectores a mano:</p>
   <table>
-    <tr><th>Dominio</th><th>Valores</th><th>Quién</th></tr>
-    <tr><td><strong>Calibración</strong></td><td>Pendiente → En proceso → Terminada</td><td>El técnico</td></tr>
-    <tr><td><strong>Entrega</strong></td><td>Pendiente → Entregado</td><td>Técnico / Coordinador</td></tr>
-    <tr><td><strong>Certificado</strong></td><td>Sin generar → En revisión → Autorizado</td><td>Se mueve solo al emitir/autorizar el certificado</td></tr>
+    <tr><th>Cuando la asignación está…</th><th>Aparece el botón</th><th>Qué hace</th></tr>
+    <tr><td>Calibración <em>Terminada</em>, Certificado <em>Sin generar</em></td><td><strong>Aprobar y autorizar certificado</strong></td><td>Aprueba de un tiro todos los cálculos de incertidumbre de la asignación y deja el certificado en <em>Autorizado</em>.</td></tr>
+    <tr><td>Certificado <em>Autorizado</em>, todavía sin documento</td><td><strong>Emitir certificado</strong></td><td>Abre un cuadro corto: <strong>vigencia</strong>, <strong>revisó</strong> y <strong>autorizó</strong>. El resto (servicio, condiciones, puntos, patrones) ya viene de la calibración. Genera el certificado con su folio y su QR.</td></tr>
+    <tr><td>Certificado <em>En revisión</em> (documento emitido)</td><td><strong>Ver certificado (PDF)</strong> · <strong>Aprobar certificado</strong> · <strong>Rechazar</strong></td><td>Revisar el PDF y dejarlo <em>Vigente</em>, o rechazarlo con un motivo.</td></tr>
+    <tr><td>Ya con certificado vigente</td><td><strong>Ver certificado (PDF)</strong></td><td>Descargar el documento definitivo.</td></tr>
+  </table>
+  <div class="box warn"><strong>¿Algo salió mal?</strong> El botón <strong>Rechazar</strong> pide un motivo, anula el certificado y regresa la Calibración a <em>Pendiente</em> para que el técnico corrija con <strong>Editar calibración</strong> y lo vuelva a mandar a revisión.</div>
+
+  <h3>7.7 Llevar el seguimiento (los 3 estados)</h3>
+  <p>Cada asignación tiene tres selectores. Con el flujo de arriba se mueven casi solos; puedes ajustarlos a mano si hace falta:</p>
+  <table>
+    <tr><th>Dominio</th><th>Valores</th><th>Cómo avanza</th></tr>
+    <tr><td><strong>Calibración</strong></td><td>Pendiente → En proceso → Terminada</td><td>Pasa a <em>Terminada</em> sola al Guardar en «Iniciar calibración».</td></tr>
+    <tr><td><strong>Entrega</strong></td><td>Pendiente → Entregado</td><td>Lo marca el técnico / coordinador al entregar el equipo.</td></tr>
+    <tr><td><strong>Certificado</strong></td><td>Sin generar → Autorizado → En revisión → (Vigente)</td><td>Con los botones «Aprobar y autorizar», «Emitir» y «Aprobar certificado» de la tarjeta.</td></tr>
   </table>
   <p>El botón <strong>Subir gráfica</strong> de cada asignación permite adjuntar la imagen de la gráfica de calibración que después sale en el informe.</p>
 
-  <h3>7.6 Cerrar el reporte</h3>
+  <h3>7.8 Cerrar el reporte</h3>
   <p>Cuando todas las asignaciones están entregadas y con certificado, usa <strong>Finalizar Reporte</strong> (abajo a la derecha). Si necesitas reabrirlo, usa <strong>Reabrir</strong> junto al estado.</p>
 
-  <h3>7.7 Mis Asignaciones</h3>
+  <h3>7.9 Mis Asignaciones</h3>
   <p class="lead"><span class="role">Admin</span> <span class="role">Coordinador</span> <span class="role">Técnico</span> &nbsp;·&nbsp; Menú: <strong>Reportes → Mis Asignaciones</strong></p>
   <figure class="fig">
     <div class="frame"><img src="manual-assets/reportes-mis-asignaciones.png" alt="Mis asignaciones"></div>
     <figcaption><b>Mis Asignaciones.</b> El técnico ve aquí, en un solo lugar, todo lo que tiene pendiente de calibrar.</figcaption>
   </figure>
 
-  <h3>7.8 Exportar</h3>
+  <h3>7.10 Exportar</h3>
   <p class="lead"><span class="role">Admin</span> <span class="role">Coordinador</span> <span class="role">Ventas</span> &nbsp;·&nbsp; Menú: <strong>Reportes → Exportar</strong></p>
   <p>Genera un listado (CSV/Excel) de reportes por rango de fechas y estado, para conciliaciones o reportes a dirección.</p>
 </section>
@@ -532,27 +575,50 @@
   <div class="box tip">Al asignar un equipo a un reporte, si el equipo trae <strong>patrones sugeridos</strong>, ya vienen preseleccionados. El presupuesto de incertidumbre toma automáticamente la <em>U</em> y la deriva del patrón elegido.</div>
 </section>
 
-<!-- ============ 10. PERFORMANCE ============ -->
+<!-- ============ 10. PLANTILLAS DE TOLERANCIA (PERFORMANCE) ============ -->
 <section id="s10">
-  <h2>10 · Performance</h2>
-  <p class="lead"><span class="role">Admin</span> <span class="role">Coordinador</span> <span class="role">Técnico</span> &nbsp;·&nbsp; Menú: <strong>Performance → Consultar</strong></p>
+  <h2>10 · Plantillas de Tolerancia (Performance)</h2>
+  <p class="lead"><span class="role">Admin</span> <span class="role">Coordinador</span> <span class="role">Técnico</span> &nbsp;·&nbsp; Menú: <strong>Calibración → Plantillas de Tolerancia</strong></p>
+
+  <h3>10.1 Qué es y cómo se usa</h3>
   <figure class="fig">
-    <div class="frame"><img src="manual-assets/performance.png" alt="Performance"></div>
-    <figcaption><b>Performance.</b> Registra el desempeño del instrumento en los puntos de calibración (lecturas, error, criterio PASA / NO PASA).</figcaption>
+    <div class="frame"><img src="manual-assets/performance.png" alt="Plantillas de Tolerancia"></div>
+    <figcaption><b>Plantillas de Tolerancia.</b> Definen los puntos de calibración de un tipo de instrumento y su tolerancia (EMP) en cada punto.</figcaption>
   </figure>
   <ul>
-    <li>Un registro de Performance se liga a una <strong>asignación</strong> (equipo dentro de un reporte).</li>
-    <li>Se capturan los <strong>puntos nominales</strong>, las <strong>lecturas</strong> y el <strong>EMP</strong>; el sistema calcula el error y marca <strong>PASA</strong> o <strong>NO PASA</strong>.</li>
-    <li>Estos puntos alimentan el <strong>informe de calibración</strong> del certificado.</li>
+    <li>Una plantilla es <strong>reutilizable</strong>: la creas una vez para "Vernier 0–150 mm", "Micrómetro 0–25 mm", etc., y la vuelves a usar en cada servicio.</li>
+    <li>Guarda una lista de <strong>puntos</strong> (nominal, unidad) y la fórmula de tolerancia por punto: <code>%RDG</code> sobre la lectura, <code>%FS</code> sobre la escala y un valor fijo en <strong>unidades</strong>. El sistema calcula el <strong>EMP</strong> y los límites mínimo/máximo de cada punto.</li>
+    <li>Se aplica <strong>al asignar el equipo</strong> al reporte (campo "Performance") y precarga los puntos en el popup de <strong>Iniciar calibración</strong>, donde ya solo se ponen las lecturas.</li>
   </ul>
+  <div class="box info">La plantilla aporta los <strong>puntos y la tolerancia</strong>. Los resultados reales de la calibración (lecturas, error, incertidumbre por punto) se capturan y se calculan en «Iniciar calibración» (7.5), y son los que alimentan el informe del certificado.</div>
+
+  <h3>10.2 Crear una plantilla a mano</h3>
+  <ol class="steps">
+    <li>Menú <strong>Calibración → Plantillas de Tolerancia → Nueva</strong>.</li>
+    <li>Ponle <strong>nombre</strong>, magnitud y unidad.</li>
+    <li>Agrega cada <strong>punto</strong> con su nominal y los coeficientes de tolerancia (%RDG, %FS, unidades). La sección <strong>Tolerancias calculadas</strong> muestra, de solo lectura, el EMP y los límites que resultan.</li>
+    <li>Usa <strong>Agregar punto</strong> para el resto y <strong>Guardar</strong>.</li>
+  </ol>
+
+  <h3>10.3 Importar de Word / Excel con IA</h3>
+  <p>Si ya tienes el formato de tolerancias en un archivo, no lo recaptures:</p>
+  <ol class="steps">
+    <li>En el formulario de plantilla, usa el recuadro <strong>Importar de Word/Excel</strong> (arriba, con borde punteado).</li>
+    <li>Elige el archivo <code>.docx</code>, <code>.xlsx</code> o <code>.xls</code>.</li>
+    <li>El sistema lee el documento e <strong>interpreta</strong> los puntos y sus tolerancias (si las columnas no son estándar, lo resuelve una IA). Rellena la tabla de puntos.</li>
+    <li><strong>Revisa</strong> lo que cargó, corrige lo que haga falta y <strong>Guarda</strong>.</li>
+  </ol>
+  <div class="box warn">La importación es una ayuda de captura, no una fuente oficial: <strong>siempre revisa</strong> los valores contra el documento antes de guardar.</div>
 </section>
 
 <!-- ============ 11. INCERTIDUMBRE ============ -->
 <section id="s11">
   <h2>11 · Incertidumbre</h2>
-  <p class="lead"><span class="role">Admin</span> <span class="role">Coordinador</span> <span class="role">Técnico</span> &nbsp;·&nbsp; Menú: <strong>Performance → Incertidumbre</strong> y <strong>Plantillas de Incertidumbre</strong>. Método <strong>GUM (JCGM 100:2008) + EA-4/02</strong>. El cálculo es determinístico: los mismos datos siempre dan el mismo resultado.</p>
+  <p class="lead"><span class="role">Admin</span> <span class="role">Coordinador</span> <span class="role">Técnico</span> &nbsp;·&nbsp; Menú: <strong>Calibración → Análisis de Incertidumbre</strong> y <strong>Calibración → Plantillas de Incertidumbre</strong>. Método <strong>GUM (JCGM 100:2008) + EA-4/02</strong>. El cálculo es determinístico: los mismos datos siempre dan el mismo resultado.</p>
 
-  <h3>11.1 Análisis de incertidumbre</h3>
+  <div class="box info"><strong>Lo normal es no entrar aquí.</strong> La incertidumbre se captura desde <strong>«Iniciar calibración»</strong> en el Reporte (7.5): eliges la plantilla, pones las lecturas y el motor arma el presupuesto solo. Esta pantalla es para <strong>uso avanzado</strong>: revisar o editar contribuciones a mano, recalcular, o hacer un cálculo suelto sin asignación.</div>
+
+  <h3>11.1 Análisis de incertidumbre (uso avanzado)</h3>
   <figure class="fig">
     <div class="frame"><img src="manual-assets/incertidumbre.png" alt="Análisis de incertidumbre"></div>
     <figcaption><b>Análisis de incertidumbre.</b> Izquierda: los datos. Derecha: el asistente de apoyo (no calcula, solo orienta).</figcaption>
@@ -569,7 +635,7 @@
   <div class="box info">La contribución del <strong>patrón</strong> (su U y su deriva) la inyecta el motor automáticamente desde el patrón elegido en la asignación. No la captures a mano.</div>
 
   <h3>11.2 Plantillas de incertidumbre</h3>
-  <p class="lead"><span class="role">Admin</span> <span class="role">Coordinador</span></p>
+  <p class="lead"><span class="role">Admin</span> <span class="role">Coordinador</span> &nbsp;·&nbsp; Menú: <strong>Calibración → Plantillas de Incertidumbre</strong></p>
   <figure class="fig">
     <div class="frame"><img src="manual-assets/incertidumbre-plantillas.png" alt="Listado de plantillas de incertidumbre"></div>
     <figcaption><b>Plantillas de incertidumbre.</b> Una plantilla es un presupuesto reutilizable por magnitud + tipo de instrumento.</figcaption>
@@ -579,12 +645,14 @@
     <figcaption><b>Nueva plantilla.</b></figcaption>
   </figure>
   <ol class="steps">
-    <li>Menú <strong>Plantillas de Incertidumbre → Nueva</strong>.</li>
+    <li>Menú <strong>Calibración → Plantillas de Incertidumbre → Nueva</strong>.</li>
     <li><strong>Información general</strong>: magnitud, tipo de instrumento, nombre de la plantilla, mensurando, unidad, rango típico, norma y nivel de confianza.</li>
     <li><strong>Criterio de aceptación</strong>: EMP y regla de decisión (simple, o con banda de guarda).</li>
     <li><strong>Contribuciones</strong>: agrega cada fuente de incertidumbre con <strong>+ Agregar contribución</strong> (fuente, símbolo, tipo, modo, distribución, valor sugerido, k, divisor, coef. de sensibilidad, grados de libertad, si es obligatoria).</li>
     <li><strong>Guardar</strong>. La plantilla queda disponible al hacer un análisis para esa magnitud/instrumento.</li>
   </ol>
+  <h4>Importar de Word / Excel con IA</h4>
+  <p>Igual que en las plantillas de tolerancia: en el formulario, el recuadro <strong>Importar de Word/Excel</strong> acepta un <code>.docx</code>/<code>.xlsx</code>/<code>.xls</code> con tu formato de presupuesto de incertidumbre; el sistema lo lee, lo interpreta (con IA si hace falta) y llena la información general y las contribuciones. <strong>Revisa siempre</strong> antes de guardar.</p>
   <div class="box tip">Consejo: crea una plantilla por cada tipo de instrumento que calibras seguido (vernier, micrómetro, manómetro, balanza…). Ahorra capturar las mismas contribuciones cada vez.</div>
 </section>
 
@@ -599,13 +667,23 @@
     <figcaption><b>Certificados de calibración</b> emitidos, con su estado y vigencia.</figcaption>
   </figure>
 
-  <h3>12.2 Emitir un certificado</h3>
+  <h3>12.2 Aprobar, autorizar y emitir</h3>
+  <p>Todo se hace <strong>desde la tarjeta de la asignación</strong> en el detalle del Reporte (ver 7.6). El resumen:</p>
   <ol class="steps">
-    <li>El certificado se emite <strong>desde una asignación</strong> cuya calibración esté <strong>Terminada</strong> y que tenga sus cálculos de incertidumbre <strong>aprobados</strong>.</li>
-    <li>En el detalle del reporte, en la asignación, usa la acción de <strong>generar certificado</strong> (mueve el dominio "Certificado" a <em>En revisión</em>).</li>
-    <li>Al <strong>autorizar</strong> (rol calidad), el certificado toma un <strong>folio</strong>, un <strong>token público</strong> con QR y queda <strong>Vigente</strong>.</li>
-    <li>El certificado guarda un <strong>snapshot</strong> (copia congelada) del equipo, del cliente y de los patrones usados: aunque después cambien esos datos, el certificado no se altera.</li>
+    <li>Con la calibración <strong>Terminada</strong> (Guardada desde «Iniciar calibración»), el botón <strong>Aprobar y autorizar certificado</strong> aprueba todos los cálculos de incertidumbre de esa asignación y la deja en <em>Autorizado</em>.</li>
+    <li>El botón <strong>Emitir certificado</strong> abre un cuadro corto: <strong>vigencia</strong>, quién <strong>revisó</strong> y quién <strong>autorizó</strong>. Los datos del servicio, las condiciones ambientales, los puntos y los patrones ya vienen de la calibración — no se vuelven a capturar.</li>
+    <li>El certificado toma un <strong>folio</strong>, un <strong>token público</strong> con QR y queda <em>En revisión</em>. El botón <strong>Aprobar certificado</strong> lo deja <strong>Vigente</strong>.</li>
+    <li>El certificado guarda un <strong>snapshot</strong> (copia congelada) del equipo, del cliente y de los patrones usados <em>con su trazabilidad</em>: aunque después cambien esos datos, el certificado no se altera.</li>
   </ol>
+  <div class="box info">La pantalla <strong>Reportes → Certificados</strong> sigue existiendo para consultar el listado y para emitir en lote, pero el camino normal es la tarjeta del Reporte.</div>
+
+  <h3>12.2.1 Rechazar y pedir corrección</h3>
+  <p>Si al revisar el certificado (o los cálculos) algo está mal, el botón <strong>Rechazar</strong> de la tarjeta:</p>
+  <ul>
+    <li>Pide un <strong>motivo</strong> (queda en el historial y visible en la tarjeta).</li>
+    <li><strong>Anula</strong> el certificado emitido, si lo había.</li>
+    <li>Regresa la <strong>Calibración</strong> a <em>Pendiente</em>. El técnico corrige con <strong>Editar calibración</strong> y vuelve a Guardar para mandarlo otra vez a revisión.</li>
+  </ul>
 
   <h3>12.3 Informe imprimible</h3>
   <ol class="steps">
@@ -736,10 +814,16 @@
 
   <h3>No me deja emitir el certificado</h3>
   <ul>
-    <li>La calibración de la asignación debe estar <strong>Terminada</strong>.</li>
-    <li>Los cálculos de incertidumbre deben estar <strong>aprobados</strong>.</li>
+    <li>La calibración de la asignación debe estar <strong>Terminada</strong> — se logra Guardando desde <strong>«Iniciar calibración»</strong> (7.5).</li>
+    <li>Los cálculos de incertidumbre deben estar <strong>aprobados</strong> — usa el botón <strong>Aprobar y autorizar certificado</strong> de la tarjeta.</li>
     <li>Ningún patrón usado puede estar <strong>vencido</strong>. Revísalo en Patrones.</li>
   </ul>
+
+  <h3>Ya inicié la calibración pero sigue apareciendo "Iniciar calibración"</h3>
+  <p>Recarga la página (el estado se actualiza al guardar). Si ya está bien, el botón dirá <strong>Continuar</strong> o <strong>Editar calibración</strong>, y solo mientras el certificado siga en <em>Sin generar</em>.</p>
+
+  <h3>¿La calibración lleva trazabilidad?</h3>
+  <p>Sí, a través del <strong>patrón</strong>. Al asignar el equipo eliges el patrón del laboratorio; su incertidumbre y su deriva entran solas al cálculo, y sus datos de trazabilidad (laboratorio que lo calibró, N° de certificado, cadena a CENAM/NIST) quedan copiados en el certificado. Sin patrón asignado, no hay trazabilidad por patrón: asígnalo antes de calibrar.</p>
 
   <h3>El equipo no aparece al asignarlo a un reporte</h3>
   <p>El equipo debe estar dado de alta <strong>con el mismo cliente</strong> del reporte. Créalo en <em>Equipos → Alta de Equipo</em>.</p>
@@ -775,7 +859,7 @@
   </table>
 
   <div class="footer-note">
-    Manual del Sistema — Metrología · v1.0 · Septiembre 2026 · Uso interno.<br>
+    Manual del Sistema — Metrología · v1.1 · Septiembre 2026 · Uso interno.<br>
     Las capturas de pantalla se tomaron con datos de demostración; los folios y valores que veas en el sistema serán distintos.
   </div>
 </section>
