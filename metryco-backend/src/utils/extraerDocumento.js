@@ -1,12 +1,15 @@
 /**
- * Extrae texto plano de un Word (.docx) o Excel (.xlsx/.xls) subido por el
- * usuario, para dárselo como contexto a la IA que interpreta plantillas
- * (ver services/asistente.service.js). No intenta entender la estructura
- * aquí — solo "aplana" el documento a texto legible; quien interpreta el
- * contenido es el modelo.
+ * Extrae texto plano de un Word (.docx), Excel (.xlsx/.xls) o PDF subido por
+ * el usuario, para dárselo como contexto a la IA que interpreta plantillas y
+ * certificados (ver services/asistente.service.js). No intenta entender la
+ * estructura aquí — solo "aplana" el documento a texto legible; quien
+ * interpreta el contenido es el modelo.
  */
 const ExcelJS = require("exceljs");
 const mammoth = require("mammoth");
+// index.js de pdf-parse ejecuta código de prueba al importarse; la ruta
+// interna es la forma soportada de usarlo como librería.
+const pdfParse = require("pdf-parse/lib/pdf-parse.js");
 const AppError = require("../utils/AppError");
 
 const MAX_CHARS = 12000; // cuida tokens/costo de la llamada a la IA
@@ -43,6 +46,15 @@ async function textoDesdeWord(buffer) {
   return value || "";
 }
 
+async function textoDesdePdf(buffer) {
+  try {
+    const { text } = await pdfParse(buffer);
+    return text || "";
+  } catch {
+    throw new AppError("No se pudo leer el PDF. ¿Está protegido con contraseña o es una imagen escaneada?", 400);
+  }
+}
+
 /** @returns {Promise<string>} texto plano, recortado a un tamaño razonable. */
 async function extraerTexto(buffer, nombreArchivo = "") {
   const ext = (nombreArchivo.match(/\.[^.]+$/)?.[0] || "").toLowerCase();
@@ -56,8 +68,10 @@ async function extraerTexto(buffer, nombreArchivo = "") {
     );
   } else if (ext === ".xlsx" || ext === ".xls") {
     texto = await textoDesdeExcel(buffer);
+  } else if (ext === ".pdf") {
+    texto = await textoDesdePdf(buffer);
   } else {
-    throw new AppError("Formato no soportado. Sube un Word (.docx) o Excel (.xlsx/.xls).", 400);
+    throw new AppError("Formato no soportado. Sube un Word (.docx), Excel (.xlsx/.xls) o PDF.", 400);
   }
 
   texto = (texto || "").trim();

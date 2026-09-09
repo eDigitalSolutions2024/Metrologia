@@ -49,6 +49,20 @@ export async function adjuntarCertificadoPatron(id, file) {
 // Alias histórico
 export const subirCertificadoPatron = adjuntarCertificadoPatron;
 
+// Sube el PDF del certificado de calibración del patrón para que la IA lo
+// lea e interprete. No guarda nada: devuelve
+// { modo: "ia"|"sin_ia", patron, advertencias, textoExtraido? } para
+// precargar el alta. El PDF que sí se conserva se adjunta aparte con
+// adjuntarCertificadoPatron una vez creado el patrón.
+export async function importarCertificadoPatron(archivo) {
+  const form = new FormData();
+  form.append("archivo", archivo);
+  const { data } = await api.post(`${ENDPOINTS.PATRONES}/importar-certificado`, form, {
+    headers: { "Content-Type": "multipart/form-data" },
+  });
+  return data.data;
+}
+
 export async function fetchCertificadoPatronBlob(id) {
   const { data } = await api.get(`${ENDPOINTS.PATRONES}/${id}/certificado`, { responseType: "blob" });
   return data;

@@ -1,5 +1,8 @@
 const asyncHandler = require("../utils/asyncHandler");
+const AppError = require("../utils/AppError");
 const service = require("../services/patron.service");
+const asistente = require("../services/asistente.service");
+const { extraerTexto } = require("../utils/extraerDocumento");
 
 const siguienteCodigo = asyncHandler(async (req, res) => {
   res.json({ success: true, data: { codigo: await service.siguienteCodigo() } });
@@ -37,6 +40,15 @@ const adjuntarPdf = asyncHandler(async (req, res) => {
   res.json({ success: true, data: await service.adjuntarPdf(req.params.id, req.file, req.user) });
 });
 
+// Lee el PDF del certificado de calibración del patrón y devuelve los campos
+// interpretados por la IA para precargar el alta. No guarda nada.
+const importarCertificado = asyncHandler(async (req, res) => {
+  if (!req.file) throw new AppError("Selecciona el PDF del certificado de calibración del patrón", 400);
+  const texto = await extraerTexto(req.file.buffer, req.file.originalname);
+  const data = await asistente.interpretarCertificadoPatron({ texto, nombreArchivo: req.file.originalname });
+  res.json({ success: true, data });
+});
+
 const porVencer = asyncHandler(async (req, res) => {
   const dias = Number(req.query.dias) || 30;
   res.json({ success: true, data: await service.porVencer(dias) });
@@ -61,5 +73,5 @@ const qrSvg = asyncHandler(async (req, res) => {
 
 module.exports = {
   listar, obtener, crear, actualizar, eliminar, eliminarPermanente, adjuntarPdf, porVencer,
-  adjuntarCertificado, descargarCertificado, qrPng, qrSvg, siguienteCodigo,
+  adjuntarCertificado, descargarCertificado, qrPng, qrSvg, siguienteCodigo, importarCertificado,
 };

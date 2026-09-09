@@ -8,6 +8,7 @@ import ArrowBackIcon from "@mui/icons-material/ArrowBack";
 import AddIcon from "@mui/icons-material/Add";
 import DeleteOutlineIcon from "@mui/icons-material/DeleteOutlined";
 import UploadFileOutlinedIcon from "@mui/icons-material/UploadFileOutlined";
+import AutoAwesomeOutlinedIcon from "@mui/icons-material/AutoAwesomeOutlined";
 import DescriptionOutlinedIcon from "@mui/icons-material/DescriptionOutlined";
 import BadgeOutlinedIcon from "@mui/icons-material/BadgeOutlined";
 import SquareFootOutlinedIcon from "@mui/icons-material/SquareFootOutlined";
@@ -20,7 +21,7 @@ import AppCard from "../../shared/components/AppCard";
 import PageHeader from "../../shared/components/PageHeader";
 import StraightenOutlinedIcon from "@mui/icons-material/StraightenOutlined";
 import { CATEGORIAS, iconoCategoria, colorCategoria, unidadesSugeridas } from "./categorias";
-import { obtenerPatron, crearPatron, actualizarPatron, adjuntarCertificadoPatron, obtenerSiguienteCodigoPatron } from "../../services/patrones";
+import { obtenerPatron, crearPatron, actualizarPatron, adjuntarCertificadoPatron, obtenerSiguienteCodigoPatron, importarCertificadoPatron } from "../../services/patrones";
 
 const num = (v) => (v === "" || v == null ? undefined : Number(v));
 
@@ -43,6 +44,9 @@ export default function PatronForm() {
   const [archivoInfo, setArchivoInfo] = useState(null);
   const [codigoAutoGenerado, setCodigoAutoGenerado] = useState(!isEdit);
   const [generandoCodigo, setGenerandoCodigo] = useState(false);
+  const [importando, setImportando] = useState(false);
+  const [avisoImport, setAvisoImport] = useState(null); // { modo, advertencias, textoExtraido }
+  const [pdfImportado, setPdfImportado] = useState(null); // File — se adjunta al crear el patrón
 
   const { register, control, handleSubmit, watch, reset, setValue, formState: { errors } } = useForm({
     defaultValues: {
@@ -58,7 +62,7 @@ export default function PatronForm() {
     },
   });
 
-  const { fields, append, remove } = useFieldArray({ control, name: "incertidumbre.puntos" });
+  const { fields, append, remove, replace } = useFieldArray({ control, name: "incertidumbre.puntos" });
   const codigoValor = watch("codigo");
   const categoriaElegida = watch("categoria");
   const opcionesUnidades = unidadesSugeridas(categoriaElegida);
@@ -142,11 +146,75 @@ export default function PatronForm() {
     try {
       const saved = isEdit ? await actualizarPatron(id, payload) : await crearPatron(payload);
       setPatronId(saved._id);
+      if (!isEdit && pdfImportado) {
+        // El PDF que la IA leyó es el propio certificado: se adjunta ya.
+        try { await adjuntarCertificadoPatron(saved._id, pdfImportado); } catch { /* se puede adjuntar luego a mano */ }
+      }
       if (!isEdit) { navigate(`/equipos/patrones/${saved._id}/editar`, { replace: true }); }
       else navigate("/equipos/patrones");
     } catch (e) {
       setError(e?.response?.data?.message || "No se pudo guardar el patrón.");
     } finally { setSaving(false); }
+  };
+
+  // Vuelca en el formulario los campos que la IA leyó del certificado. No pisa
+  // lo que ya esté escrito con vacío; el usuario revisa todo antes de guardar.
+  const aplicarCertificado = (p) => {
+    const set = (path, val) => {
+      if (val === undefined || val === null || val === "") return;
+      setValue(path, val, { shouldDirty: true });
+    };
+    set("nombre", p.nombre);
+    set("marca", p.marca);
+    set("modelo", p.modelo);
+    set("serie", p.serie);
+    set("magnitud", p.magnitud ? String(p.magnitud).toLowerCase() : undefined);
+    if (p.categoria && CATEGORIAS.includes(p.categoria)) set("categoria", p.categoria);
+    set("unidad", p.unidad);
+    set("intervaloMedicion", p.intervaloMedicion);
+    set("resolucion", p.resolucion);
+    set("trazabilidad", p.trazabilidad);
+    set("calibracion.laboratorio", p.laboratorio);
+    set("calibracion.numeroCertificado", p.numeroCertificado);
+    set("calibracion.fecha", p.fecha);
+    if (Number.isFinite(Number(p.periodicidadMeses))) setValue("calibracion.periodicidadMeses", Number(p.periodicidadMeses), { shouldDirty: true });
+    set("condicionesReferencia", p.condicionesReferencia);
+
+    const inc = p.incertidumbre || {};
+    const pts = (Array.isArray(inc.puntos) ? inc.puntos : [])
+      .filter((x) => Number.isFinite(Number(x?.nominal)) && Number.isFinite(Number(x?.U)))
+      .map((x) => ({ nominal: Number(x.nominal), U: Number(x.U) }));
+    const modoInc = inc.modo === "tabla" || inc.modo === "fija" ? inc.modo : pts.length >= 2 ? "tabla" : "fija";
+    setValue("incertidumbre.modo", modoInc, { shouldDirty: true });
+    if (Number.isFinite(Number(inc.k))) setValue("incertidumbre.k", Number(inc.k), { shouldDirty: true });
+    set("incertidumbre.unidad", inc.unidad);
+    if (modoInc === "fija") {
+      if (Number.isFinite(Number(inc.valor))) setValue("incertidumbre.valor", Number(inc.valor), { shouldDirty: true });
+    } else if (pts.length) {
+      replace(pts);
+    }
+
+    const der = p.deriva || {};
+    if (Number.isFinite(Number(der.valor)) && Number(der.valor) > 0) {
+      setValue("deriva.valor", Number(der.valor), { shouldDirty: true });
+      if (der.unidad) setValue("deriva.unidad", der.unidad, { shouldDirty: true });
+      if (Number.isFinite(Number(der.periodoMeses))) setValue("deriva.periodoMeses", Number(der.periodoMeses), { shouldDirty: true });
+    }
+  };
+
+  const onCertificadoPdf = async (file) => {
+    if (!file) return;
+    setImportando(true); setError(""); setAvisoImport(null);
+    try {
+      const res = await importarCertificadoPatron(file);
+      if (res.modo === "ia" && res.patron) aplicarCertificado(res.patron);
+      setPdfImportado(file); // el PDF se adjunta al crear el patrón, con IA o sin ella
+      setAvisoImport({ modo: res.modo, advertencias: res.advertencias || [], textoExtraido: res.textoExtraido });
+    } catch (e) {
+      setError(e?.response?.data?.message || "No se pudo leer el certificado.");
+    } finally {
+      setImportando(false);
+    }
   };
 
   const subirPdf = async (file) => {
@@ -175,6 +243,64 @@ export default function PatronForm() {
       />
 
       {error && <Alert severity="error" sx={{ mb: 2, borderRadius: 2 }}>{error}</Alert>}
+
+      {!isEdit && (
+        <Box
+          sx={{
+            mb: 2, p: 2, borderRadius: 2, border: "1px dashed", borderColor: "primary.main",
+            bgcolor: "action.hover", display: "flex", gap: 2, alignItems: "center", flexWrap: "wrap",
+          }}
+        >
+          <AutoAwesomeOutlinedIcon color="primary" />
+          <Box sx={{ flex: 1, minWidth: 240 }}>
+            <Typography variant="subtitle2" fontWeight={700}>
+              ¿Tienes el certificado de calibración del patrón en PDF?
+            </Typography>
+            <Typography variant="caption" color="text.secondary">
+              Súbelo y el sistema llena marca, unidad, incertidumbre (U y k), trazabilidad, laboratorio y fechas para que solo confirmes. El PDF queda adjunto al guardar. Funciona con PDFs digitales, no con escaneos.
+            </Typography>
+          </Box>
+          <Button
+            component="label" variant="contained" startIcon={<AutoAwesomeOutlinedIcon />}
+            disabled={importando} sx={{ borderRadius: 2 }}
+          >
+            {importando ? "Leyendo…" : "Leer certificado (PDF)"}
+            <input
+              type="file" accept="application/pdf" hidden
+              onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ""; onCertificadoPdf(f); }}
+            />
+          </Button>
+        </Box>
+      )}
+
+      {avisoImport && (
+        <Alert
+          severity={avisoImport.modo === "ia" ? "success" : "warning"}
+          sx={{ mb: 2, borderRadius: 2 }}
+          onClose={() => setAvisoImport(null)}
+        >
+          <Typography variant="body2" fontWeight={700}>
+            {avisoImport.modo === "ia"
+              ? "Campos precargados del certificado — revísalos contra el PDF antes de guardar."
+              : "No se pudo interpretar el certificado automáticamente."}
+          </Typography>
+          {avisoImport.advertencias?.length > 0 && (
+            <Box component="ul" sx={{ m: "6px 0 0", pl: 2.5 }}>
+              {avisoImport.advertencias.map((a, i) => (
+                <li key={i}><Typography variant="caption">{a}</Typography></li>
+              ))}
+            </Box>
+          )}
+          {avisoImport.textoExtraido && (
+            <Typography
+              variant="caption" component="pre"
+              sx={{ mt: 1, maxHeight: 180, overflow: "auto", whiteSpace: "pre-wrap", bgcolor: "action.hover", p: 1, borderRadius: 1 }}
+            >
+              {avisoImport.textoExtraido}
+            </Typography>
+          )}
+        </Alert>
+      )}
 
       <Box component="form" onSubmit={handleSubmit(onSubmit)} sx={{ display: "flex", flexDirection: "column", gap: 3 }}>
 

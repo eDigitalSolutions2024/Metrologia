@@ -199,6 +199,26 @@ const importarPlantillaIncertidumbre = (req, res, next) => {
   });
 };
 
+// --- Lectura del PDF del certificado de un patrón (para precargar el alta) ---
+// Solo en memoria: la IA lo interpreta y se descarta. El PDF que sí se
+// conserva se sube aparte por la ruta /:id/certificado una vez creado el patrón.
+const leerCertificadoPatron = multer({
+  storage: multer.memoryStorage(),
+  fileFilter: soloPdf,
+  limits: { fileSize: 15 * 1024 * 1024, files: 1 },
+}).single("archivo");
+
+const importarCertificadoPatron = (req, res, next) => {
+  leerCertificadoPatron(req, res, (err) => {
+    if (err instanceof multer.MulterError) {
+      const msg = err.code === "LIMIT_FILE_SIZE" ? "El PDF supera el tamaño máximo (15 MB)" : err.message;
+      return next(new AppError(msg, 400));
+    }
+    if (err) return next(err);
+    next();
+  });
+};
+
 module.exports = {
   pdfCertificado,
   pdfPatron,
@@ -211,4 +231,5 @@ module.exports = {
   adjuntoCotizacion, destinoAdjuntosCotizacion,
   importarPerformance,
   importarPlantillaIncertidumbre,
+  importarCertificadoPatron,
 };

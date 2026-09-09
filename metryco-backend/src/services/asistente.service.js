@@ -313,4 +313,105 @@ async function interpretarFilasPerformance({ texto } = {}) {
   }
 }
 
-module.exports = { asistir, DISCLAIMER, interpretarPlantillaIncertidumbre, interpretarFilasPerformance };
+/**
+ * ----------------------------------------------------------------------
+ *  Interpretación del certificado de calibración de un PATRÓN -> JSON
+ * ----------------------------------------------------------------------
+ *  Lee el texto plano de un PDF de certificado y devuelve los campos para
+ *  precargar el alta de patrón. Mismo principio: la IA sólo INTERPRETA, el
+ *  técnico revisa y confirma. Sin ANTHROPIC_API_KEY se devuelve el texto
+ *  extraído para capturar a mano.
+ */
+const PATRON_SYSTEM_PROMPT = `Eres un asistente metrológico. Un laboratorio te da el texto plano extraído del PDF del CERTIFICADO DE CALIBRACIÓN de un patrón de referencia. Interprétalo y devuelve los datos para precargar el alta del patrón en el sistema. NO inventes datos: si un campo no aparece en el texto, omítelo o ponlo en null (no pongas 0 ni un valor inventado).
+
+Responde SIEMPRE en JSON válido con esta forma exacta:
+{
+  "nombre": "nombre corto del patrón, ej. 'Bloque patrón 10 mm' o 'Multímetro Fluke 87V'",
+  "marca": "marca del instrumento o null",
+  "modelo": "modelo o null",
+  "serie": "número de serie o null",
+  "magnitud": "una palabra en minúsculas: dimensional|presion|masa|flujo|electrica|temperatura|volumen|fuerza|par|... o null",
+  "unidad": "unidad de la magnitud, ej. mm, bar, g, V",
+  "intervaloMedicion": "rango del instrumento si aparece, ej. '0 a 25 mm' o null",
+  "resolucion": "resolución / división mínima si aparece o null",
+  "trazabilidad": "entidad a la que se declara trazable, ej. 'CENAM', 'NIST', 'a través de patrones nacionales' o null",
+  "laboratorio": "nombre del laboratorio que emitió el certificado o null",
+  "numeroCertificado": "folio / número del certificado o null",
+  "fecha": "fecha de calibración en formato YYYY-MM-DD o null",
+  "periodicidadMeses": <numero o null: solo si el certificado indica el periodo de recalibración>,
+  "condicionesReferencia": "condiciones ambientales de la calibración, ej. '20 ± 1 °C, 50 % HR' o null",
+  "incertidumbre": {
+    "k": <numero: factor de cobertura, normalmente 2; null si no aparece>,
+    "unidad": "unidad de U si difiere de la del instrumento, o null",
+    "modo": "fija (una sola U para todo el intervalo) | tabla (U distinta por punto nominal)",
+    "valor": <numero o null: U del certificado cuando modo=fija>,
+    "puntos": [ { "nominal": <numero>, "U": <numero> } ]
+  },
+  "deriva": { "valor": <numero>, "unidad": "texto", "periodoMeses": <numero> } ,
+  "advertencias": [ "campos ambiguos, valores en otro idioma, si el PDF parece escaneado/incompleto, si hay varias magnitudes, etc." ]
+}
+
+Reglas:
+- Si el certificado da una tabla de incertidumbre por punto (varios nominales con su U), usa modo="tabla" y llena "puntos"; deja "valor" en null.
+- Si da una sola incertidumbre global, usa modo="fija" y "valor"; deja "puntos" vacío.
+- "deriva" casi nunca viene en el certificado: inclúyela SOLO si el documento reporta explícitamente una deriva/estabilidad; si no, OMITE la clave "deriva" por completo.
+- Si el texto no parece un certificado de calibración, devuelve "incertidumbre": { "modo": "fija", "puntos": [] } y explica en "advertencias".
+No incluyas nada fuera del JSON.`;
+
+async function interpretarCertificadoPatron({ texto, nombreArchivo = "" } = {}) {
+  if (!process.env.ANTHROPIC_API_KEY) {
+    return {
+      modo: "sin_ia",
+      patron: null,
+      advertencias: [
+        "La lectura automática del certificado no está activa en este servidor (falta configurar ANTHROPIC_API_KEY).",
+        "Se extrajo el texto del PDF para que lo captures a mano mientras se activa.",
+      ],
+      textoExtraido: texto,
+    };
+  }
+
+  const userContent = [
+    `Archivo: ${nombreArchivo || "(sin nombre)"}`,
+    "",
+    "Texto extraído del certificado (PDF):",
+    "-----",
+    texto,
+    "-----",
+  ].join("\n");
+
+  try {
+    const respuesta = await llamarModelo(userContent, { system: PATRON_SYSTEM_PROMPT, maxTokens: 2200 });
+    const json = parseJsonLaxo(respuesta);
+    if (!json) {
+      return {
+        modo: "sin_ia",
+        patron: null,
+        advertencias: ["La IA no devolvió datos reconocibles del certificado. Captura el patrón a mano."],
+        textoExtraido: texto,
+      };
+    }
+    const { advertencias, ...patron } = json;
+    return {
+      modo: "ia",
+      patron,
+      advertencias: Array.isArray(advertencias) ? advertencias : [],
+      nota: "Datos leídos por IA del certificado — revisa cada campo antes de guardar.",
+    };
+  } catch (err) {
+    return {
+      modo: "sin_ia",
+      patron: null,
+      advertencias: [`La IA no respondió (${err.message}). Captura el patrón a mano con el texto extraído como referencia.`],
+      textoExtraido: texto,
+    };
+  }
+}
+
+module.exports = {
+  asistir,
+  DISCLAIMER,
+  interpretarPlantillaIncertidumbre,
+  interpretarFilasPerformance,
+  interpretarCertificadoPatron,
+};
