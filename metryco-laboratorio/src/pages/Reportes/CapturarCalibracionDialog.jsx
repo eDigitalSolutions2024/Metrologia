@@ -7,7 +7,7 @@ import AddIcon from "@mui/icons-material/Add";
 import DeleteOutlineIcon from "@mui/icons-material/DeleteOutlined";
 
 import AppButton from "../../shared/components/AppButton";
-import { listarMagnitudes, listarModelos, listarCalculos, crearCalculo } from "../../services/incertidumbre";
+import { listarMagnitudes, listarModelos, listarCalculos, crearCalculo, reemplazarCalculosPorAsignacion } from "../../services/incertidumbre";
 import { obtenerPerformance } from "../../services/performance";
 import { cambiarEstadoAsignacion, actualizarAsignacion } from "../../services/reportes";
 import { obtenerLaboratorio } from "../../services/configuracion";
@@ -34,9 +34,9 @@ const puntoVacio = () => ({
 
 /**
  * Un solo popup para capturar una calibración completa: tolerancia (EMP,
- * heredado del Performance ligado a la asignación si existe) e incertidumbre
- * (GUM, vía una plantilla) juntas, punto por punto. Reemplaza tener que
- * visitar Performance e Incertidumbre por separado para lo mismo.
+ * heredado de la plantilla de Tolerancia ligada a la asignación si existe) e
+ * incertidumbre (GUM, vía una plantilla) juntas, punto por punto. Reemplaza
+ * tener que visitar Tolerancia e Incertidumbre por separado para lo mismo.
  *
  * No edita contribuciones a mano — requiere elegir una plantilla y deja que
  * el motor las derive (igual que hace `crearCalculo` cuando no se manda
@@ -107,12 +107,11 @@ export default function CapturarCalibracionDialog({ open, asignacion, onClose, o
     }
 
     listarMagnitudes().then(setMagnitudes).catch(() => setMagnitudes([]));
-    listarCalculos({ asignacion: asignacion._id, pageSize: 1 })
-      .then(({ total }) => setCalcsPrevios(total || 0))
-      .catch(() => setCalcsPrevios(0));
 
-    const perfId = asignacion.performance?._id || asignacion.performance;
-    if (perfId) {
+    // Siembra los puntos desde la plantilla de Tolerancia ligada (o en blanco).
+    const sembrarDesdePlantilla = () => {
+      const perfId = asignacion.performance?._id || asignacion.performance;
+      if (!perfId) { setPuntos([puntoVacio()]); return; }
       setCargandoPuntos(true);
       setAvisoPerformance("");
       obtenerPerformance(perfId)
@@ -129,12 +128,53 @@ export default function CapturarCalibracionDialog({ open, asignacion, onClose, o
         })
         .catch(() => {
           setPuntos([puntoVacio()]);
-          setAvisoPerformance("No se pudo cargar el Performance vinculado a esta asignación — captura los puntos a mano.");
+          setAvisoPerformance("No se pudo cargar la plantilla de Tolerancia vinculada a esta asignación — captura los puntos a mano.");
         })
         .finally(() => setCargandoPuntos(false));
-    } else {
-      setPuntos([puntoVacio()]);
-    }
+    };
+
+    // "Editar calibración": si ya hay cálculos capturados, se reconstruye el
+    // formulario con ellos (plantilla, modo, puntos y lecturas) para poder
+    // cambiarlos; al guardar se reemplaza el juego completo.
+    setCargandoPuntos(true);
+    listarCalculos({ asignacion: asignacion._id, pageSize: 100 })
+      .then(({ items, total }) => {
+        setCalcsPrevios(total || 0);
+        if (!items || !items.length) { sembrarDesdePlantilla(); return; }
+
+        const base = items[0];
+        setMagnitud(base.magnitud || "");
+        setTipo(base.tipoInstrumento || "");
+        setModeloId(base.modelo || "");
+        setMensurando(base.mensurando || "");
+        setUnidad(base.unidad || "");
+        setNivelConfianza(base.modeloSnapshot?.nivelConfianza || "95.45%");
+        const tieneCond = items.some((c) => c.condicion === "encontrado" || c.condicion === "dejado");
+        setModoCaptura(tieneCond ? "encontrado_dejado" : "unico");
+
+        const porNominal = new Map();
+        for (const c of items) {
+          const key = String(c.puntoNominal);
+          if (!porNominal.has(key)) {
+            porNominal.set(key, {
+              nominal: c.puntoNominal ?? "", unidad: c.unidad || "",
+              emp: c.emp ?? "", lecturasUnico: "", lecturasEncontrado: "", lecturasDejado: "",
+            });
+          }
+          const fila = porNominal.get(key);
+          const txt = (c.lecturas || []).join(" ");
+          if (c.condicion === "encontrado") fila.lecturasEncontrado = txt;
+          else if (c.condicion === "dejado") fila.lecturasDejado = txt;
+          else fila.lecturasUnico = txt;
+          if ((fila.emp === "" || fila.emp == null) && c.emp != null) fila.emp = c.emp;
+        }
+        const filas = [...porNominal.values()]
+          .sort((a, b) => Number(a.nominal) - Number(b.nominal))
+          .map((f) => ({ id: `p${++uidSeq}`, prueba: "", ...f }));
+        setPuntos(filas.length ? filas : [puntoVacio()]);
+        setCargandoPuntos(false);
+      })
+      .catch(() => { setCalcsPrevios(0); sembrarDesdePlantilla(); });
   }, [open, asignacion]);
 
   useEffect(() => {
@@ -205,11 +245,27 @@ export default function CapturarCalibracionDialog({ open, asignacion, onClose, o
       });
     } catch { /* no bloquea la captura de puntos */ }
 
-    const resultados = await Promise.allSettled(tareas.map((t) => crearCalculo(t.payload)));
-    const ok = resultados.filter((r) => r.status === "fulfilled").length;
-    const fallos = resultados
-      .map((r, i) => (r.status === "rejected" ? { etiqueta: tareas[i].etiqueta, mensaje: r.reason?.response?.data?.message || "Error al guardar" } : null))
-      .filter(Boolean);
+    let ok;
+    let fallos;
+    if (calcsPrevios > 0) {
+      // "Editar calibración": reemplaza el juego completo (borra los previos
+      // no aprobados y crea estos) — evita duplicar puntos al editar.
+      try {
+        const r = await reemplazarCalculosPorAsignacion(asignacion._id, tareas.map((t) => t.payload));
+        ok = r.creados || 0;
+        fallos = (r.fallos || []).map((f) => ({ etiqueta: tareas[f.indice]?.etiqueta || `Punto ${f.indice + 1}`, mensaje: f.mensaje }));
+      } catch (e) {
+        setErrorGlobal(e?.response?.data?.message || "No se pudo reemplazar la calibración.");
+        setGuardando(false);
+        return;
+      }
+    } else {
+      const resultados = await Promise.allSettled(tareas.map((t) => crearCalculo(t.payload)));
+      ok = resultados.filter((r) => r.status === "fulfilled").length;
+      fallos = resultados
+        .map((r, i) => (r.status === "rejected" ? { etiqueta: tareas[i].etiqueta, mensaje: r.reason?.response?.data?.message || "Error al guardar" } : null))
+        .filter(Boolean);
+    }
     setResumen({ ok, fallos });
     setGuardando(false);
 
@@ -230,7 +286,8 @@ export default function CapturarCalibracionDialog({ open, asignacion, onClose, o
 
         {calcsPrevios > 0 && (
           <Alert severity="info" sx={{ borderRadius: 2 }}>
-            Esta asignación ya tiene {calcsPrevios} cálculo(s) de incertidumbre registrados. Este formulario siempre agrega nuevos.
+            Estás editando la calibración ya capturada ({calcsPrevios} cálculo(s)). Los campos vienen precargados;
+            al Guardar se <b>reemplaza</b> el juego completo con lo que dejes aquí.
           </Alert>
         )}
 

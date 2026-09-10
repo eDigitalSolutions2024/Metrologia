@@ -26,7 +26,7 @@ import FactCheckOutlinedIcon from "@mui/icons-material/FactCheckOutlined";
 import { formatDate } from "../../shared/utils/formatDate";
 import { listarClientes } from "../../services/clientes";
 import { listarReportes, crearReporte } from "../../services/reportes";
-import { listarContactos } from "../../services/contactos";
+import { listarContactos, crearContacto } from "../../services/contactos";
 import { listarCotizaciones } from "../../services/cotizaciones";
 import { useAuth } from "../../core/auth/useAuth";
 
@@ -81,7 +81,7 @@ export default function ReportesPage() {
 
   const columns = [
     {
-      field: "folio", headerName: "Reporte de Servicio",
+      field: "folio", headerName: "Reporte",
       renderCell: (r) => (
         <Tooltip title="Abrir reporte">
           <Chip
@@ -106,16 +106,6 @@ export default function ReportesPage() {
       },
     },
     {
-      field: "pdf", headerName: "Descargar", align: "center",
-      renderCell: (r) => (
-        <Tooltip title="Descargar Reporte de Servicio (PDF)">
-          <IconButton size="small" onClick={() => window.open(`/informe/reporte/${r._id}`, "_blank")}>
-            <PictureAsPdfOutlinedIcon fontSize="small" sx={{ color: "error.main" }} />
-          </IconButton>
-        </Tooltip>
-      ),
-    },
-    {
       field: "cotizacion", headerName: "Cotización", align: "center",
       renderCell: (r) =>
         r.cotizacion?._id ? (
@@ -132,18 +122,30 @@ export default function ReportesPage() {
           </Tooltip>
         ) : "—",
     },
-    { field: "ordenCompra", headerName: "Orden de Compra", renderCell: (r) => r.ordenCompra || "—" },
-    { field: "factura", headerName: "Factura", renderCell: (r) => r.factura || "—" },
-    { field: "cantidadEnProceso", headerName: "Cantidad en Proceso", align: "center", renderCell: (r) => r.cantidadEnProceso ?? 0 },
-    { field: "numEquipos", headerName: "Cantidad Asignaciones", align: "center", renderCell: (r) => r.numEquipos ?? 0 },
+    { field: "ordenCompra", headerName: "OC / Factura", renderCell: (r) => r.ordenCompra || r.factura || "—" },
+    {
+      field: "equipos", headerName: "Equipos", align: "center",
+      renderCell: (r) => (
+        <Tooltip title="En proceso / total de asignaciones">
+          <span>{(r.cantidadEnProceso ?? 0)} / {(r.numEquipos ?? 0)}</span>
+        </Tooltip>
+      ),
+    },
     {
       field: "acciones", headerName: "Acciones", align: "center",
       renderCell: (r) => (
-        <Tooltip title="Ver reporte">
-          <IconButton size="small" onClick={() => navigate(`/reportes/${r._id}`)}>
-            <VisibilityOutlinedIcon fontSize="small" sx={{ color: "secondary.main" }} />
-          </IconButton>
-        </Tooltip>
+        <Box sx={{ display: "flex", justifyContent: "center" }}>
+          <Tooltip title="Ver reporte">
+            <IconButton size="small" onClick={() => navigate(`/reportes/${r._id}`)}>
+              <VisibilityOutlinedIcon fontSize="small" sx={{ color: "secondary.main" }} />
+            </IconButton>
+          </Tooltip>
+          <Tooltip title="Descargar Reporte de Servicio (PDF)">
+            <IconButton size="small" onClick={() => window.open(`/informe/reporte/${r._id}`, "_blank")}>
+              <PictureAsPdfOutlinedIcon fontSize="small" sx={{ color: "error.main" }} />
+            </IconButton>
+          </Tooltip>
+        </Box>
       ),
     },
   ];
@@ -230,22 +232,38 @@ function NuevoReporteDialog({ open, onClose, onDone }) {
   const [obs, setObs] = useState("");
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
+  const [nuevoContacto, setNuevoContacto] = useState(null); // { nombre, telefono, correo } | null
 
   useEffect(() => {
     if (!open) return;
-    setCliente(""); setOc(""); setObs(""); setError("");
+    setCliente(""); setOc(""); setObs(""); setError(""); setNuevoContacto(null);
     setContactos([]); setContacto(""); setCotizaciones([]); setCotizacion("");
     listarClientes({ pageSize: 200 }).then(({ items }) => setClientes(items)).catch(() => {});
   }, [open]);
 
   useEffect(() => {
-    setContacto(""); setCotizacion("");
+    setContacto(""); setCotizacion(""); setNuevoContacto(null);
     if (!cliente) { setContactos([]); setCotizaciones([]); return; }
     listarContactos(cliente).then(setContactos).catch(() => setContactos([]));
     listarCotizaciones({ clienteId: cliente, pageSize: 100 })
       .then(({ items }) => setCotizaciones(items))
       .catch(() => setCotizaciones([]));
   }, [cliente]);
+
+  const agregarContacto = async () => {
+    if (!nuevoContacto?.nombre?.trim()) { setError("Escribe el nombre del contacto."); return; }
+    try {
+      const c = await crearContacto(cliente, {
+        nombre: nuevoContacto.nombre.trim(),
+        telefono: nuevoContacto.telefono?.trim() || undefined,
+        correo: nuevoContacto.correo?.trim() || undefined,
+      });
+      const lista = await listarContactos(cliente).catch(() => contactos);
+      setContactos(lista); setContacto(c._id); setNuevoContacto(null); setError("");
+    } catch (e) {
+      setError(e?.response?.data?.message || "No se pudo agregar el contacto.");
+    }
+  };
 
   const crear = async () => {
     if (!cliente) { setError("Elige un cliente."); return; }
@@ -270,14 +288,34 @@ function NuevoReporteDialog({ open, onClose, onDone }) {
           <TextField select fullWidth size="small" label="Cliente" value={cliente} onChange={(e) => setCliente(e.target.value)}>
             {clientes.map((c) => <MenuItem key={c._id} value={c._id}>{c.nombre}</MenuItem>)}
           </TextField>
-          <TextField
-            select fullWidth size="small" label="Contacto (opcional)" value={contacto}
-            onChange={(e) => setContacto(e.target.value)} disabled={!cliente}
-            helperText={cliente && contactos.length === 0 ? "Este cliente no tiene contactos registrados" : ""}
-          >
-            <MenuItem value="">— Sin especificar —</MenuItem>
-            {contactos.map((c) => <MenuItem key={c._id} value={c._id}>{c.nombre}</MenuItem>)}
-          </TextField>
+          <Box>
+            <TextField
+              select fullWidth size="small" label="Contacto (opcional)" value={contacto}
+              onChange={(e) => setContacto(e.target.value)} disabled={!cliente}
+              helperText={cliente && contactos.length === 0 ? "Este cliente no tiene contactos registrados" : ""}
+            >
+              <MenuItem value="">— Sin especificar —</MenuItem>
+              {contactos.map((c) => <MenuItem key={c._id} value={c._id}>{c.nombre}</MenuItem>)}
+            </TextField>
+            {cliente && (nuevoContacto ? (
+              <Box sx={{ mt: 1, p: 1.5, border: "1px dashed", borderColor: "divider", borderRadius: 2, display: "flex", flexDirection: "column", gap: 1.5 }}>
+                <Typography variant="caption" fontWeight={700} color="text.secondary">Nuevo contacto</Typography>
+                <TextField size="small" label="Nombre" value={nuevoContacto.nombre} onChange={(e) => setNuevoContacto({ ...nuevoContacto, nombre: e.target.value })} autoFocus />
+                <Box sx={{ display: "flex", gap: 1 }}>
+                  <TextField size="small" label="Teléfono" value={nuevoContacto.telefono} onChange={(e) => setNuevoContacto({ ...nuevoContacto, telefono: e.target.value })} fullWidth />
+                  <TextField size="small" label="Correo" value={nuevoContacto.correo} onChange={(e) => setNuevoContacto({ ...nuevoContacto, correo: e.target.value })} fullWidth />
+                </Box>
+                <Box sx={{ display: "flex", gap: 1, justifyContent: "flex-end" }}>
+                  <Button size="small" onClick={() => setNuevoContacto(null)}>Cancelar</Button>
+                  <Button size="small" variant="contained" onClick={agregarContacto} sx={{ borderRadius: 2 }}>Agregar</Button>
+                </Box>
+              </Box>
+            ) : (
+              <Button size="small" startIcon={<AddIcon />} onClick={() => setNuevoContacto({ nombre: "", telefono: "", correo: "" })} sx={{ mt: 0.5, borderRadius: 2 }}>
+                Nuevo contacto
+              </Button>
+            ))}
+          </Box>
           <TextField
             select fullWidth size="small" label="Cotización (opcional)" value={cotizacion}
             onChange={(e) => setCotizacion(e.target.value)} disabled={!cliente}

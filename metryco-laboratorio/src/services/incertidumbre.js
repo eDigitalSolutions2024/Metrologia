@@ -68,6 +68,13 @@ export async function crearCalculo(payload) {
   const { data } = await api.post(`${base}/calculos`, payload);
   return data.data;
 }
+// "Editar calibración": reemplaza el juego completo de cálculos de una
+// asignación (borra los no aprobados y crea los que se pasan).
+// Devuelve { creados, eliminados, fallos: [{ indice, mensaje }] }.
+export async function reemplazarCalculosPorAsignacion(asignacionId, calculos) {
+  const { data } = await api.put(`${base}/calculos/reemplazar-por-asignacion/${asignacionId}`, { calculos });
+  return data.data;
+}
 export async function recalcularCalculo(id, payload) {
   const { data } = await api.patch(`${base}/calculos/${id}/recalcular`, payload);
   return data.data;

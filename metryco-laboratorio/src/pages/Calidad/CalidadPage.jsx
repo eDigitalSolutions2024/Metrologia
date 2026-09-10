@@ -8,8 +8,6 @@ import CancelOutlinedIcon from "@mui/icons-material/CancelOutlined";
 import HistoryOutlinedIcon from "@mui/icons-material/HistoryOutlined";
 import VisibilityOutlinedIcon from "@mui/icons-material/VisibilityOutlined";
 import FileDownloadOutlinedIcon from "@mui/icons-material/FileDownloadOutlined";
-import InsertChartOutlinedIcon from "@mui/icons-material/InsertChartOutlined";
-import HourglassEmptyOutlinedIcon from "@mui/icons-material/HourglassEmptyOutlined";
 import DescriptionOutlinedIcon from "@mui/icons-material/DescriptionOutlined";
 
 import AppButton from "../../shared/components/AppButton";
@@ -20,7 +18,7 @@ import { formatDate } from "../../shared/utils/formatDate";
 import { listarClientes } from "../../services/clientes";
 import { obtenerDirectorio } from "../../services/usuarios";
 import { exportCsv } from "../../shared/utils/exportCsv";
-import { listarCalidad, cambiarEstadoAsignacion, fetchGraficaAsignacionBlob } from "../../services/reportes";
+import { listarCalidad, cambiarEstadoAsignacion } from "../../services/reportes";
 import { pedirRefrescoAlertas } from "../../shared/utils/alertasBus";
 import { useNavigate } from "react-router-dom";
 
@@ -128,19 +126,6 @@ function ConsultarTab() {
     }
   };
 
-  const descargarGrafica = async (a) => {
-    try {
-      const blob = await fetchGraficaAsignacionBlob(a._id);
-      const url = URL.createObjectURL(blob);
-      const el = document.createElement("a");
-      el.href = url; el.download = a.grafica?.nombreOriginal || "grafica";
-      el.click();
-      setTimeout(() => URL.revokeObjectURL(url), 60000);
-    } catch {
-      setError("No se pudo descargar la gráfica.");
-    }
-  };
-
   const confirmarRechazo = async (motivo) => {
     setError("");
     try {
@@ -171,26 +156,6 @@ function ConsultarTab() {
           </IconButton>
         </Tooltip>
       ),
-    },
-    {
-      field: "grafica",
-      headerName: "Gráfica",
-      align: "center",
-      renderCell: (a) =>
-        a.grafica?.nombreArchivo ? (
-          <Tooltip title="Descargar gráfica">
-            <IconButton size="small" onClick={() => descargarGrafica(a)}>
-              <InsertChartOutlinedIcon fontSize="small" sx={{ color: "primary.main" }} />
-            </IconButton>
-          </Tooltip>
-        ) : (
-          <Tooltip title="El técnico todavía no la sube">
-            <Chip
-              icon={<HourglassEmptyOutlinedIcon sx={{ fontSize: 14 }} />} label="En proceso" size="small" variant="outlined"
-              sx={{ borderRadius: "6px", "& .MuiChip-label": { px: 1 } }}
-            />
-          </Tooltip>
-        ),
     },
     {
       field: "statusCalidad",

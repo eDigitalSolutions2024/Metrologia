@@ -58,7 +58,9 @@ async function obtener(id) {
   const reporte = await Reporte.findById(id)
     .populate("cliente", "nombre rfc domicilioFiscal")
     .populate("contacto", "nombre correo telefono")
-    .populate("cotizacion", "folio total")
+    // items sin `precioUnitario`: el detalle del reporte muestra los equipos
+    // cotizados como referencia, sin precios.
+    .populate("cotizacion", "folio total items.descripcion items.marca items.modelo items.tiempoEntrega items.cantidad")
     .populate("creadoPor", "nombre usuario")
     .populate("historial.usuario.id", "nombre usuario");
   if (!reporte) throw new AppError("Reporte no encontrado", 404);

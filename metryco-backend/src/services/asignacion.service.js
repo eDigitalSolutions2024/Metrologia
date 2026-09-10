@@ -236,6 +236,14 @@ async function cambiarEstado(id, { dominio, valor, motivo }, reqUser) {
     if (valor === "terminada") {
       if (!a.tecnicoEjecutor) a.tecnicoEjecutor = reqUser?.id;
       if (!a.fechaCalibracion) a.fechaCalibracion = new Date();
+      // El técnico corrigió y volvió a terminar tras un rechazo: reabre el
+      // certificado para que pase de nuevo por "Aprobar y autorizar". Es un
+      // efecto lateral (no pasa por la validación de rol de "certificado")
+      // porque lo dispara el propio técnico, no Calidad.
+      if (a.estados.certificado === "rechazado") {
+        a.estados.certificado = "sin_generar";
+        a.motivoRechazo = undefined;
+      }
     }
   }
   if (dominio === "entrega" && valor === "entregado" && !a.fechaEntrega) {
@@ -266,6 +274,18 @@ async function cambiarEstado(id, { dominio, valor, motivo }, reqUser) {
       cert.historial.push(evento);
       await cert.save();
     }
+
+    // Regresa a "calculado" los cálculos que ya estaban aprobados: rechazar
+    // significa "corrígelo desde la calibración", así que la aprobación de
+    // Calidad que respaldaba el certificado anulado ya no aplica. Sin esto,
+    // "Editar calibración" se topa con el guard de reemplazarPorAsignacion
+    // ("ya hay cálculos aprobados") y el técnico se queda sin forma de
+    // volver a guardar sus puntos corregidos.
+    const CalculoIncertidumbre = require("../models/CalculoIncertidumbre");
+    await CalculoIncertidumbre.updateMany(
+      { asignacion: a._id, estado: "aprobado" },
+      { $set: { estado: "calculado" }, $unset: { aprobadoPor: "" } }
+    );
   }
 
   a.historial.push(evento);

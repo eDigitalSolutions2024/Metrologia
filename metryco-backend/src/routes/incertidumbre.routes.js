@@ -33,6 +33,9 @@ router.post("/asistente", c.asistir);
 router.get("/calculos", c.listarCalculos);
 router.get("/calculos/:id", c.obtenerCalculo);
 router.post("/calculos", c.crearCalculo);
+// "Editar calibración": reemplaza el juego de cálculos de una asignación
+// (borra los no aprobados y crea los que manda el popup).
+router.put("/calculos/reemplazar-por-asignacion/:asignacionId", c.reemplazarPorAsignacion);
 router.patch("/calculos/:id/recalcular", c.recalcular);
 router.patch("/calculos/:id/revisar", c.revisar);
 router.patch("/calculos/:id/aprobar", c.aprobar);

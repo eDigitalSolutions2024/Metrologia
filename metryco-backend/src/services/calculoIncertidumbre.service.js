@@ -423,6 +423,44 @@ async function aprobarPorAsignacion(asignacionId, reqUser) {
   return { aprobados: calcs.length };
 }
 
+// "Editar calibración": el técnico reabre el popup con lo ya capturado y lo
+// vuelve a guardar. En vez de acumular cálculos nuevos junto a los viejos,
+// se reemplaza el juego completo de la asignación. Solo aplica mientras
+// ningún cálculo esté aprobado (si ya hay certificado en curso, no se toca).
+async function reemplazarPorAsignacion(asignacionId, listaDatos, reqUser) {
+  if (!Array.isArray(listaDatos) || !listaDatos.length) {
+    throw new AppError("No hay puntos que guardar", 400);
+  }
+  const previos = await CalculoIncertidumbre.find({ asignacion: asignacionId }).select("_id estado");
+  if (previos.some((c) => c.estado === "aprobado")) {
+    throw new AppError("No se puede reemplazar: ya hay cálculos aprobados en esta asignación.", 409);
+  }
+
+  // Se borran primero: en este punto son solo "calculado"/"revisado" y nada
+  // downstream los consume todavía (el certificado se emite después). Si algún
+  // `crear` fallara, el formulario sigue con todo en pantalla para reintentar.
+  const idsPrevios = previos.map((c) => c._id);
+  if (idsPrevios.length) {
+    await CalculoIncertidumbre.deleteMany({ _id: { $in: idsPrevios } });
+    const Asignacion = require("../models/Asignacion");
+    await Asignacion.updateOne(
+      { _id: asignacionId },
+      { $pull: { calculosIncertidumbre: { $in: idsPrevios } } }
+    );
+  }
+
+  const resultados = await Promise.allSettled(
+    listaDatos.map((datos) => crear({ ...datos, asignacion: asignacionId }, reqUser))
+  );
+  const creados = resultados.filter((r) => r.status === "fulfilled").length;
+  const fallos = resultados
+    .map((r, i) => (r.status === "rejected"
+      ? { indice: i, mensaje: r.reason?.message || "Error al guardar" }
+      : null))
+    .filter(Boolean);
+  return { creados, eliminados: idsPrevios.length, fallos };
+}
+
 async function transicion(id, estado, campoFirma, desde, reqUser) {
   const c = await CalculoIncertidumbre.findById(id);
   if (!c) throw new AppError("Cálculo de incertidumbre no encontrado", 404);
@@ -438,6 +476,7 @@ async function transicion(id, estado, campoFirma, desde, reqUser) {
 }
 
 module.exports = {
-  listar, obtener, crear, recalcular, revisar, aprobar, aprobarPorAsignacion, preview,
+  listar, obtener, crear, recalcular, revisar, aprobar, aprobarPorAsignacion,
+  reemplazarPorAsignacion, preview,
   contribucionesDesdeModelo, desviacionEstandarMuestral,
 };

@@ -23,7 +23,7 @@ const TITULOS = {
   calidad: "Calidad",
   actividades: "Actividades",
   cobranza: "Cuentas por Cobrar",
-  performance: "Performance",
+  performance: "Plantillas de Tolerancia",
   usuarios: "Usuarios",
   general: "General",
 };

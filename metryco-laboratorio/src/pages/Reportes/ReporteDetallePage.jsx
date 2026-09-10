@@ -14,8 +14,6 @@ import CheckRoundedIcon from "@mui/icons-material/CheckRounded";
 import BiotechOutlinedIcon from "@mui/icons-material/BiotechOutlined";
 import LocalShippingOutlined from "@mui/icons-material/LocalShippingOutlined";
 import WorkspacePremiumOutlinedIcon from "@mui/icons-material/WorkspacePremiumOutlined";
-import InsertChartOutlinedIcon from "@mui/icons-material/InsertChartOutlined";
-import UploadFileOutlinedIcon from "@mui/icons-material/UploadFileOutlined";
 import ReportProblemOutlinedIcon from "@mui/icons-material/ReportProblemOutlined";
 import PlayCircleOutlineIcon from "@mui/icons-material/PlayCircleOutlineOutlined";
 import VerifiedOutlinedIcon from "@mui/icons-material/VerifiedOutlined";
@@ -29,21 +27,20 @@ import FactCheckOutlinedIcon from "@mui/icons-material/FactCheckOutlined";
 import {
   obtenerReporte, actualizarReporte, agregarComentarioReporte,
   crearAsignacion, actualizarAsignacion, cambiarEstadoAsignacion, eliminarAsignacion,
-  subirGraficaAsignacion, fetchGraficaAsignacionBlob,
 } from "../../services/reportes";
 import { listarEquipos } from "../../services/equipos";
 import { obtenerDirectorio } from "../../services/usuarios";
 import { listarPatrones } from "../../services/patrones";
 import { listarPerformance } from "../../services/performance";
+import { listarContactos, crearContacto } from "../../services/contactos";
+import { listarCotizaciones } from "../../services/cotizaciones";
 import { listarCertificadosPorReporte, emitirCertificado, cambiarEstadoCertificado } from "../../services/certificados";
 import { aprobarCalculosPorAsignacion } from "../../services/incertidumbre";
 import { direccionCliente } from "./imprimir/shared";
 import { useAuth } from "../../core/auth/useAuth";
 import CapturarCalibracionDialog from "./CapturarCalibracionDialog";
 
-const EST_CALIBRACION = { pendiente: "Pendiente", en_proceso: "En proceso", terminada: "Terminada" };
 const EST_ENTREGA = { pendiente: "Pendiente", entregado: "Entregado" };
-const EST_CERTIFICADO = { sin_generar: "Sin generar", en_revision: "En revisión", autorizado: "Autorizado", rechazado: "Rechazado" };
 const STATUS_REPORTE = {
   recepcion: { label: "Recepción", color: "default" },
   en_proceso: { label: "En proceso", color: "warning" },
@@ -138,6 +135,8 @@ export default function ReporteDetallePage() {
   const [eliminarTarget, setEliminarTarget] = useState(null);
   const [eliminando, setEliminando] = useState(false);
   const [emitirTarget, setEmitirTarget] = useState(null);
+  const [contactoDialog, setContactoDialog] = useState(false);
+  const [cotizacionDialog, setCotizacionDialog] = useState(false);
 
   const cargar = useCallback(() => {
     setLoading(true);
@@ -208,28 +207,6 @@ export default function ReporteDetallePage() {
       cargar();
     } catch {
       setError("No se pudo guardar la factura de la asignación.");
-    }
-  };
-
-  const subirGrafica = async (asignacionId, archivo) => {
-    try {
-      await subirGraficaAsignacion(asignacionId, archivo);
-      cargar();
-    } catch {
-      setError("No se pudo subir la gráfica de calibración.");
-    }
-  };
-
-  const descargarGrafica = async (asignacionId, nombreOriginal) => {
-    try {
-      const blob = await fetchGraficaAsignacionBlob(asignacionId);
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url; a.download = nombreOriginal || "grafica";
-      a.click();
-      setTimeout(() => URL.revokeObjectURL(url), 60000);
-    } catch {
-      setError("No se pudo descargar la gráfica.");
     }
   };
 
@@ -330,19 +307,39 @@ export default function ReporteDetallePage() {
         <Box sx={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 4 }}>
           <Box>
             <Campo label="Cliente" value={cliente.nombre} />
-            <Campo label="Contacto" value={reporte.contacto?.nombre} />
-            <Campo label="Teléfono" value={reporte.contacto?.telefono} />
+            <Campo label="Contacto">
+              <Box sx={{ display: "flex", alignItems: "center", gap: 0.5, minWidth: 0 }}>
+                <Typography variant="body2" noWrap>{reporte.contacto?.nombre || "—"}</Typography>
+                {puedeEditarReporte && (
+                  <Tooltip title={reporte.contacto ? "Cambiar contacto" : "Asignar contacto"}>
+                    <IconButton size="small" onClick={() => setContactoDialog(true)}>
+                      <EditOutlinedIcon sx={{ fontSize: 15 }} />
+                    </IconButton>
+                  </Tooltip>
+                )}
+              </Box>
+            </Campo>
+            <Campo label="Teléfono" value={reporte.contacto?.telefono || reporte.contacto?.correo} />
             <Campo label="Reporte" value={reporte.folio} />
             <Campo label="Orden de Compra" value={reporte.ordenCompra} />
           </Box>
           <Box>
             <Campo label="Dirección" value={direccionCliente(cliente)} />
             <Campo label="Cotización">
-              {reporte.cotizacion?.folio ? (
-                <MuiLink component="button" variant="body2" onClick={() => navigate(`/cotizaciones?editar=${reporte.cotizacion._id}`)}>
-                  {reporte.cotizacion.folio}
-                </MuiLink>
-              ) : <Typography variant="body2">—</Typography>}
+              <Box sx={{ display: "flex", alignItems: "center", gap: 0.5, minWidth: 0 }}>
+                {reporte.cotizacion?.folio ? (
+                  <MuiLink component="button" variant="body2" onClick={() => navigate(`/cotizaciones?editar=${reporte.cotizacion._id}`)}>
+                    {reporte.cotizacion.folio}
+                  </MuiLink>
+                ) : <Typography variant="body2">—</Typography>}
+                {puedeEditarReporte && (
+                  <Tooltip title={reporte.cotizacion ? "Cambiar cotización" : "Asignar cotización"}>
+                    <IconButton size="small" onClick={() => setCotizacionDialog(true)}>
+                      <EditOutlinedIcon sx={{ fontSize: 15 }} />
+                    </IconButton>
+                  </Tooltip>
+                )}
+              </Box>
             </Campo>
             <Campo label="Factura">
               <Box sx={{ display: "flex", gap: 1 }}>
@@ -390,6 +387,43 @@ export default function ReporteDetallePage() {
           </Tooltip>
         </Box>
       </Paper>
+
+      {/* Equipos cotizados — referencia de lo que trae la cotización ligada, sin precios */}
+      {reporte.cotizacion?.items?.length > 0 && (
+        <>
+          <Typography variant="subtitle2" fontWeight={700} sx={{ mb: 1 }}>
+            Equipos Cotizados
+            <Typography component="span" variant="caption" color="text.secondary" sx={{ ml: 1, fontWeight: 400 }}>
+              (de la cotización {reporte.cotizacion.folio})
+            </Typography>
+          </Typography>
+          <Paper variant="outlined" sx={{ borderRadius: 1.5, mb: 2.5, overflow: "auto" }}>
+            <Box component="table" sx={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+              <Box component="thead" sx={{ bgcolor: "background.default" }}>
+                <Box component="tr">
+                  {["Descripción", "Marca", "Modelo", "Cantidad", "Tiempo de entrega"].map((h) => (
+                    <Box
+                      component="th" key={h}
+                      sx={{ px: 2, py: 1.5, textAlign: "left", borderBottom: 1, borderColor: "divider", fontSize: 11, fontWeight: 700, color: "text.secondary" }}
+                    >{h}</Box>
+                  ))}
+                </Box>
+              </Box>
+              <Box component="tbody">
+                {reporte.cotizacion.items.map((it, i) => (
+                  <Box component="tr" key={i} sx={{ "& td": { px: 2, py: 1.25, borderBottom: 1, borderColor: "divider" } }}>
+                    <Box component="td">{it.descripcion || "—"}</Box>
+                    <Box component="td">{it.marca || "—"}</Box>
+                    <Box component="td">{it.modelo || "—"}</Box>
+                    <Box component="td">{it.cantidad ?? "—"}</Box>
+                    <Box component="td">{it.tiempoEntrega || "—"}</Box>
+                  </Box>
+                ))}
+              </Box>
+            </Box>
+          </Paper>
+        </>
+      )}
 
       {/* Recolección de equipos */}
       <Typography variant="subtitle2" fontWeight={700} sx={{ mb: 1 }}>Recolección de equipos</Typography>
@@ -478,7 +512,7 @@ export default function ReporteDetallePage() {
                   )}
                   {puedeAsignar && asignacionEditable(a) && (
                     <>
-                      <Tooltip title="Editar asignación (técnico, patrones, Performance)">
+                      <Tooltip title="Editar asignación (técnico, patrones, Tolerancia)">
                         <IconButton size="small" onClick={() => setEditarTarget(a)}>
                           <EditOutlinedIcon fontSize="small" sx={{ color: "secondary.main" }} />
                         </IconButton>
@@ -518,19 +552,55 @@ export default function ReporteDetallePage() {
                 </Box>
               )}
 
+              {a.motivoRechazo && (() => {
+                const ultimo = (a.historialRechazos || [])[a.historialRechazos.length - 1];
+                return (
+                  <Alert
+                    severity="error" icon={<ReportProblemOutlinedIcon />}
+                    sx={{ mt: 1.5, borderRadius: 2, alignItems: "flex-start", "& .MuiAlert-message": { width: "100%" } }}
+                  >
+                    <Typography variant="body2" fontWeight={700}>Certificado rechazado — pendiente de corrección</Typography>
+                    <Typography variant="body2" sx={{ mt: 0.25 }}>{a.motivoRechazo}</Typography>
+                    {ultimo && (
+                      <Typography variant="caption" color="text.secondary" sx={{ display: "block", mt: 0.5 }}>
+                        {ultimo.usuario?.nombre || "Calidad"} · {formatDate(ultimo.fecha)}
+                      </Typography>
+                    )}
+                  </Alert>
+                );
+              })()}
+
               <Box sx={{ display: "flex", gap: 1.5, mt: 1.5, flexWrap: "wrap", alignItems: "flex-start" }}>
-                {/* Capturar / editar la calibración — solo antes de que arranque el certificado */}
-                {puedeOperarAsignacion && a.estados?.certificado === "sin_generar" && (
+                {/* Capturar / editar la calibración — antes de que arranque el
+                    certificado, o después de un rechazo para corregirla (el
+                    backend reabre el certificado solo al volver a Terminar). */}
+                {puedeOperarAsignacion &&
+                  (a.estados?.certificado === "sin_generar" || a.estados?.certificado === "rechazado") && (
                   <AppButton
                     type="button" variant="outlined" size="small" startIcon={<PlayCircleOutlineIcon />}
                     onClick={() => setCalibracionTarget(a)}
                     sx={{ borderRadius: 2, height: 40 }}
                   >
-                    {a.estados?.calibracion === "pendiente"
+                    {a.estados?.certificado === "rechazado"
+                      ? "Corregir calibración"
+                      : a.estados?.calibracion === "pendiente"
                       ? "Iniciar calibración"
                       : a.estados?.calibracion === "en_proceso"
                       ? "Continuar calibración"
                       : "Editar calibración"}
+                  </AppButton>
+                )}
+
+                {/* Ver la calibración capturada como se vería en el certificado
+                    (sin folio ni QR reales) — para que Calidad la revise antes
+                    de aprobar/rechazar, sin entrar a editarla. */}
+                {a.estados?.calibracion === "terminada" && !certificadoPorAsignacion[a._id] && (
+                  <AppButton
+                    type="button" variant="outlined" size="small" startIcon={<PictureAsPdfOutlinedIcon />}
+                    onClick={() => window.open(`/informe/asignacion/${a._id}/preview`, "_blank")}
+                    sx={{ borderRadius: 2, height: 40 }}
+                  >
+                    Consultar calibración
                   </AppButton>
                 )}
 
@@ -579,10 +649,14 @@ export default function ReporteDetallePage() {
                   </AppButton>
                 )}
 
-                {/* Calidad: algo está mal → rechazar con motivo, regresa al técnico */}
+                {/* Calidad: algo está mal → rechazar con motivo. Regresa la
+                    calibración a "pendiente" para que el técnico la termine.
+                    Disponible mientras se revisa (calibración terminada sin
+                    certificado, o certificado emitido en revisión). Una vez
+                    autorizado ya no se rechaza desde aquí. */}
                 {puedeCertificado &&
-                  (a.estados?.certificado === "en_revision" ||
-                    (a.estados?.certificado === "autorizado" && !certificadoPorAsignacion[a._id])) && (
+                  a.estados?.calibracion === "terminada" &&
+                  ["sin_generar", "en_revision"].includes(a.estados?.certificado) && (
                     <AppButton
                       type="button" variant="outlined" color="error" size="small" startIcon={<ReportProblemOutlinedIcon />}
                       onClick={() => onCambiarEstado(a._id, "certificado", "rechazado")}
@@ -592,53 +666,17 @@ export default function ReporteDetallePage() {
                     </AppButton>
                   )}
 
-                <FormControl size="small" sx={{ minWidth: 130 }} disabled={!puedeOperarAsignacion}>
-                  <InputLabel>Calibración</InputLabel>
-                  <Select label="Calibración" value={a.estados?.calibracion} onChange={(e) => onCambiarEstado(a._id, "calibracion", e.target.value)}>
-                    {Object.entries(EST_CALIBRACION).map(([k, v]) => <MenuItem key={k} value={k}>{v}</MenuItem>)}
-                  </Select>
-                </FormControl>
-                <FormControl size="small" sx={{ minWidth: 120 }} disabled={!puedeOperarAsignacion}>
+                {/* La calibración y el certificado se manejan solo con los
+                    botones de arriba y la barra de 3 pasos; el único estado
+                    que se marca a mano es la entrega del equipo. */}
+                <FormControl size="small" sx={{ minWidth: 150 }} disabled={!puedeOperarAsignacion}>
                   <InputLabel>Entrega</InputLabel>
                   <Select label="Entrega" value={a.estados?.entrega} onChange={(e) => onCambiarEstado(a._id, "entrega", e.target.value)}>
                     {Object.entries(EST_ENTREGA).map(([k, v]) => <MenuItem key={k} value={k}>{v}</MenuItem>)}
                   </Select>
                 </FormControl>
-                <Box>
-                  <FormControl size="small" sx={{ minWidth: 140 }} disabled={!puedeCertificado}>
-                    <InputLabel>Certificado</InputLabel>
-                    <Select label="Certificado" value={a.estados?.certificado} onChange={(e) => onCambiarEstado(a._id, "certificado", e.target.value)}>
-                      {Object.entries(EST_CERTIFICADO).map(([k, v]) => <MenuItem key={k} value={k}>{v}</MenuItem>)}
-                    </Select>
-                  </FormControl>
-                  {a.motivoRechazo && (
-                    <Typography variant="caption" color="error.main" sx={{ display: "block", mt: 0.5, maxWidth: 200 }}>
-                      {a.motivoRechazo}
-                    </Typography>
-                  )}
-                </Box>
                 <TextField size="small" label="Factura" defaultValue={a.factura || ""} disabled={!puedeOperarAsignacion}
                   onBlur={(e) => guardarFacturaAsignacion(a._id, e.target.value)} />
-
-                {a.grafica?.nombreArchivo ? (
-                  <AppButton
-                    variant="text" size="small" startIcon={<InsertChartOutlinedIcon />}
-                    onClick={() => descargarGrafica(a._id, a.grafica.nombreOriginal)}
-                  >
-                    Ver gráfica
-                  </AppButton>
-                ) : (
-                  <Button
-                    component="label" variant="outlined" size="small" startIcon={<UploadFileOutlinedIcon />}
-                    disabled={!puedeOperarAsignacion} sx={{ borderRadius: 2, height: 40 }}
-                  >
-                    Subir gráfica
-                    <input
-                      type="file" accept="image/*" hidden
-                      onChange={(e) => { const f = e.target.files?.[0]; if (f) subirGrafica(a._id, f); e.target.value = ""; }}
-                    />
-                  </Button>
-                )}
               </Box>
             </Paper>
           );
@@ -717,6 +755,24 @@ export default function ReporteDetallePage() {
         onDone={() => { setEmitirTarget(null); cargar(); }}
       />
 
+      <AsignarContactoDialog
+        open={contactoDialog}
+        reporteId={id}
+        clienteId={cliente._id}
+        actual={reporte.contacto?._id || ""}
+        onClose={() => setContactoDialog(false)}
+        onDone={() => { setContactoDialog(false); cargar(); }}
+      />
+
+      <AsignarCotizacionDialog
+        open={cotizacionDialog}
+        reporteId={id}
+        clienteId={cliente._id}
+        actual={reporte.cotizacion?._id || ""}
+        onClose={() => setCotizacionDialog(false)}
+        onDone={() => { setCotizacionDialog(false); cargar(); }}
+      />
+
       <Dialog open={!!eliminarTarget} onClose={() => setEliminarTarget(null)} maxWidth="xs" fullWidth>
         <DialogTitle sx={{ fontWeight: 700 }}>Quitar asignación</DialogTitle>
         <DialogContent>
@@ -738,8 +794,140 @@ export default function ReporteDetallePage() {
   );
 }
 
+// Asignar / cambiar el contacto del cliente en el reporte, con alta rápida
+// para no tener que salir a la ficha del cliente.
+function AsignarContactoDialog({ open, reporteId, clienteId, actual, onClose, onDone }) {
+  const [contactos, setContactos] = useState([]);
+  const [sel, setSel] = useState("");
+  const [nuevo, setNuevo] = useState(null); // { nombre, telefono, correo } | null
+  const [guardando, setGuardando] = useState(false);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    if (!open) return;
+    setSel(actual || ""); setNuevo(null); setError("");
+    if (clienteId) listarContactos(clienteId).then(setContactos).catch(() => setContactos([]));
+  }, [open, clienteId, actual]);
+
+  const agregar = async () => {
+    if (!nuevo?.nombre?.trim()) { setError("Escribe el nombre del contacto."); return; }
+    setGuardando(true); setError("");
+    try {
+      const c = await crearContacto(clienteId, {
+        nombre: nuevo.nombre.trim(), telefono: nuevo.telefono?.trim() || undefined, correo: nuevo.correo?.trim() || undefined,
+      });
+      const lista = await listarContactos(clienteId).catch(() => contactos);
+      setContactos(lista);
+      setSel(c._id);
+      setNuevo(null);
+    } catch (e) {
+      setError(e?.response?.data?.message || "No se pudo agregar el contacto.");
+    } finally { setGuardando(false); }
+  };
+
+  const guardar = async () => {
+    setGuardando(true); setError("");
+    try {
+      await actualizarReporte(reporteId, { contacto: sel || null });
+      onDone();
+    } catch (e) {
+      setError(e?.response?.data?.message || "No se pudo asignar el contacto.");
+    } finally { setGuardando(false); }
+  };
+
+  return (
+    <Dialog open={open} onClose={onClose} maxWidth="xs" fullWidth>
+      <DialogTitle sx={{ fontWeight: 700 }}>Contacto del reporte</DialogTitle>
+      <DialogContent>
+        {error && <Alert severity="error" sx={{ mb: 2, borderRadius: 2 }}>{error}</Alert>}
+        <Box sx={{ display: "flex", flexDirection: "column", gap: 2, mt: 0.5 }}>
+          <TextField select fullWidth size="small" label="Contacto" value={sel} onChange={(e) => setSel(e.target.value)}
+            helperText={contactos.length === 0 ? "Este cliente no tiene contactos — agrega uno abajo" : ""}>
+            <MenuItem value="">— Sin contacto —</MenuItem>
+            {contactos.map((c) => (
+              <MenuItem key={c._id} value={c._id}>{c.nombre}{c.telefono ? ` · ${c.telefono}` : ""}</MenuItem>
+            ))}
+          </TextField>
+
+          {nuevo ? (
+            <Box sx={{ p: 1.5, border: "1px dashed", borderColor: "divider", borderRadius: 2, display: "flex", flexDirection: "column", gap: 1.5 }}>
+              <Typography variant="caption" fontWeight={700} color="text.secondary">Nuevo contacto</Typography>
+              <TextField size="small" label="Nombre" value={nuevo.nombre} onChange={(e) => setNuevo({ ...nuevo, nombre: e.target.value })} autoFocus />
+              <Box sx={{ display: "flex", gap: 1 }}>
+                <TextField size="small" label="Teléfono" value={nuevo.telefono} onChange={(e) => setNuevo({ ...nuevo, telefono: e.target.value })} fullWidth />
+                <TextField size="small" label="Correo" value={nuevo.correo} onChange={(e) => setNuevo({ ...nuevo, correo: e.target.value })} fullWidth />
+              </Box>
+              <Box sx={{ display: "flex", gap: 1, justifyContent: "flex-end" }}>
+                <Button size="small" onClick={() => setNuevo(null)}>Cancelar</Button>
+                <Button size="small" variant="contained" onClick={agregar} disabled={guardando} sx={{ borderRadius: 2 }}>Agregar</Button>
+              </Box>
+            </Box>
+          ) : (
+            <Button size="small" startIcon={<AddIcon />} onClick={() => setNuevo({ nombre: "", telefono: "", correo: "" })} sx={{ alignSelf: "flex-start", borderRadius: 2 }}>
+              Nuevo contacto
+            </Button>
+          )}
+        </Box>
+      </DialogContent>
+      <DialogActions sx={{ px: 3, pb: 2 }}>
+        <Button onClick={onClose}>Cancelar</Button>
+        <Button variant="contained" onClick={guardar} disabled={guardando} sx={{ borderRadius: 2 }}>Guardar</Button>
+      </DialogActions>
+    </Dialog>
+  );
+}
+
+// Ligar / cambiar la cotización del reporte (útil cuando el reporte no nació
+// desde una cotización).
+function AsignarCotizacionDialog({ open, reporteId, clienteId, actual, onClose, onDone }) {
+  const [cotizaciones, setCotizaciones] = useState([]);
+  const [sel, setSel] = useState("");
+  const [guardando, setGuardando] = useState(false);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    if (!open) return;
+    setSel(actual || ""); setError("");
+    if (clienteId) {
+      listarCotizaciones({ clienteId, pageSize: 100 })
+        .then(({ items }) => setCotizaciones(items || []))
+        .catch(() => setCotizaciones([]));
+    }
+  }, [open, clienteId, actual]);
+
+  const guardar = async () => {
+    setGuardando(true); setError("");
+    try {
+      await actualizarReporte(reporteId, { cotizacion: sel || null });
+      onDone();
+    } catch (e) {
+      setError(e?.response?.data?.message || "No se pudo asignar la cotización.");
+    } finally { setGuardando(false); }
+  };
+
+  return (
+    <Dialog open={open} onClose={onClose} maxWidth="xs" fullWidth>
+      <DialogTitle sx={{ fontWeight: 700 }}>Cotización del reporte</DialogTitle>
+      <DialogContent>
+        {error && <Alert severity="error" sx={{ mb: 2, borderRadius: 2 }}>{error}</Alert>}
+        <TextField select fullWidth size="small" label="Cotización" value={sel} onChange={(e) => setSel(e.target.value)} sx={{ mt: 0.5 }}
+          helperText={cotizaciones.length === 0 ? "Este cliente no tiene cotizaciones registradas" : ""}>
+          <MenuItem value="">— Sin cotización —</MenuItem>
+          {cotizaciones.map((c) => (
+            <MenuItem key={c._id} value={c._id}>{c.folio}{c.total != null ? ` · $${Number(c.total).toLocaleString()}` : ""}</MenuItem>
+          ))}
+        </TextField>
+      </DialogContent>
+      <DialogActions sx={{ px: 3, pb: 2 }}>
+        <Button onClick={onClose}>Cancelar</Button>
+        <Button variant="contained" onClick={guardar} disabled={guardando} sx={{ borderRadius: 2 }}>Guardar</Button>
+      </DialogActions>
+    </Dialog>
+  );
+}
+
 // Editar una asignación ya creada (mientras no haya arrancado): cambiar
-// técnico, patrones o Performance sin tener que quitarla y rehacerla.
+// técnico, patrones o plantilla de Tolerancia sin tener que quitarla y rehacerla.
 function EditarAsignacionDialog({ open, asignacion, onClose, onDone }) {
   const [tecnicos, setTecnicos] = useState([]);
   const [patronesDisp, setPatronesDisp] = useState([]);
@@ -811,8 +999,8 @@ function EditarAsignacionDialog({ open, asignacion, onClose, onDone }) {
           renderInput={(params) => <TextField {...params} label="Patrón" />}
         />
         <FormControl size="small" fullWidth>
-          <InputLabel>Performance</InputLabel>
-          <Select label="Performance" value={performance} onChange={(e) => setPerformance(e.target.value)}>
+          <InputLabel>Tolerancia</InputLabel>
+          <Select label="Tolerancia" value={performance} onChange={(e) => setPerformance(e.target.value)}>
             <MenuItem value="">Ninguna</MenuItem>
             {performanceDisp.map((p) => <MenuItem key={p._id} value={p._id}>{p.nombre}</MenuItem>)}
           </Select>
@@ -986,8 +1174,8 @@ function AsignarForm({ clienteId, reporteId, equiposYaAsignados = [], onDone }) 
           renderInput={(params) => <TextField {...params} label="Patrón" />}
         />
         <FormControl size="small" sx={{ minWidth: 180 }}>
-          <InputLabel>Performance</InputLabel>
-          <Select label="Performance" value={performance} onChange={(e) => setPerformance(e.target.value)}>
+          <InputLabel>Tolerancia</InputLabel>
+          <Select label="Tolerancia" value={performance} onChange={(e) => setPerformance(e.target.value)}>
             <MenuItem value="">Ninguna</MenuItem>
             {performanceDisp.map((p) => <MenuItem key={p._id} value={p._id}>{p.nombre}</MenuItem>)}
           </Select>

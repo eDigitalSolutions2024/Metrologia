@@ -8,7 +8,6 @@ import FileDownloadOutlinedIcon from "@mui/icons-material/FileDownloadOutlined";
 import NotificationsActiveOutlinedIcon from "@mui/icons-material/NotificationsActiveOutlined";
 import EditOutlinedIcon from "@mui/icons-material/EditOutlined";
 import DescriptionOutlinedIcon from "@mui/icons-material/DescriptionOutlined";
-import InsertChartOutlinedIcon from "@mui/icons-material/InsertChartOutlined";
 import HistoryOutlinedIcon from "@mui/icons-material/HistoryOutlined";
 import VerifiedOutlinedIcon from "@mui/icons-material/VerifiedOutlined";
 import ScheduleOutlinedIcon from "@mui/icons-material/ScheduleOutlined";
@@ -22,7 +21,6 @@ import { listarClientes } from "../../services/clientes";
 import { exportCsv } from "../../shared/utils/exportCsv";
 import { listarPatrones } from "../../services/patrones";
 import { listarCertificados } from "../../services/certificados";
-import { fetchGraficaAsignacionBlob } from "../../services/reportes";
 import { formatDate } from "../../shared/utils/formatDate";
 import { iconoCategoria, colorCategoria } from "./categorias";
 
@@ -129,19 +127,6 @@ export default function HistorialCertificadosPage() {
 
   const cuenta = (estado) => items.filter((c) => (c.estadoEfectivo || c.estado) === estado).length;
 
-  const descargarGrafica = async (cert) => {
-    setError("");
-    try {
-      const blob = await fetchGraficaAsignacionBlob(cert.asignacion);
-      const url = URL.createObjectURL(blob);
-      const el = document.createElement("a");
-      el.href = url; el.download = `grafica-${cert.folio}`;
-      el.click();
-      setTimeout(() => URL.revokeObjectURL(url), 60000);
-    } catch {
-      setError("Ese certificado no tiene gráfica adjunta.");
-    }
-  };
 
   const columns = [
     {
@@ -196,13 +181,6 @@ export default function HistorialCertificadosPage() {
             <IconButton size="small" onClick={() => window.open(`/informe/certificado/${c._id}`, "_blank")}>
               <DescriptionOutlinedIcon fontSize="small" sx={{ color: "primary.main" }} />
             </IconButton>
-          </Tooltip>
-          <Tooltip title={c.asignacion ? "Descargar gráfica adjunta" : "Sin asignación ligada"}>
-            <span>
-              <IconButton size="small" disabled={!c.asignacion} onClick={() => descargarGrafica(c)}>
-                <InsertChartOutlinedIcon fontSize="small" sx={{ color: "primary.main" }} />
-              </IconButton>
-            </span>
           </Tooltip>
         </Box>
       ),

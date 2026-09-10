@@ -65,6 +65,14 @@ const aprobarPorAsignacion = asyncHandler(async (req, res) => {
   res.json({ success: true, data: await calculos.aprobarPorAsignacion(req.params.asignacionId, req.user) });
 });
 
+// "Editar calibración": reemplaza el juego completo de cálculos de una
+// asignación por el que manda el popup (borra los previos no aprobados y
+// crea los nuevos). Evita que "editar" acumule cálculos duplicados.
+const reemplazarPorAsignacion = asyncHandler(async (req, res) => {
+  const lista = req.body?.calculos || req.body;
+  res.json({ success: true, data: await calculos.reemplazarPorAsignacion(req.params.asignacionId, lista, req.user) });
+});
+
 // Cálculo determinístico SIN persistir — para la vista previa "en vivo".
 const preview = asyncHandler(async (req, res) => {
   res.json({ success: true, data: await calculos.preview(req.body) });
@@ -78,6 +86,7 @@ const asistir = asyncHandler(async (req, res) => {
 
 module.exports = {
   listarModelos, obtenerModelo, crearModelo, actualizarModelo, eliminarModelo, importarModelo,
-  listarCalculos, obtenerCalculo, crearCalculo, recalcular, revisar, aprobar, aprobarPorAsignacion, preview,
+  listarCalculos, obtenerCalculo, crearCalculo, recalcular, revisar, aprobar, aprobarPorAsignacion,
+  reemplazarPorAsignacion, preview,
   asistir,
 };
