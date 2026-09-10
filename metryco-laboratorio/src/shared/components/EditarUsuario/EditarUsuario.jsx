@@ -1,14 +1,16 @@
 import { useEffect, useState } from "react";
 import {
-  Dialog, DialogTitle, DialogContent, DialogActions, Grid, Alert, Box,
-  MenuItem, Select, FormControl, InputLabel, IconButton, InputAdornment, Tooltip,
+  Dialog, DialogTitle, DialogContent, DialogActions, Grid, Alert, Box, Typography,
+  MenuItem, Select, FormControl, InputLabel, IconButton, InputAdornment, Tooltip, Button,
 } from "@mui/material";
 import RefreshIcon from "@mui/icons-material/Refresh";
 import ContentCopyIcon from "@mui/icons-material/ContentCopy";
+import DrawOutlinedIcon from "@mui/icons-material/DrawOutlined";
 import { useForm, Controller } from "react-hook-form";
 import AppInput from "../AppInput";
 import AppButton from "../AppButton";
-import { actualizarUsuario } from "../../../services/usuarios";
+import { actualizarUsuario, subirFirmaUsuario, eliminarFirmaUsuario } from "../../../services/usuarios";
+import { firmaUrl } from "../../../services/perfil";
 import { generarPasswordSegura } from "../../utils/generarPassword";
 
 const ROLES = [
@@ -27,6 +29,8 @@ const SUCURSALES = [
 export default function EditarUsuario({ open, onClose, usuario, onSaved }) {
   const [submitError, setSubmitError] = useState("");
   const [copiado, setCopiado] = useState(false);
+  const [firma, setFirma] = useState("");
+  const [firmaBusy, setFirmaBusy] = useState(false);
   const {
     register,
     handleSubmit,
@@ -51,8 +55,39 @@ export default function EditarUsuario({ open, onClose, usuario, onSaved }) {
         status: usuario.status || "activo",
       });
       setCopiado(false);
+      setFirma(usuario.firmaUrl || "");
     }
   }, [open, usuario, reset]);
+
+  const onFirmaArchivo = async (e) => {
+    const archivo = e.target.files?.[0];
+    e.target.value = "";
+    if (!archivo || !usuario?.id) return;
+    setFirmaBusy(true); setSubmitError("");
+    try {
+      const u = await subirFirmaUsuario(usuario.id, archivo);
+      setFirma(u.firmaUrl || "");
+      onSaved?.();
+    } catch (err) {
+      setSubmitError(err.response?.data?.message || "No se pudo subir la firma.");
+    } finally {
+      setFirmaBusy(false);
+    }
+  };
+
+  const quitarFirma = async () => {
+    if (!usuario?.id) return;
+    setFirmaBusy(true); setSubmitError("");
+    try {
+      await eliminarFirmaUsuario(usuario.id);
+      setFirma("");
+      onSaved?.();
+    } catch {
+      setSubmitError("No se pudo quitar la firma.");
+    } finally {
+      setFirmaBusy(false);
+    }
+  };
 
   const cerrar = () => {
     setSubmitError("");
@@ -204,6 +239,31 @@ export default function EditarUsuario({ open, onClose, usuario, onSaved }) {
                   )}
                 />
               </FormControl>
+            </Grid>
+
+            <Grid size={{ xs: 12 }}>
+              <Typography variant="caption" fontWeight={700} color="text.secondary" sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
+                <DrawOutlinedIcon sx={{ fontSize: 16 }} /> Firma digital
+              </Typography>
+              <Typography variant="caption" color="text.secondary" sx={{ display: "block", mb: 1 }}>
+                Aparece en los certificados que este usuario elabore, revise o autorice.
+              </Typography>
+              <Box sx={{ display: "flex", alignItems: "center", gap: 2, flexWrap: "wrap" }}>
+                <Box sx={{ width: 160, height: 60, border: "1px dashed", borderColor: "divider", borderRadius: 2, display: "grid", placeItems: "center", bgcolor: "background.default" }}>
+                  {firma
+                    ? <Box component="img" src={firmaUrl(firma)} alt="Firma" sx={{ maxWidth: "90%", maxHeight: "80%", objectFit: "contain" }} />
+                    : <Typography variant="caption" color="text.disabled">Sin firma</Typography>}
+                </Box>
+                <Button component="label" size="small" variant="outlined" disabled={firmaBusy} sx={{ borderRadius: 2 }}>
+                  {firma ? "Cambiar" : "Subir firma"}
+                  <input type="file" accept="image/png,image/jpeg,image/svg+xml,image/webp" hidden onChange={onFirmaArchivo} />
+                </Button>
+                {firma && (
+                  <Button size="small" color="error" onClick={quitarFirma} disabled={firmaBusy} sx={{ borderRadius: 2 }}>
+                    Quitar
+                  </Button>
+                )}
+              </Box>
             </Grid>
           </Grid>
         </DialogContent>

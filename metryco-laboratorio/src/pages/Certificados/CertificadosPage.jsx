@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   Box, Typography, TextField, InputAdornment, IconButton, Tooltip, Chip,
-  MenuItem, Select, FormControl, InputLabel, Grid, Paper,
+  MenuItem, Select, FormControl, InputLabel, Grid,
   Dialog, DialogTitle, DialogContent, DialogActions, Button, Alert,
 } from "@mui/material";
 import { useTheme } from "@mui/material/styles";
@@ -9,7 +9,6 @@ import SearchIcon from "@mui/icons-material/Search";
 import AddIcon from "@mui/icons-material/Add";
 import QrCode2OutlinedIcon from "@mui/icons-material/QrCode2Outlined";
 import LabelOutlinedIcon from "@mui/icons-material/LabelOutlined";
-import PictureAsPdfOutlinedIcon from "@mui/icons-material/PictureAsPdfOutlined";
 import ArticleOutlinedIcon from "@mui/icons-material/ArticleOutlined";
 import BlockOutlinedIcon from "@mui/icons-material/BlockOutlined";
 import VerifiedOutlinedIcon from "@mui/icons-material/VerifiedOutlined";
@@ -25,7 +24,7 @@ import { formatDate } from "../../shared/utils/formatDate";
 import { useAuth } from "../../core/auth/useAuth";
 import { listarClientes } from "../../services/clientes";
 import {
-  listarCertificados, emitirCertificado, cambiarEstadoCertificado, anularCertificado, fetchPdfBlob,
+  listarCertificados, emitirCertificado, cambiarEstadoCertificado, anularCertificado,
 } from "../../services/certificados";
 import { listarAsignaciones } from "../../services/reportes";
 import { obtenerDirectorio } from "../../services/usuarios";
@@ -120,22 +119,6 @@ export default function CertificadosPage() {
               </IconButton>
             </Tooltip>
           )}
-          <Tooltip title={r.archivo?.nombreArchivo ? "Ver PDF" : "Sin PDF adjunto"}>
-            <span>
-              <IconButton
-                size="small"
-                disabled={!r.archivo?.nombreArchivo}
-                onClick={async () => {
-                  const blob = await fetchPdfBlob(r._id);
-                  const url = URL.createObjectURL(blob);
-                  window.open(url, "_blank");
-                  setTimeout(() => URL.revokeObjectURL(url), 60000);
-                }}
-              >
-                <PictureAsPdfOutlinedIcon fontSize="small" sx={{ color: r.archivo?.nombreArchivo ? "error.main" : "text.disabled" }} />
-              </IconButton>
-            </span>
-          </Tooltip>
           <Tooltip title="Informe de calibración (PDF)">
             <IconButton size="small" onClick={() => window.open(`/informe/certificado/${r._id}`, "_blank")}>
               <ArticleOutlinedIcon fontSize="small" sx={{ color: "secondary.main" }} />

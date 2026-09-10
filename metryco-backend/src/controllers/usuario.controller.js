@@ -1,5 +1,6 @@
 const asyncHandler = require("../utils/asyncHandler");
 const usuarioService = require("../services/usuario.service");
+const perfilService = require("../services/perfil.service");
 
 const directorio = asyncHandler(async (req, res) => {
   const usuarios = await usuarioService.directorio();
@@ -65,7 +66,17 @@ const eliminarObservacion = asyncHandler(async (req, res) => {
   res.json({ success: true, data: usuario });
 });
 
+// Firma digital de un usuario (para certificados). Reutiliza la lógica del
+// perfil, que ya recibe cualquier id — aquí lo hace un admin sobre otro usuario.
+const subirFirma = asyncHandler(async (req, res) => {
+  res.json({ success: true, data: await perfilService.subirFirma(req.params.id, req.file) });
+});
+
+const eliminarFirma = asyncHandler(async (req, res) => {
+  res.json({ success: true, data: await perfilService.eliminarFirma(req.params.id) });
+});
+
 module.exports = {
   listar, obtener, crear, actualizar, desactivar, reactivar, eliminar,
-  agregarObservacion, eliminarObservacion, directorio,
+  agregarObservacion, eliminarObservacion, directorio, subirFirma, eliminarFirma,
 };

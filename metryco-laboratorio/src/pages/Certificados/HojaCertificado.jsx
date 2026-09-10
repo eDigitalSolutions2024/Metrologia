@@ -112,7 +112,9 @@ export default function HojaCertificado({ cert, ultima = true }) {
 
   useEffect(() => {
     let cancelado = false;
-    if (!cert?._id) return;
+    // La vista previa no tiene certificado emitido: su _id es "preview-<...>",
+    // que no es un ObjectId — pedir su QR devuelve 500. No hay QR en el previo.
+    if (!cert?._id || cert.preview) return;
     fetchQrBlob(cert._id, "png")
       .then((blob) => {
         if (cancelado) return;
@@ -122,7 +124,7 @@ export default function HojaCertificado({ cert, ultima = true }) {
       })
       .catch(() => {});
     return () => { cancelado = true; };
-  }, [cert?._id]);
+  }, [cert?._id, cert?.preview]);
 
   const eq = cert.equipoSnapshot || {};
   const cli = cert.clienteSnapshot || {};
@@ -141,8 +143,48 @@ export default function HojaCertificado({ cert, ultima = true }) {
   const revisor = cert.revisadoPor;
   const autorizador = cert.autorizadoPor;
 
+  // Marca de agua: en un certificado emitido usa el LOGOTIPO configurado en
+  // Administración → Datos del Laboratorio (así se cambia sin tocar código);
+  // si no hay logo, cae a texto con el nombre del laboratorio. La vista previa
+  // siempre lleva el texto "VISTA PREVIA".
+  const watermarkLogo = !cert.preview && cert.laboratorio?.logo?.nombreArchivo
+    ? logoUrl(cert.laboratorio.logo.nombreArchivo)
+    : null;
+  const watermarkText = cert.preview ? "VISTA PREVIA" : (cert.laboratorio?.nombre || "CERTIFICADO ORIGINAL");
+
   return (
-    <Box sx={{ maxWidth: 900, mx: "auto", px: 4, py: 4, fontFamily: "Arial, Helvetica, sans-serif", breakAfter: ultima ? "auto" : "page" }}>
+    <Box sx={{ maxWidth: 900, mx: "auto", px: 4, py: 4, fontFamily: "Arial, Helvetica, sans-serif", breakAfter: ultima ? "auto" : "page", position: "relative", overflow: "hidden" }}>
+
+      {/* ---------- Marca de agua: UNA sola, grande, en diagonal ---------- */}
+      <Box
+        aria-hidden
+        sx={{
+          position: "absolute", inset: 0, zIndex: 0, pointerEvents: "none",
+          display: "flex", alignItems: "center", justifyContent: "center", overflow: "hidden",
+          WebkitPrintColorAdjust: "exact", printColorAdjust: "exact",
+        }}
+      >
+        {watermarkLogo ? (
+          <Box
+            component="img" src={watermarkLogo} alt=""
+            sx={{ width: "90%", maxHeight: "82%", objectFit: "contain", opacity: 0.12, transform: "rotate(-16deg)", userSelect: "none" }}
+          />
+        ) : (
+          <Typography
+            sx={{
+              transform: "rotate(-30deg)", whiteSpace: "nowrap", fontWeight: 800, lineHeight: 1,
+              letterSpacing: ".04em", userSelect: "none",
+              // grande: una palabra/frase que cruza buena parte de la hoja.
+              fontSize: cert.preview ? 150 : Math.min(150, Math.max(72, Math.round(2100 / (watermarkText.length || 1)))),
+              color: cert.preview ? "rgba(217,119,6,0.16)" : "rgba(16,38,92,0.10)",
+            }}
+          >
+            {watermarkText}
+          </Typography>
+        )}
+      </Box>
+
+      <Box sx={{ position: "relative", zIndex: 1 }}>
 
       {/* ---------- Encabezado ---------- */}
       <Box sx={{ display: "flex", alignItems: "center", gap: 1.5, borderBottom: "2px solid #10265c", pb: 1, mb: 0.5 }}>
@@ -162,12 +204,6 @@ export default function HojaCertificado({ cert, ultima = true }) {
             <Typography sx={{ fontSize: 10, color: "#555" }}>Acreditación {cert.laboratorio.acreditacion}</Typography>
           )}
         </Box>
-        {qrDataUrl && (
-          <Box sx={{ textAlign: "center", flexShrink: 0 }}>
-            <Box component="img" src={qrDataUrl} alt="QR de verificación" sx={{ width: 52, height: 52, display: "block" }} />
-            <Typography sx={{ fontSize: 7, color: "#888", mt: 0.2 }}>Verificar</Typography>
-          </Box>
-        )}
         <Box sx={{ textAlign: "right", flexShrink: 0 }}>
           <Typography sx={{ fontWeight: 800, fontSize: 15, color: "#10265c", letterSpacing: ".03em" }}>CERTIFICADO DE CALIBRACIÓN</Typography>
           <Typography sx={{ fontSize: 10.5, color: "#666", fontStyle: "italic" }}>Calibration Certificate</Typography>
@@ -250,16 +286,11 @@ export default function HojaCertificado({ cert, ultima = true }) {
         </>
       )}
 
-      {/* ---------- Remarks ---------- */}
+      {/* ---------- Remarks (editable desde Admin → Datos del laboratorio) ---------- */}
       <Banda>Remarks</Banda>
-      <Box sx={{ border: "1px solid #cbd5e1", borderTop: "none", p: 1, fontSize: 9.5, color: "#334155", textAlign: "justify" }}>
-        The instrument(s) listed in this certification have been calibrated against standards traceable to N.I.S.T. (National
-        Institute of Standards and Technology) derived from ratio type measurements, or compared to national or internationally
-        recognized consensus standards. A calibration uncertainty ratio of 4:1 was maintained and a K=2 coverage factor with a
-        confidence level of 95%, unless otherwise stated. {cert.laboratorio?.nombre || "El laboratorio"} quality system complies
-        with applicable requirements of ISO/IEC 17025:2017. All results contained within this certification relate only to
-        item(s) calibrated. This calibration report shall not be reproduced except in full and with the written consent of{" "}
-        {cert.laboratorio?.nombre || "el laboratorio"}. Decision rule: Simple acceptance / Shared risk.
+      <Box sx={{ border: "1px solid #cbd5e1", borderTop: "none", p: 1, fontSize: 9.5, color: "#334155", textAlign: "justify", whiteSpace: "pre-line" }}>
+        {cert.laboratorio?.remarks ||
+          `The instrument(s) listed in this certification have been calibrated against standards traceable to N.I.S.T. (National Institute of Standards and Technology) derived from ratio type measurements, or compared to national or internationally recognized consensus standards. A calibration uncertainty ratio of 4:1 was maintained and a K=2 coverage factor with a confidence level of 95%, unless otherwise stated. ${cert.laboratorio?.nombre || "The laboratory"} quality system complies with applicable requirements of ISO/IEC 17025:2017. All results contained within this certification relate only to item(s) calibrated. This calibration report shall not be reproduced except in full and with the written consent of ${cert.laboratorio?.nombre || "the laboratory"}. Decision rule: Simple acceptance / Shared risk.`}
       </Box>
 
       {/* ---------- página de resultados / gráfica ---------- */}
@@ -280,13 +311,23 @@ export default function HojaCertificado({ cert, ultima = true }) {
             <b>RESOLUCIÓN:</b><span>{eq.resolucion || eq.divisionMinima || "—"}</span>
           </Box>
 
-          {grupos.map(([titulo, filas]) => (
+          {grupos.map(([titulo, filas]) => {
+            // Columnas de lecturas = las que realmente se capturaron (mín. 3,
+            // tope 10 para no desbordar la hoja). Antes estaba fijo en 3 y
+            // recortaba las lecturas 4+.
+            const nLecturas = Math.min(
+              10,
+              Math.max(3, ...filas.map((p) => (p.lecturas || []).length)),
+            );
+            const colsLectura = Array.from({ length: nLecturas }, (_, k) => k);
+            return (
             <Box key={titulo} sx={{ breakInside: "avoid" }}>
               <div className="rep-band">{titulo}</div>
               <table className="rep-table">
                 <thead>
                   <tr>
-                    <th>NOMINAL</th><th>1</th><th>2</th><th>3</th>
+                    <th>NOMINAL</th>
+                    {colsLectura.map((k) => <th key={k}>{k + 1}</th>)}
                     <th>PROMEDIO</th><th>DESVIACIÓN STD</th><th>CRITERIO</th><th>U Expan.</th>
                   </tr>
                 </thead>
@@ -296,7 +337,7 @@ export default function HojaCertificado({ cert, ultima = true }) {
                     return (
                       <tr key={i}>
                         <td className="nom">{p.puntoNominal ?? "—"}</td>
-                        {[0, 1, 2].map((k) => (
+                        {colsLectura.map((k) => (
                           <td key={k}>{L[k] != null ? Number(L[k]).toFixed(dec) : "—"}</td>
                         ))}
                         <td>{p.valorMedido != null ? Number(p.valorMedido).toFixed(dec + 1) : "—"}</td>
@@ -312,7 +353,8 @@ export default function HojaCertificado({ cert, ultima = true }) {
               </table>
               <GraficaCalibracion titulo={titulo} filas={filas} />
             </Box>
-          ))}
+            );
+          })}
 
           <Box className="rep-band" sx={{ mt: 2 }}>
             Factor de conversión 1 in = 25.4 mm
@@ -320,31 +362,61 @@ export default function HojaCertificado({ cert, ultima = true }) {
         </Box>
       )}
 
-      {/* ---------- Credits / firmas ---------- */}
+      {/* ---------- Credits / firmas + sello de verificación ---------- */}
       <Banda>Credits</Banda>
-      <Box sx={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 3, mt: 3, mb: 1, fontSize: 11, border: "1px solid #cbd5e1", borderTop: "none", p: 2 }}>
-        {[
-          ["Elaboró", cert.creadoPor?.nombre, cert.creadoPor?.firmaUrl],
-          ["Technical Approval", revisor?.nombre, revisor?.id?.firmaUrl],
-          ["Quality Assurance", autorizador?.nombre, autorizador?.id?.firmaUrl],
-        ].map(([rol, quien, firma]) => (
-          <Box key={rol} sx={{ textAlign: "center" }}>
-            <Box sx={{ height: 36, display: "flex", alignItems: "flex-end", justifyContent: "center" }}>
-              {firma && (
-                <Box component="img" src={firmaUrl(firma)} alt="Firma" sx={{ maxHeight: 34, maxWidth: "80%", objectFit: "contain" }} />
-              )}
+      <Box sx={{ display: "flex", gap: 2, mt: 3, mb: 1, alignItems: "stretch", border: "1px solid #cbd5e1", borderTop: "none", p: 2 }}>
+        <Box sx={{ flex: 1, display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 3, fontSize: 11 }}>
+          {[
+            ["Elaboró", cert.creadoPor?.nombre, cert.creadoPor?.firmaUrl],
+            ["Technical Approval", revisor?.nombre, revisor?.id?.firmaUrl],
+            ["Quality Assurance", autorizador?.nombre, autorizador?.id?.firmaUrl],
+          ].map(([rol, quien, firma]) => (
+            <Box key={rol} sx={{ textAlign: "center" }}>
+              <Box sx={{ height: 36, display: "flex", alignItems: "flex-end", justifyContent: "center" }}>
+                {firma && (
+                  <Box component="img" src={firmaUrl(firma)} alt="Firma" sx={{ maxHeight: 34, maxWidth: "80%", objectFit: "contain" }} />
+                )}
+              </Box>
+              <Box sx={{ borderTop: "1px solid #111", pt: 0.5 }}>
+                <b>{rol}</b><br />{quien || "—"}
+              </Box>
             </Box>
-            <Box sx={{ borderTop: "1px solid #111", pt: 0.5 }}>
-              <b>{rol}</b><br />{quien || "—"}
+          ))}
+        </Box>
+
+        {qrDataUrl && (
+          <Box
+            sx={{
+              flexShrink: 0, width: 132, borderLeft: "1px dashed #cbd5e1", pl: 2,
+              display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", textAlign: "center",
+              WebkitPrintColorAdjust: "exact", printColorAdjust: "exact",
+            }}
+          >
+            <Typography sx={{ fontSize: 8, fontWeight: 800, letterSpacing: ".08em", color: "#10265c" }}>
+              SELLO DE VERIFICACIÓN
+            </Typography>
+            <Box
+              sx={{
+                mt: 0.5, p: 0.75, border: "2px solid #10265c", borderRadius: "50%",
+                display: "grid", placeItems: "center", transform: "rotate(-4deg)",
+              }}
+            >
+              <Box component="img" src={qrDataUrl} alt="QR de verificación en línea" sx={{ width: 78, height: 78, display: "block" }} />
             </Box>
+            <Typography sx={{ fontSize: 7.5, color: "#555", mt: 0.6, lineHeight: 1.25 }}>
+              Escanea para comprobar la autenticidad de este certificado en línea.
+            </Typography>
           </Box>
-        ))}
+        )}
       </Box>
 
       <Typography sx={{ fontSize: 9.5, color: "#888", mt: 2, textAlign: "center" }}>
-        {cert.folio} · emitido {formatDate(cert.fechaEmision)} · nivel de confianza {cert.puntos?.[0]?.nivelConfianza || "95,45 %"} ·
-        método GUM (JCGM 100:2008) — cálculo determinístico. Verificable en línea con el QR del certificado.
+        {cert.folio} · emitido {formatDate(cert.fechaEmision)} · nivel de confianza {cert.puntos?.[0]?.nivelConfianza || "95,45 %"} ·{" "}
+        {cert.laboratorio?.notaCertificado ||
+          "método GUM (JCGM 100:2008) — cálculo determinístico. Verificable en línea con el QR del certificado."}
       </Typography>
+
+      </Box>
     </Box>
   );
 }

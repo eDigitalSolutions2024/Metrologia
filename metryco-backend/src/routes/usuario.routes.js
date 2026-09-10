@@ -4,6 +4,7 @@ const requireRole = require("../middleware/requireRole");
 const validate = require("../middleware/validate");
 const auditar = require("../middleware/auditar");
 const { crearUsuarioSchema, actualizarUsuarioSchema } = require("../schemas/usuario.schema");
+const { firma } = require("../middleware/upload");
 const usuarioController = require("../controllers/usuario.controller");
 
 const router = Router();
@@ -21,5 +22,7 @@ router.patch("/:id/reactivar", auditar("usuario_reactivado", "Usuario"), usuario
 router.delete("/:id/permanente", auditar("usuario_eliminado", "Usuario"), usuarioController.eliminar);
 router.post("/:id/observaciones", usuarioController.agregarObservacion);
 router.delete("/:id/observaciones/:obsId", usuarioController.eliminarObservacion);
+router.post("/:id/firma", firma, usuarioController.subirFirma);
+router.delete("/:id/firma", usuarioController.eliminarFirma);
 
 module.exports = router;

@@ -8,10 +8,12 @@ import PersonAddAltOutlinedIcon from "@mui/icons-material/PersonAddAltOutlined";
 import RefreshIcon from "@mui/icons-material/Refresh";
 import ContentCopyIcon from "@mui/icons-material/ContentCopy";
 import VpnKeyOutlinedIcon from "@mui/icons-material/VpnKeyOutlined";
+import DrawOutlinedIcon from "@mui/icons-material/DrawOutlined";
+import { Button } from "@mui/material";
 import { useForm } from "react-hook-form";
 import AppInput from "../AppInput";
 import AppButton from "../AppButton";
-import { crearUsuario } from "../../../services/usuarios";
+import { crearUsuario, subirFirmaUsuario } from "../../../services/usuarios";
 import { generarPasswordSegura } from "../../utils/generarPassword";
 
 // "Juan Pérez" -> "juanp" (nombre completo + inicial del/los apellidos),
@@ -54,6 +56,7 @@ export default function NuevoUsuario({ open, onClose, onCreated }) {
   const [submitError, setSubmitError] = useState("");
   const [copiado, setCopiado] = useState(false);
   const [usuarioTocado, setUsuarioTocado] = useState(false);
+  const [firmaFile, setFirmaFile] = useState(null);
   const {
     register,
     handleSubmit,
@@ -84,6 +87,7 @@ export default function NuevoUsuario({ open, onClose, onCreated }) {
     setSubmitError("");
     setCopiado(false);
     setUsuarioTocado(false);
+    setFirmaFile(null);
     onClose();
   };
 
@@ -105,8 +109,12 @@ export default function NuevoUsuario({ open, onClose, onCreated }) {
   const onSubmit = async (data) => {
     setSubmitError("");
     try {
-      await crearUsuario(data);
+      const creado = await crearUsuario(data);
+      if (firmaFile && creado?.id) {
+        try { await subirFirmaUsuario(creado.id, firmaFile); } catch { /* se puede subir luego en Editar */ }
+      }
       reset({ password: generarPasswordSegura() });
+      setFirmaFile(null);
       onCreated?.();
       onClose();
     } catch (err) {
@@ -257,6 +265,26 @@ export default function NuevoUsuario({ open, onClose, onCreated }) {
           </Box>
           <Typography variant="caption" color="text.secondary" sx={{ display: "block", mt: 1 }}>
             Cópiala y compártela con el usuario. Podrá cambiarla después.
+          </Typography>
+
+          <Divider sx={{ my: 2.5 }} />
+
+          <SeccionTitulo>Firma digital (opcional)</SeccionTitulo>
+          <Box sx={{ display: "flex", alignItems: "center", gap: 2, flexWrap: "wrap" }}>
+            <Box sx={{ width: 160, height: 60, border: "1px dashed", borderColor: "divider", borderRadius: 2, display: "grid", placeItems: "center", bgcolor: "background.default", overflow: "hidden" }}>
+              {firmaFile
+                ? <Box component="img" src={URL.createObjectURL(firmaFile)} alt="Firma" sx={{ maxWidth: "90%", maxHeight: "80%", objectFit: "contain" }} />
+                : <DrawOutlinedIcon color="disabled" />}
+            </Box>
+            <Button component="label" size="small" variant="outlined" sx={{ borderRadius: 2 }}>
+              {firmaFile ? "Cambiar" : "Subir firma"}
+              <input type="file" accept="image/png,image/jpeg,image/svg+xml,image/webp" hidden
+                onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ""; if (f) setFirmaFile(f); }} />
+            </Button>
+            {firmaFile && <Button size="small" color="error" onClick={() => setFirmaFile(null)} sx={{ borderRadius: 2 }}>Quitar</Button>}
+          </Box>
+          <Typography variant="caption" color="text.secondary" sx={{ display: "block", mt: 1 }}>
+            Aparece en los certificados que el usuario elabore, revise o autorice. Se puede subir después desde Editar.
           </Typography>
         </DialogContent>
 

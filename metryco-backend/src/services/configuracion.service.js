@@ -25,14 +25,33 @@ async function actualizarMenuPermisos(permisos) {
 
 // Mientras nadie haya guardado nada desde Administración, se usan los valores
 // del .env (LAB_*) como default — así la migración no pierde lo ya configurado.
+const NOTA_CERT_DEFAULT =
+  "método GUM (JCGM 100:2008) — cálculo determinístico. Verificable en línea con el QR del certificado.";
+
+function remarksPorDefecto(nombreLab) {
+  const n = nombreLab || "the laboratory";
+  return (
+    "The instrument(s) listed in this certification have been calibrated against standards traceable to " +
+    "N.I.S.T. (National Institute of Standards and Technology) derived from ratio type measurements, or compared " +
+    "to national or internationally recognized consensus standards. A calibration uncertainty ratio of 4:1 was " +
+    "maintained and a K=2 coverage factor with a confidence level of 95%, unless otherwise stated. " +
+    `${n} quality system complies with applicable requirements of ISO/IEC 17025:2017. All results contained ` +
+    "within this certification relate only to item(s) calibrated. This calibration report shall not be reproduced " +
+    `except in full and with the written consent of ${n}. Decision rule: Simple acceptance / Shared risk.`
+  );
+}
+
 async function obtenerLaboratorio() {
   const cfg = await obtenerDoc();
+  const nombre = cfg.laboratorio?.nombre || laboratorioEnv.nombre;
   return {
-    nombre: cfg.laboratorio?.nombre || laboratorioEnv.nombre,
+    nombre,
     acreditacion: cfg.laboratorio?.acreditacion || laboratorioEnv.acreditacion,
     rfc: cfg.laboratorio?.rfc || laboratorioEnv.rfc,
     domicilio: cfg.laboratorio?.domicilio || laboratorioEnv.domicilio,
     telefono: cfg.laboratorio?.telefono || laboratorioEnv.telefono,
+    remarks: cfg.laboratorio?.remarks || remarksPorDefecto(nombre),
+    notaCertificado: cfg.laboratorio?.notaCertificado || NOTA_CERT_DEFAULT,
   };
 }
 
@@ -44,9 +63,11 @@ async function actualizarLaboratorio(datos) {
     rfc: datos?.rfc || "",
     domicilio: datos?.domicilio || "",
     telefono: datos?.telefono || "",
+    remarks: datos?.remarks?.trim() || "",
+    notaCertificado: datos?.notaCertificado?.trim() || "",
   };
   await cfg.save();
-  return cfg.laboratorio;
+  return obtenerLaboratorio();
 }
 
 async function obtenerLogo() {

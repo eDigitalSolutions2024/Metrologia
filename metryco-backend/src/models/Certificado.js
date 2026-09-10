@@ -69,7 +69,7 @@ const certificadoSchema = new Schema(
       },
     ],
 
-    laboratorio: { nombre: String, acreditacion: String },
+    laboratorio: { nombre: String, acreditacion: String, remarks: String, notaCertificado: String },
 
     fechaCalibracion: { type: Date, required: true },
     fechaEmision: { type: Date, default: Date.now },

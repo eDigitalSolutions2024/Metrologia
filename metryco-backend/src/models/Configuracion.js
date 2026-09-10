@@ -23,6 +23,13 @@ const configuracionSchema = new Schema(
       rfc: String,
       domicilio: String,
       telefono: String,
+      // Texto del bloque "Remarks" del certificado (declaración de
+      // trazabilidad / ISO 17025 / regla de decisión). Editable sin tocar el
+      // código; si está vacío se usa el texto por defecto.
+      remarks: String,
+      // Cola de la línea al pie del certificado (después de folio · fecha ·
+      // nivel de confianza). Por defecto: "método GUM (JCGM 100:2008) — …".
+      notaCertificado: String,
     },
 
     // Logo de la empresa — reemplaza el ícono genérico (BrandMark SVG) en

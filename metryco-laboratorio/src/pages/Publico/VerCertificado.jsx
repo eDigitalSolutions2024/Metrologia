@@ -31,6 +31,13 @@ function Mark({ size = 34 }) {
   );
 }
 
+// Redondea sin arrastrar la cola de flotante ("25.014000000000003" -> "25.014").
+function fmtNum(v, dec = 4) {
+  const n = Number(v);
+  if (!Number.isFinite(n)) return v ?? "—";
+  return String(Number(n.toFixed(dec)));
+}
+
 function Campo({ label, children }) {
   if (children == null || children === "" || (Array.isArray(children) && !children.length)) return null;
   return (
@@ -189,9 +196,9 @@ function Contenido({ cert, token }) {
                 <TableBody>
                   {cert.puntos.map((p, i) => (
                     <TableRow key={i}>
-                      <TableCell>{p.puntoNominal} {p.unidad}</TableCell>
-                      <TableCell><b>{p.valorMedido}</b> {p.unidad}</TableCell>
-                      <TableCell>± {p.incertidumbreExpandida} {p.unidad}</TableCell>
+                      <TableCell>{fmtNum(p.puntoNominal)} {p.unidad}</TableCell>
+                      <TableCell><b>{fmtNum(p.valorMedido, 4)}</b> {p.unidad}</TableCell>
+                      <TableCell>± {fmtNum(p.incertidumbreExpandida, 5)} {p.unidad}</TableCell>
                       <TableCell>{p.nivelConfianza}</TableCell>
                     </TableRow>
                   ))}
@@ -208,7 +215,7 @@ function Contenido({ cert, token }) {
               Resultado
             </Typography>
             <Typography sx={{ fontWeight: 800, fontSize: 22, mt: 0.5 }}>
-              {cert.resultado.valorMedido} ± {cert.resultado.incertidumbreExpandida} {cert.resultado.unidad}
+              {fmtNum(cert.resultado.valorMedido, 4)} ± {fmtNum(cert.resultado.incertidumbreExpandida, 5)} {cert.resultado.unidad}
             </Typography>
             <Typography variant="body2" color="text.secondary">
               k = {cert.resultado.k} · nivel de confianza {cert.resultado.nivelConfianza}

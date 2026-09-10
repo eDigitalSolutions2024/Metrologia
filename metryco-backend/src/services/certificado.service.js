@@ -297,7 +297,10 @@ async function emitir(datos, reqUser) {
           ? `según certificado (tabla, k=${p.incertidumbre.k || 2})`
           : undefined,
     })),
-    laboratorio: { nombre: laboratorioActual.nombre, acreditacion: laboratorioActual.acreditacion },
+    laboratorio: {
+      nombre: laboratorioActual.nombre, acreditacion: laboratorioActual.acreditacion,
+      remarks: laboratorioActual.remarks, notaCertificado: laboratorioActual.notaCertificado,
+    },
     fechaCalibracion,
     fechaEmision: datos.fechaEmision || new Date(),
     vigencia: datos.vigencia || undefined,
@@ -402,7 +405,10 @@ async function previsualizar(asignacionId) {
           ? `${p.incertidumbre.valor} ${p.incertidumbre.unidad || p.unidad || ""} (k=${p.incertidumbre.k || 2})`
           : p.incertidumbre?.modo === "tabla" ? `según certificado (tabla, k=${p.incertidumbre.k || 2})` : undefined,
     })),
-    laboratorio: { nombre: laboratorioActual.nombre, acreditacion: laboratorioActual.acreditacion },
+    laboratorio: {
+      nombre: laboratorioActual.nombre, acreditacion: laboratorioActual.acreditacion,
+      remarks: laboratorioActual.remarks, notaCertificado: laboratorioActual.notaCertificado,
+    },
     fechaCalibracion: asig.fechaCalibracion,
     fechaEmision: new Date(),
     puntos,

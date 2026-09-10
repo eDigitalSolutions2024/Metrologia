@@ -21,7 +21,24 @@ const CAMPOS = [
   { key: "telefono", label: "Teléfono", placeholder: "Ej. 656-123-4567", md: 6 },
 ];
 
-const VACIO = { nombre: "", acreditacion: "", rfc: "", domicilio: "", telefono: "" };
+const CAMPOS_CERT = [
+  {
+    key: "remarks",
+    label: "Remarks del certificado",
+    placeholder: "Declaración de trazabilidad, cumplimiento ISO/IEC 17025, regla de decisión…",
+    rows: 7,
+    ayuda: "Bloque «Remarks» del certificado. Si lo dejas vacío se usa el texto por defecto en inglés.",
+  },
+  {
+    key: "notaCertificado",
+    label: "Nota al pie del certificado",
+    placeholder: "método GUM (JCGM 100:2008) — cálculo determinístico. Verificable en línea con el QR del certificado.",
+    rows: 2,
+    ayuda: "Va al final de la línea gris del pie, después de «folio · emitido · nivel de confianza ·».",
+  },
+];
+
+const VACIO = { nombre: "", acreditacion: "", rfc: "", domicilio: "", telefono: "", remarks: "", notaCertificado: "" };
 
 function LogoCard({ setError }) {
   const [logo, setLogo] = useState(null);
@@ -158,6 +175,23 @@ export default function LaboratorioPage() {
           </Grid>
         )}
       </Paper>
+
+      {!loading && (
+        <Paper variant="outlined" sx={{ p: 3, borderRadius: "12px", maxWidth: 720, mt: 2.5 }}>
+          <Typography variant="subtitle2" fontWeight={700} sx={{ mb: 2 }}>Textos del certificado de calibración</Typography>
+          <Grid container spacing={2.5}>
+            {CAMPOS_CERT.map((c) => (
+              <Grid key={c.key} size={{ xs: 12 }}>
+                <TextField
+                  fullWidth size="small" label={c.label} placeholder={c.placeholder}
+                  multiline minRows={c.rows} helperText={c.ayuda}
+                  value={datos[c.key] || ""} onChange={(e) => cambiar(c.key, e.target.value)}
+                />
+              </Grid>
+            ))}
+          </Grid>
+        </Paper>
+      )}
     </Box>
   );
 }
