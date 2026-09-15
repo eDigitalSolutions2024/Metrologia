@@ -23,6 +23,7 @@ export const ENDPOINTS = {
   CALIDAD: "/calidad",
   ACTIVIDADES: "/actividades",
   COBRANZA: "/cobranza",
+  CFDI: "/cfdi",
   USUARIOS: "/usuarios",
   CONFIGURACION: "/configuracion",
   ALERTAS: "/alertas",

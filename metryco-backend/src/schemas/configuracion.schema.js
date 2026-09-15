@@ -8,6 +8,9 @@ const actualizarLaboratorioSchema = z.object({
   telefono: z.string().trim().optional(),
   remarks: z.string().trim().max(4000).optional(),
   notaCertificado: z.string().trim().max(1000).optional(),
+  regimenFiscal: z.string().trim().optional(),
+  codigoPostalFiscal: z.string().trim().optional(),
+  serieCFDI: z.string().trim().optional(),
 });
 
 const hexColor = z.string().trim().regex(/^#[0-9A-Fa-f]{6}$/, "Debe ser un color hexadecimal válido (#RRGGBB)");

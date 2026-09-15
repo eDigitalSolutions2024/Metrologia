@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   Box, Typography, TextField, InputAdornment, IconButton, Tooltip, Chip,
-  MenuItem, Select, FormControl, InputLabel, Grid,
+  MenuItem, Select, FormControl, InputLabel, Grid, Tabs, Tab, Paper,
   Dialog, DialogTitle, DialogContent, DialogActions, Button, Alert,
 } from "@mui/material";
 import { useTheme } from "@mui/material/styles";
@@ -25,11 +25,14 @@ import { useAuth } from "../../core/auth/useAuth";
 import { listarClientes } from "../../services/clientes";
 import {
   listarCertificados, emitirCertificado, cambiarEstadoCertificado, anularCertificado,
+  listarCertificadosPorVencer,
 } from "../../services/certificados";
 import { listarAsignaciones } from "../../services/reportes";
 import { obtenerDirectorio } from "../../services/usuarios";
 import QrDialog from "./QrDialog";
 import EtiquetaDialog from "./EtiquetaDialog";
+import EditarCertificadoDialog from "./EditarCertificadoDialog";
+import EditOutlinedIcon from "@mui/icons-material/EditOutlined";
 
 const ESTADO_CHIP = {
   vigente:    { label: "Vigente",     color: "success" },
@@ -58,6 +61,13 @@ export default function CertificadosPage() {
   const [etiquetaCert, setEtiquetaCert] = useState(null);
   const [emitirOpen, setEmitirOpen] = useState(false);
   const [anularCert, setAnularCert] = useState(null);
+  const [editarCertId, setEditarCertId] = useState(null);
+
+  const [tab, setTab] = useState(0); // 0 = listado, 1 = por vencer
+  const [vencClienteId, setVencClienteId] = useState("");
+  const [vencEstado, setVencEstado] = useState("");
+  const [vencRows, setVencRows] = useState([]);
+  const [vencLoading, setVencLoading] = useState(false);
 
   const cargar = useCallback(() => {
     setLoading(true);
@@ -68,6 +78,16 @@ export default function CertificadosPage() {
   }, [search, estado, clienteId, page, rowsPerPage]);
 
   useEffect(() => { cargar(); }, [cargar]);
+
+  const cargarPorVencer = useCallback(() => {
+    setVencLoading(true);
+    listarCertificadosPorVencer({ clienteId: vencClienteId, estado: vencEstado })
+      .then(setVencRows)
+      .catch(() => setVencRows([]))
+      .finally(() => setVencLoading(false));
+  }, [vencClienteId, vencEstado]);
+
+  useEffect(() => { if (tab === 1) cargarPorVencer(); }, [tab, cargarPorVencer]);
   useEffect(() => {
     listarClientes({ pageSize: 200 }).then(({ items }) => setClientes(items)).catch(() => {});
   }, []);
@@ -134,10 +154,63 @@ export default function CertificadosPage() {
               <LabelOutlinedIcon fontSize="small" sx={{ color: "secondary.main" }} />
             </IconButton>
           </Tooltip>
+          {esAdmin && r.estado === "vigente" && (
+            <Tooltip title="Editar certificado (servicio, condiciones, comentarios)">
+              <IconButton size="small" onClick={() => setEditarCertId(r._id)}>
+                <EditOutlinedIcon fontSize="small" sx={{ color: "secondary.main" }} />
+              </IconButton>
+            </Tooltip>
+          )}
           {esAdmin && r.estado !== "anulado" && (
             <Tooltip title="Anular">
               <IconButton size="small" onClick={() => setAnularCert(r)}>
                 <BlockOutlinedIcon fontSize="small" sx={{ color: "text.secondary" }} />
+              </IconButton>
+            </Tooltip>
+          )}
+        </Box>
+      ),
+    },
+  ];
+
+  const vencColumns = [
+    {
+      field: "folio",
+      headerName: "Certificado",
+      renderCell: (r) => (
+        <Box>
+          <Typography variant="body2" fontWeight={700}>{r.folio}</Typography>
+          <Typography variant="caption" color="text.secondary">
+            {r.equipoSnapshot?.idInterno} · {r.equipoSnapshot?.descripcion}
+          </Typography>
+        </Box>
+      ),
+    },
+    { field: "cliente", headerName: "Cliente", renderCell: (r) => r.clienteSnapshot?.nombre || r.cliente?.nombre || "—" },
+    { field: "vigencia", headerName: "Vigencia", renderCell: (r) => formatDate(r.vigencia) },
+    {
+      field: "estado",
+      headerName: "Estado",
+      renderCell: (r) => {
+        const s = ESTADO_CHIP[r.estadoEfectivo] || { label: r.estadoEfectivo, color: "default" };
+        return <Chip size="small" label={s.label} color={s.color} />;
+      },
+    },
+    {
+      field: "acciones",
+      headerName: "Acciones",
+      align: "center",
+      renderCell: (r) => (
+        <Box sx={{ display: "flex", gap: 0.25, justifyContent: "center" }}>
+          <Tooltip title="Informe de calibración (PDF)">
+            <IconButton size="small" onClick={() => window.open(`/informe/certificado/${r._id}`, "_blank")}>
+              <ArticleOutlinedIcon fontSize="small" sx={{ color: "secondary.main" }} />
+            </IconButton>
+          </Tooltip>
+          {esAdmin && (
+            <Tooltip title="Editar certificado (servicio, condiciones, comentarios)">
+              <IconButton size="small" onClick={() => setEditarCertId(r._id)}>
+                <EditOutlinedIcon fontSize="small" sx={{ color: "secondary.main" }} />
               </IconButton>
             </Tooltip>
           )}
@@ -167,49 +240,102 @@ export default function CertificadosPage() {
         ))}
       </Grid>
 
-      <Box sx={{ display: "flex", gap: 2, mb: 2, flexWrap: "wrap" }}>
-        <TextField
-          placeholder="Buscar por folio, equipo, serie o cliente…"
-          size="small"
-          value={search}
-          onChange={(e) => { setSearch(e.target.value); setPage(0); }}
-          sx={{ width: 340, "& .MuiOutlinedInput-root": { borderRadius: 2 } }}
-          slotProps={{ input: { startAdornment: <InputAdornment position="start"><SearchIcon fontSize="small" sx={{ color: "text.secondary" }} /></InputAdornment> } }}
-        />
-        <FormControl size="small" sx={{ minWidth: 160 }}>
-          <InputLabel>Estado</InputLabel>
-          <Select label="Estado" value={estado} onChange={(e) => { setEstado(e.target.value); setPage(0); }} sx={{ borderRadius: 2 }}>
-            <MenuItem value="">Todos</MenuItem>
-            <MenuItem value="borrador">Borrador</MenuItem>
-            <MenuItem value="vigente">Vigente</MenuItem>
-            <MenuItem value="anulado">Anulado</MenuItem>
-          </Select>
-        </FormControl>
-        <FormControl size="small" sx={{ minWidth: 220 }}>
-          <InputLabel>Cliente</InputLabel>
-          <Select label="Cliente" value={clienteId} onChange={(e) => { setClienteId(e.target.value); setPage(0); }} sx={{ borderRadius: 2 }}>
-            <MenuItem value="">Todos</MenuItem>
-            {clientes.map((c) => <MenuItem key={c._id} value={c._id}>{c.nombre}</MenuItem>)}
-          </Select>
-        </FormControl>
-      </Box>
+      <Paper variant="outlined" sx={{ borderRadius: 2, mb: 2.5 }}>
+        <Tabs value={tab} onChange={(_, v) => setTab(v)} sx={{ px: 1.5, borderBottom: 1, borderColor: "divider" }}>
+          <Tab label="Todos los certificados" />
+          <Tab label="Por vencer" />
+        </Tabs>
+      </Paper>
 
-      <AppTable
-        columns={columns}
-        rows={rows}
-        loading={loading}
-        totalCount={total}
-        page={page}
-        rowsPerPage={rowsPerPage}
-        onPageChange={setPage}
-        onRowsPerPageChange={(n) => { setRowsPerPage(n); setPage(0); }}
-        emptyText="Sin certificados"
-      />
+      {tab === 0 ? (
+        <>
+          <Box sx={{ display: "flex", gap: 2, mb: 2, flexWrap: "wrap" }}>
+            <TextField
+              placeholder="Buscar por folio, equipo, serie o cliente…"
+              size="small"
+              value={search}
+              onChange={(e) => { setSearch(e.target.value); setPage(0); }}
+              sx={{ width: 340, "& .MuiOutlinedInput-root": { borderRadius: 2 } }}
+              slotProps={{ input: { startAdornment: <InputAdornment position="start"><SearchIcon fontSize="small" sx={{ color: "text.secondary" }} /></InputAdornment> } }}
+            />
+            <FormControl size="small" sx={{ minWidth: 160 }}>
+              <InputLabel>Estado</InputLabel>
+              <Select label="Estado" value={estado} onChange={(e) => { setEstado(e.target.value); setPage(0); }} sx={{ borderRadius: 2 }}>
+                <MenuItem value="">Todos</MenuItem>
+                <MenuItem value="borrador">Borrador</MenuItem>
+                <MenuItem value="vigente">Vigente</MenuItem>
+                <MenuItem value="anulado">Anulado</MenuItem>
+              </Select>
+            </FormControl>
+            <FormControl size="small" sx={{ minWidth: 220 }}>
+              <InputLabel>Cliente</InputLabel>
+              <Select label="Cliente" value={clienteId} onChange={(e) => { setClienteId(e.target.value); setPage(0); }} sx={{ borderRadius: 2 }}>
+                <MenuItem value="">Todos</MenuItem>
+                {clientes.map((c) => <MenuItem key={c._id} value={c._id}>{c.nombre}</MenuItem>)}
+              </Select>
+            </FormControl>
+          </Box>
+
+          <AppTable
+            columns={columns}
+            rows={rows}
+            loading={loading}
+            totalCount={total}
+            page={page}
+            rowsPerPage={rowsPerPage}
+            onPageChange={setPage}
+            onRowsPerPageChange={(n) => { setRowsPerPage(n); setPage(0); }}
+            emptyText="Sin certificados"
+          />
+        </>
+      ) : (
+        <>
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+            Certificados vigentes cuya vigencia ya venció o vence dentro de los próximos 30 días.
+          </Typography>
+          <Box sx={{ display: "flex", gap: 2, mb: 2, flexWrap: "wrap" }}>
+            <FormControl size="small" sx={{ minWidth: 220 }}>
+              <InputLabel>Cliente</InputLabel>
+              <Select label="Cliente" value={vencClienteId} onChange={(e) => setVencClienteId(e.target.value)} sx={{ borderRadius: 2 }}>
+                <MenuItem value="">Todos</MenuItem>
+                {clientes.map((c) => <MenuItem key={c._id} value={c._id}>{c.nombre}</MenuItem>)}
+              </Select>
+            </FormControl>
+            <FormControl size="small" sx={{ minWidth: 160 }}>
+              <InputLabel>Estado</InputLabel>
+              <Select label="Estado" value={vencEstado} onChange={(e) => setVencEstado(e.target.value)} sx={{ borderRadius: 2 }}>
+                <MenuItem value="">Todos (vencidos + por vencer)</MenuItem>
+                <MenuItem value="por_vencer">Solo por vencer</MenuItem>
+                <MenuItem value="vencido">Solo vencidos</MenuItem>
+              </Select>
+            </FormControl>
+          </Box>
+
+          <AppTable
+            columns={vencColumns}
+            rows={vencRows}
+            loading={vencLoading}
+            totalCount={vencRows.length}
+            page={0}
+            rowsPerPage={vencRows.length || 10}
+            onPageChange={() => {}}
+            onRowsPerPageChange={() => {}}
+            emptyText="Sin certificados por vencer"
+          />
+        </>
+      )}
 
       <QrDialog open={!!qrCert} onClose={() => setQrCert(null)} certificado={qrCert} />
       <EtiquetaDialog open={!!etiquetaCert} onClose={() => setEtiquetaCert(null)} certificado={etiquetaCert} />
       <EmitirDialog open={emitirOpen} onClose={() => setEmitirOpen(false)} onDone={() => { setEmitirOpen(false); cargar(); }} />
       <AnularDialog cert={anularCert} onClose={() => setAnularCert(null)} onDone={() => { setAnularCert(null); cargar(); }} />
+      {editarCertId && (
+        <EditarCertificadoDialog
+          certificadoId={editarCertId}
+          onClose={() => setEditarCertId(null)}
+          onDone={() => { setEditarCertId(null); cargar(); if (tab === 1) cargarPorVencer(); }}
+        />
+      )}
     </Box>
   );
 }

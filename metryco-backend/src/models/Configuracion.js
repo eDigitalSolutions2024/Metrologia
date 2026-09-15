@@ -23,6 +23,15 @@ const configuracionSchema = new Schema(
       rfc: String,
       domicilio: String,
       telefono: String,
+      // Datos fiscales del EMISOR para CFDI 4.0 — se piden aparte de `rfc`
+      // porque un CFDI real también exige régimen fiscal y el código postal
+      // exacto del lugar de expedición (no siempre es el mismo texto que
+      // `domicilio`, que es de formato libre para los PDFs). Mientras no se
+      // configuren, no se puede generar ni un borrador de CFDI válido — ver
+      // cfdi.service.js `obtenerEmisorFiscal`.
+      regimenFiscal: String, // catálogo SAT c_RegimenFiscal, ej. "601"
+      codigoPostalFiscal: String, // lugar de expedición
+      serieCFDI: String, // opcional, serie con la que se timbra (ej. "A")
       // Texto del bloque "Remarks" del certificado (declaración de
       // trazabilidad / ISO 17025 / regla de decisión). Editable sin tocar el
       // código; si está vacío se usa el texto por defecto.

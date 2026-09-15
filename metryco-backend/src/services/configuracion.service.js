@@ -52,6 +52,9 @@ async function obtenerLaboratorio() {
     telefono: cfg.laboratorio?.telefono || laboratorioEnv.telefono,
     remarks: cfg.laboratorio?.remarks || remarksPorDefecto(nombre),
     notaCertificado: cfg.laboratorio?.notaCertificado || NOTA_CERT_DEFAULT,
+    regimenFiscal: cfg.laboratorio?.regimenFiscal || "",
+    codigoPostalFiscal: cfg.laboratorio?.codigoPostalFiscal || "",
+    serieCFDI: cfg.laboratorio?.serieCFDI || "",
   };
 }
 
@@ -65,6 +68,9 @@ async function actualizarLaboratorio(datos) {
     telefono: datos?.telefono || "",
     remarks: datos?.remarks?.trim() || "",
     notaCertificado: datos?.notaCertificado?.trim() || "",
+    regimenFiscal: datos?.regimenFiscal?.trim() || "",
+    codigoPostalFiscal: datos?.codigoPostalFiscal?.trim() || "",
+    serieCFDI: datos?.serieCFDI?.trim() || "",
   };
   await cfg.save();
   return obtenerLaboratorio();

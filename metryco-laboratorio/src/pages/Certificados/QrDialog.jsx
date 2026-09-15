@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   Dialog, DialogTitle, DialogContent, DialogActions, Box, Typography,
   IconButton, Tooltip, Button, CircularProgress, TextField, InputAdornment,
@@ -6,6 +6,7 @@ import {
 import ContentCopyOutlinedIcon from "@mui/icons-material/ContentCopyOutlined";
 import DownloadOutlinedIcon from "@mui/icons-material/DownloadOutlined";
 import CheckOutlinedIcon from "@mui/icons-material/CheckOutlined";
+import PrintOutlinedIcon from "@mui/icons-material/PrintOutlined";
 import { fetchQrBlob } from "../../services/certificados";
 
 function descargar(blob, nombre) {
@@ -22,6 +23,7 @@ export default function QrDialog({ open, onClose, certificado }) {
   const [pngBlob, setPngBlob] = useState(null);
   const [cargando, setCargando] = useState(true);
   const [copiado, setCopiado] = useState(false);
+  const iframeRef = useRef(null);
 
   const urlPublica = certificado?.urlPublica || "";
 
@@ -43,6 +45,28 @@ export default function QrDialog({ open, onClose, certificado }) {
     navigator.clipboard?.writeText(urlPublica);
     setCopiado(true);
     setTimeout(() => setCopiado(false), 1500);
+  };
+
+  // Igual que Etiqueta: abre el diálogo nativo de impresión del navegador
+  // (ya preselecciona la impresora predeterminada del sistema) sobre una
+  // página aparte con solo el QR, para no imprimir el resto de la pantalla.
+  const imprimir = () => {
+    if (!pngUrl) return;
+    const doc = `<!doctype html><html><head><meta charset="utf-8"><style>
+      @page { margin: 12mm; }
+      html,body { margin:0; padding:0; display:flex; align-items:center; justify-content:center; height:100%; }
+      img { width: 70mm; height: 70mm; }
+    </style></head><body><img src="${pngUrl}" /></body></html>`;
+    const iframe = iframeRef.current;
+    iframe.srcdoc = doc;
+    iframe.onload = () => {
+      try {
+        iframe.contentWindow.focus();
+        iframe.contentWindow.print();
+      } catch {
+        /* noop */
+      }
+    };
   };
 
   return (
@@ -90,8 +114,17 @@ export default function QrDialog({ open, onClose, certificado }) {
           }}
           sx={{ "& .MuiOutlinedInput-root": { borderRadius: 2, fontSize: 12.5 } }}
         />
+
+        <iframe ref={iframeRef} title="print" style={{ display: "none" }} />
       </DialogContent>
       <DialogActions sx={{ px: 3, pb: 2, gap: 1 }}>
+        <Button
+          startIcon={<PrintOutlinedIcon />}
+          disabled={!pngUrl}
+          onClick={imprimir}
+        >
+          Imprimir
+        </Button>
         <Button
           startIcon={<DownloadOutlinedIcon />}
           disabled={!pngBlob}

@@ -39,6 +39,7 @@ import { aprobarCalculosPorAsignacion } from "../../services/incertidumbre";
 import { direccionCliente } from "./imprimir/shared";
 import { useAuth } from "../../core/auth/useAuth";
 import CapturarCalibracionDialog from "./CapturarCalibracionDialog";
+import EditarCertificadoDialog from "../Certificados/EditarCertificadoDialog";
 
 const EST_ENTREGA = { pendiente: "Pendiente", entregado: "Entregado" };
 const STATUS_REPORTE = {
@@ -135,6 +136,7 @@ export default function ReporteDetallePage() {
   const [eliminarTarget, setEliminarTarget] = useState(null);
   const [eliminando, setEliminando] = useState(false);
   const [emitirTarget, setEmitirTarget] = useState(null);
+  const [editarCertTarget, setEditarCertTarget] = useState(null);
   const [contactoDialog, setContactoDialog] = useState(false);
   const [cotizacionDialog, setCotizacionDialog] = useState(false);
 
@@ -637,6 +639,19 @@ export default function ReporteDetallePage() {
                   </AppButton>
                 )}
 
+                {/* Solo Admin/Coordinador, y solo una vez autorizado — se
+                    valida igual en el backend. Únicamente texto/formato
+                    (servicio, condiciones, comentarios), no resultados. */}
+                {puedeCertificado && a.estados?.certificado === "autorizado" && certificadoPorAsignacion[a._id] && (
+                  <AppButton
+                    type="button" variant="outlined" size="small" startIcon={<EditOutlinedIcon />}
+                    onClick={() => setEditarCertTarget(certificadoPorAsignacion[a._id])}
+                    sx={{ borderRadius: 2, height: 40 }}
+                  >
+                    Editar certificado
+                  </AppButton>
+                )}
+
                 {/* Calidad: revisar el certificado emitido → aprobarlo (vigente) */}
                 {puedeCertificado && a.estados?.certificado === "en_revision" && certificadoPorAsignacion[a._id] && (
                   <AppButton
@@ -754,6 +769,14 @@ export default function ReporteDetallePage() {
         onClose={() => setEmitirTarget(null)}
         onDone={() => { setEmitirTarget(null); cargar(); }}
       />
+
+      {editarCertTarget && (
+        <EditarCertificadoDialog
+          certificadoId={editarCertTarget}
+          onClose={() => setEditarCertTarget(null)}
+          onDone={() => { setEditarCertTarget(null); cargar(); }}
+        />
+      )}
 
       <AsignarContactoDialog
         open={contactoDialog}

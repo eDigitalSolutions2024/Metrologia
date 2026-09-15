@@ -22,6 +22,7 @@ es admin-only, para que nadie pueda bloquearse a sí mismo el acceso.
 ========================================================
 */
 import SpaceDashboardOutlinedIcon from "@mui/icons-material/SpaceDashboardOutlined";
+import ReceiptLongOutlinedIcon from "@mui/icons-material/ReceiptLongOutlined";
 import FactCheckOutlinedIcon from "@mui/icons-material/FactCheckOutlined";
 import ScienceOutlinedIcon from "@mui/icons-material/ScienceOutlined";
 import PrecisionManufacturingOutlinedIcon from "@mui/icons-material/PrecisionManufacturingOutlined";
@@ -121,6 +122,10 @@ const menu = [
           { title: "Consultar Calendario", path: "/cobranza/calendario", roles: ADMIN_COORD_VENTAS },
         ],
       },
+      // Distinto de "Cuentas por Cobrar": ahí se controla el cobro, aquí se
+      // genera el comprobante fiscal (CFDI) formal. Requiere un PAC
+      // configurado para timbrar de verdad (ver services/pac/pac.config.js).
+      { title: "Facturación (CFDI)", icon: ReceiptLongOutlinedIcon, path: "/facturacion", roles: ADMIN_COORD },
     ],
   },
   {

@@ -63,6 +63,41 @@ async function listar({ search = "", clienteId = "", estado = "", page = 0, page
 }
 
 /**
+ * Certificados vigentes cuya vigencia ya venció o está por vencer dentro de
+ * `dias` (default 30, mismo umbral que `estadoCalculado`). Trae ambos casos
+ * en una sola consulta por fecha (vencido = vigencia ya pasada, por_vencer =
+ * dentro de la ventana) y permite filtrar por cliente y sub-filtrar por
+ * estado efectivo. Excluye anulados y borradores — esos no están "vigentes"
+ * para empezar, así que no aplica hablar de que "vencen".
+ *
+ * Distinta de `porVencer(dias)` (más abajo) que usa el motor de alertas
+ * internamente: aquella solo trae próximos a vencer sin filtro de cliente,
+ * esta es la vista completa (vencidos + por vencer) para la pantalla
+ * "Certificados por vencer".
+ */
+async function listarPorVencer({ clienteId = "", estado = "", dias = 30 } = {}) {
+  const limite = new Date();
+  limite.setDate(limite.getDate() + Number(dias));
+
+  const match = {
+    estado: "vigente",
+    vigencia: { $exists: true, $ne: null, $lte: limite },
+  };
+  if (clienteId && oid(clienteId)) match.cliente = oid(clienteId);
+
+  let items = await Certificado.find(match)
+    .populate("cliente", "nombre rfc")
+    .sort({ vigencia: 1 })
+    .limit(2000);
+
+  items = items.map(conEstadoVigente);
+  if (estado === "vencido" || estado === "por_vencer") {
+    items = items.filter((c) => c.estadoEfectivo === estado);
+  }
+  return items;
+}
+
+/**
  * Exportación (CSV desde el frontend): sin paginación, con filtros de
  * cliente/mes/año (por `fechaEmision`) y con/sin factura (del Reporte
  * ligado, el Certificado en sí no tiene campo de factura propio).
@@ -418,15 +453,34 @@ async function previsualizar(asignacionId) {
   };
 }
 
+// Fechas/resultado son datos de la calibración en sí — solo se pueden tocar
+// mientras el certificado está en borrador (antes de que Calidad lo autorice).
+// Servicio/condiciones/comentarios son texto/formato y siempre son editables.
+const CAMPOS_TEXTO = ["servicio", "condiciones", "comentarios"];
+const CAMPOS_CALIBRACION = ["fechaCalibracion", "fechaEmision", "vigencia", "resultado"];
+
 async function actualizar(id, datos, reqUser) {
   const cert = await Certificado.findById(id);
   if (!cert) throw new AppError("Certificado no encontrado", 404);
   if (cert.estado === "anulado") throw new AppError("El certificado está anulado", 409);
 
-  for (const campo of [
-    "fechaCalibracion", "fechaEmision", "vigencia", "resultado",
-    "servicio", "condiciones", "comentarios",
-  ]) {
+  const yaAutorizado = cert.estado === "vigente";
+  if (yaAutorizado) {
+    // Una vez autorizado por Calidad, editar es cosa de Coordinador/Admin
+    // (mismo nivel que autoriza/anula), y solo texto/formato — el resultado
+    // de la calibración ya quedó fijado cuando se aprobó; para corregirlo de
+    // verdad se anula y se rehace, no se edita en silencio.
+    if (!["admin", "coordinador"].includes(reqUser?.rol)) {
+      throw new AppError("Solo Admin o Coordinador pueden editar un certificado ya autorizado", 403);
+    }
+    for (const campo of CAMPOS_CALIBRACION) {
+      if (datos[campo] !== undefined) {
+        throw new AppError(`No se puede modificar "${campo}" en un certificado ya autorizado`, 409);
+      }
+    }
+  }
+
+  for (const campo of [...CAMPOS_TEXTO, ...CAMPOS_CALIBRACION]) {
     if (datos[campo] !== undefined) cert[campo] = datos[campo];
   }
   cert.historial.push(await crearEvento(reqUser, "certificado_editado", {}));
@@ -557,6 +611,6 @@ async function archivoStream(id) {
 
 module.exports = {
   listar, obtener, exportar, emitir, actualizar, cambiarEstado, adjuntarPdf,
-  anular, regenerarToken, qrPng, qrSvg, archivoStream, porVencer, porReporte,
+  anular, regenerarToken, qrPng, qrSvg, archivoStream, porVencer, listarPorVencer, porReporte,
   urlPublica, rutaArchivo, previsualizar,
 };

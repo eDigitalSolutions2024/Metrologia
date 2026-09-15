@@ -38,7 +38,16 @@ const CAMPOS_CERT = [
   },
 ];
 
-const VACIO = { nombre: "", acreditacion: "", rfc: "", domicilio: "", telefono: "", remarks: "", notaCertificado: "" };
+const CAMPOS_FISCALES = [
+  { key: "regimenFiscal", label: "Régimen fiscal (SAT)", placeholder: "Ej. 601 - General de Ley Personas Morales", md: 6 },
+  { key: "codigoPostalFiscal", label: "Código postal fiscal (lugar de expedición)", placeholder: "Ej. 32340", md: 3 },
+  { key: "serieCFDI", label: "Serie CFDI (opcional)", placeholder: "Ej. A", md: 3 },
+];
+
+const VACIO = {
+  nombre: "", acreditacion: "", rfc: "", domicilio: "", telefono: "", remarks: "", notaCertificado: "",
+  regimenFiscal: "", codigoPostalFiscal: "", serieCFDI: "",
+};
 
 function LogoCard({ setError }) {
   const [logo, setLogo] = useState(null);
@@ -175,6 +184,26 @@ export default function LaboratorioPage() {
           </Grid>
         )}
       </Paper>
+
+      {!loading && (
+        <Paper variant="outlined" sx={{ p: 3, borderRadius: "12px", maxWidth: 720, mt: 2.5 }}>
+          <Typography variant="subtitle2" fontWeight={700} sx={{ mb: 0.5 }}>Datos fiscales (CFDI)</Typography>
+          <Typography variant="caption" color="text.secondary" sx={{ display: "block", mb: 2 }}>
+            Necesarios para poder generar comprobantes fiscales en Facturación. El RFC se toma del campo
+            "RFC" de arriba.
+          </Typography>
+          <Grid container spacing={2.5}>
+            {CAMPOS_FISCALES.map((c) => (
+              <Grid key={c.key} size={{ xs: 12, md: c.md }}>
+                <TextField
+                  fullWidth size="small" label={c.label} placeholder={c.placeholder}
+                  value={datos[c.key] || ""} onChange={(e) => cambiar(c.key, e.target.value)}
+                />
+              </Grid>
+            ))}
+          </Grid>
+        </Paper>
+      )}
 
       {!loading && (
         <Paper variant="outlined" sx={{ p: 3, borderRadius: "12px", maxWidth: 720, mt: 2.5 }}>
