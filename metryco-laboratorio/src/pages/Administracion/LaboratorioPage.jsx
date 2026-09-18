@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Box, TextField, Alert, Paper, Grid, Typography, Avatar, MenuItem, Select, FormControl, InputLabel } from "@mui/material";
+import { Box, TextField, Alert, Paper, Grid, Typography, Avatar, Autocomplete } from "@mui/material";
 import DomainOutlinedIcon from "@mui/icons-material/DomainOutlined";
 import ImageOutlinedIcon from "@mui/icons-material/ImageOutlined";
 import DeleteOutlineIcon from "@mui/icons-material/DeleteOutlined";
@@ -12,7 +12,7 @@ import {
   obtenerLogo, subirLogo, eliminarLogo, logoUrl,
 } from "../../services/configuracion";
 import { useLogoMarca } from "../../theme/AppThemeProvider";
-import { REGIMENES_FISCALES } from "../../shared/constants/regimenFiscal";
+import { REGIMENES_FISCALES, labelRegimenFiscal } from "../../shared/constants/regimenFiscal";
 
 const CAMPOS = [
   { key: "nombre", label: "Nombre del laboratorio", placeholder: "Ej. Laboratorio de Metrología y Consultoría", md: 12 },
@@ -196,20 +196,24 @@ export default function LaboratorioPage() {
           </Typography>
           <Grid container spacing={2.5}>
             <Grid size={12}>
-              <FormControl fullWidth size="small">
-                <InputLabel>Régimen fiscal (SAT)</InputLabel>
-                <Select
-                  label="Régimen fiscal (SAT)"
-                  value={datos.regimenFiscal || ""}
-                  onChange={(e) => cambiar("regimenFiscal", e.target.value)}
-                  sx={{ borderRadius: 2 }}
-                  MenuProps={{ PaperProps: { sx: { maxHeight: 320 } } }}
-                >
-                  {REGIMENES_FISCALES.map((r) => (
-                    <MenuItem key={r.value} value={r.value} sx={{ whiteSpace: "normal" }}>{r.label}</MenuItem>
-                  ))}
-                </Select>
-              </FormControl>
+              <Autocomplete
+                size="small"
+                options={REGIMENES_FISCALES}
+                getOptionLabel={(r) => (typeof r === "string" ? labelRegimenFiscal(r) : `${r.value} - ${r.descripcion}`)}
+                isOptionEqualToValue={(opt, val) => opt.value === val}
+                value={datos.regimenFiscal || null}
+                onChange={(_, opt) => cambiar("regimenFiscal", opt?.value || "")}
+                renderOption={(props, r) => (
+                  <Box component="li" {...props} key={r.value}>
+                    <Box>
+                      <Typography variant="body2" fontWeight={700}>{r.value}</Typography>
+                      <Typography variant="caption" color="text.secondary">{r.descripcion}</Typography>
+                    </Box>
+                  </Box>
+                )}
+                renderInput={(params) => <TextField {...params} label="Régimen fiscal (SAT)" />}
+                slotProps={{ paper: { sx: { maxHeight: 340 } } }}
+              />
               <Typography variant="caption" color="text.secondary" sx={{ display: "block", mt: 0.5 }}>
                 El régimen bajo el que está dado de alta el laboratorio ante el SAT (lo dice su Constancia de
                 Situación Fiscal) — hay que elegir el real, no se puede adivinar.

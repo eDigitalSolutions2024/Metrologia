@@ -4,7 +4,7 @@ import { useForm, Controller } from "react-hook-form";
 import {
   Box, Typography, Grid, Alert, CircularProgress,
   MenuItem, Select, FormControl, InputLabel, IconButton, InputAdornment, Tooltip,
-  Chip, OutlinedInput, Avatar, Stack,
+  Chip, OutlinedInput, Avatar, Stack, Autocomplete, TextField,
 } from "@mui/material";
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
 import RefreshIcon from "@mui/icons-material/Refresh";
@@ -27,7 +27,7 @@ import {
 } from "../../services/contactos";
 import { generarPasswordSegura } from "../../shared/utils/generarPassword";
 import { SECTORES } from "../../shared/constants/sectores";
-import { REGIMENES_FISCALES } from "../../shared/constants/regimenFiscal";
+import { REGIMENES_FISCALES, labelRegimenFiscal } from "../../shared/constants/regimenFiscal";
 import ContactoDialog from "./ContactoDialog";
 import ConfirmDialog from "../../shared/components/ConfirmDialog";
 
@@ -289,24 +289,33 @@ export default function ClienteForm() {
               />
             </Grid>
             <Grid size={{ xs: 12, sm: 6, md: 4 }}>
-              <FormControl fullWidth size="small" error={!!errors.regimenFiscal}>
-                <InputLabel>Régimen Fiscal *</InputLabel>
-                <Controller
-                  name="regimenFiscal"
-                  control={control}
-                  rules={{ required: true }}
-                  render={({ field }) => (
-                    <Select
-                      label="Régimen Fiscal *" {...field} value={field.value ?? ""} sx={{ borderRadius: 2 }}
-                      MenuProps={{ PaperProps: { sx: { maxHeight: 320 } } }}
-                    >
-                      {REGIMENES_FISCALES.map((r) => (
-                        <MenuItem key={r.value} value={r.value} sx={{ whiteSpace: "normal" }}>{r.label}</MenuItem>
-                      ))}
-                    </Select>
-                  )}
-                />
-              </FormControl>
+              <Controller
+                name="regimenFiscal"
+                control={control}
+                rules={{ required: true }}
+                render={({ field }) => (
+                  <Autocomplete
+                    size="small"
+                    options={REGIMENES_FISCALES}
+                    getOptionLabel={(r) => (typeof r === "string" ? labelRegimenFiscal(r) : `${r.value} - ${r.descripcion}`)}
+                    isOptionEqualToValue={(opt, val) => opt.value === val}
+                    value={field.value ?? null}
+                    onChange={(_, opt) => field.onChange(opt?.value || "")}
+                    renderOption={(props, r) => (
+                      <Box component="li" {...props} key={r.value}>
+                        <Box>
+                          <Typography variant="body2" fontWeight={700}>{r.value}</Typography>
+                          <Typography variant="caption" color="text.secondary">{r.descripcion}</Typography>
+                        </Box>
+                      </Box>
+                    )}
+                    renderInput={(params) => (
+                      <TextField {...params} label="Régimen Fiscal *" error={!!errors.regimenFiscal} />
+                    )}
+                    slotProps={{ paper: { sx: { maxHeight: 340 } } }}
+                  />
+                )}
+              />
             </Grid>
             <Grid size={{ xs: 12, sm: 6, md: 4 }}>
               <FormControl fullWidth size="small" error={!!errors.usoCFDI}>
