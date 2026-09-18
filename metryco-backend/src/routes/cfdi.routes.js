@@ -13,6 +13,7 @@ router.use(auth);
 // autenticado consulta, solo Admin/Coordinador administra comprobantes.
 router.get("/", c.listar);
 router.get("/:id", c.obtener);
+router.get("/:id/xml-preview", c.previsualizarXml);
 router.get("/:id/xml", c.descargarXml);
 router.get("/:id/pdf", c.descargarPdf);
 

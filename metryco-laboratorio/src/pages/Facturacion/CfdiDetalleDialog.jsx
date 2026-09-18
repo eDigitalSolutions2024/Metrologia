@@ -7,7 +7,9 @@ import WarningAmberOutlinedIcon from "@mui/icons-material/WarningAmberOutlined";
 import AppButton from "../../shared/components/AppButton";
 import { formatCurrency } from "../../shared/utils/currency";
 import { formatDate } from "../../shared/utils/formatDate";
-import { timbrarCfdi, cancelarCfdi, descargarXmlCfdi, descargarPdfCfdi } from "../../services/cfdi";
+import { timbrarCfdi, cancelarCfdi, descargarXmlCfdi, descargarPdfCfdi, previsualizarXmlCfdi } from "../../services/cfdi";
+import CodeOutlinedIcon from "@mui/icons-material/CodeOutlined";
+import DownloadOutlinedIcon from "@mui/icons-material/DownloadOutlined";
 import { ESTADO_CFDI_CHIP } from "./estadosCfdi";
 
 function descargarBlob(blob, nombre) {
@@ -23,6 +25,17 @@ export default function CfdiDetalleDialog({ cfdi, onClose, onCambiado }) {
   const [cargando, setCargando] = useState(false);
   const [motivoCancelacion, setMotivoCancelacion] = useState("");
   const [pidiendoCancelacion, setPidiendoCancelacion] = useState(false);
+  const [preview, setPreview] = useState(null); // { xml, nombre } | null
+  const [previewDeId, setPreviewDeId] = useState(null);
+  const [cargandoPreview, setCargandoPreview] = useState(false);
+
+  // Si se abre un comprobante distinto, se descarta el XML mostrado del
+  // anterior — sin esto quedaba viendo el XML de otro CFDI hasta volver a
+  // darle "Ver XML" a propósito.
+  if (cfdi && preview && previewDeId !== cfdi._id) {
+    setPreview(null);
+    setPreviewDeId(null);
+  }
 
   if (!cfdi) return null;
   const s = ESTADO_CFDI_CHIP[cfdi.estado] || { label: cfdi.estado, color: "default" };
@@ -65,10 +78,25 @@ export default function CfdiDetalleDialog({ cfdi, onClose, onCambiado }) {
     } catch (err) { manejarError(err); } finally { setCargando(false); }
   };
 
-  const descargarXml = async () => {
-    try { descargarBlob(await descargarXmlCfdi(cfdi._id), `${cfdi.folioInterno}.xml`); }
-    catch (err) { manejarError(err); }
+  const verPreview = async () => {
+    setCargandoPreview(true); setError(null);
+    try {
+      if (cfdi.uuid) {
+        // Ya está timbrado: se muestra el XML REAL firmado, no uno reconstruido.
+        const blob = await descargarXmlCfdi(cfdi._id);
+        setPreview({ xml: await blob.text(), nombre: `${cfdi.folioInterno}.xml` });
+      } else {
+        setPreview(await previsualizarXmlCfdi(cfdi._id));
+      }
+      setPreviewDeId(cfdi._id);
+    } catch (err) { manejarError(err); } finally { setCargandoPreview(false); }
   };
+
+  const descargarPreview = () => {
+    if (!preview) return;
+    descargarBlob(new Blob([preview.xml], { type: "application/xml" }), preview.nombre);
+  };
+
   const descargarPdf = async () => {
     try { descargarBlob(await descargarPdfCfdi(cfdi._id), `${cfdi.folioInterno}.pdf`); }
     catch (err) { manejarError(err); }
@@ -168,13 +196,42 @@ export default function CfdiDetalleDialog({ cfdi, onClose, onCambiado }) {
             value={motivoCancelacion} onChange={(e) => setMotivoCancelacion(e.target.value)}
           />
         )}
+
+        {preview && (
+          <Box sx={{ mt: 2.5 }}>
+            <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", mb: 1 }}>
+              <Typography variant="subtitle2" fontWeight={700}>
+                XML {cfdi.uuid ? "timbrado" : "sin timbrar (vista previa)"}
+              </Typography>
+              <AppButton type="button" size="small" variant="text" startIcon={<DownloadOutlinedIcon />} onClick={descargarPreview}>
+                Descargar
+              </AppButton>
+            </Box>
+            {!cfdi.uuid && (
+              <Typography variant="caption" color="text.secondary" sx={{ display: "block", mb: 1 }}>
+                Este XML todavía no está firmado ni timbrado ante el SAT — es solo para revisar que los datos
+                salgan bien formados antes de conectar un PAC.
+              </Typography>
+            )}
+            <Box
+              component="pre"
+              sx={{
+                m: 0, p: 1.5, borderRadius: 2, bgcolor: "background.default", border: 1, borderColor: "divider",
+                fontSize: 11.5, fontFamily: "monospace", whiteSpace: "pre-wrap", wordBreak: "break-all",
+                maxHeight: 260, overflow: "auto",
+              }}
+            >
+              {preview.xml}
+            </Box>
+          </Box>
+        )}
       </DialogContent>
       <DialogActions sx={{ px: 3, pb: 2, flexWrap: "wrap", gap: 1 }}>
+        <AppButton type="button" variant="outlined" startIcon={<CodeOutlinedIcon />} loading={cargandoPreview} onClick={verPreview} sx={{ borderRadius: 2 }}>
+          Ver XML
+        </AppButton>
         {cfdi.uuid && (
-          <>
-            <AppButton type="button" variant="outlined" onClick={descargarXml} sx={{ borderRadius: 2 }}>XML</AppButton>
-            <AppButton type="button" variant="outlined" onClick={descargarPdf} sx={{ borderRadius: 2 }}>PDF</AppButton>
-          </>
+          <AppButton type="button" variant="outlined" onClick={descargarPdf} sx={{ borderRadius: 2 }}>PDF</AppButton>
         )}
         <Box sx={{ flex: 1 }} />
         {puedeCancelar && !pidiendoCancelacion && (

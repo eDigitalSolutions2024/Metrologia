@@ -27,6 +27,10 @@ const cancelar = asyncHandler(async (req, res) => {
   res.json({ success: true, data: await service.cancelar(req.params.id, req.body) });
 });
 
+const previsualizarXml = asyncHandler(async (req, res) => {
+  res.json({ success: true, data: await service.previsualizarXml(req.params.id) });
+});
+
 const descargarXml = asyncHandler(async (req, res) => {
   const { xml, nombre } = await service.obtenerXml(req.params.id);
   res.setHeader("Content-Disposition", `attachment; filename="${nombre}"`);
@@ -41,4 +45,4 @@ const descargarPdf = asyncHandler(async (req, res) => {
   res.send(buffer);
 });
 
-module.exports = { listar, obtener, crear, actualizar, timbrar, cancelar, descargarXml, descargarPdf };
+module.exports = { listar, obtener, crear, actualizar, timbrar, cancelar, previsualizarXml, descargarXml, descargarPdf };

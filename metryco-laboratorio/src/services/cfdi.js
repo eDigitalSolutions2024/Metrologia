@@ -30,6 +30,11 @@ export async function cancelarCfdi(id, motivo, folioSustitucion) {
   return data.data;
 }
 
+export async function previsualizarXmlCfdi(id) {
+  const { data } = await api.get(`${ENDPOINTS.CFDI}/${id}/xml-preview`);
+  return data.data;
+}
+
 export async function descargarXmlCfdi(id) {
   const { data } = await api.get(`${ENDPOINTS.CFDI}/${id}/xml`, { responseType: "blob" });
   return data;

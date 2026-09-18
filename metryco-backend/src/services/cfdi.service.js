@@ -355,6 +355,19 @@ async function obtenerXml(id) {
   return { xml, nombre: `${cfdi.folioInterno}.xml` };
 }
 
+/**
+ * Genera el XML sin timbrar de un borrador PARA REVISARLO — no llama al PAC,
+ * no cambia el estado, no se guarda. Es lo mismo que arma `timbrar()` justo
+ * antes de mandarlo, expuesto aparte para poder verlo aunque no haya (o no
+ * se quiera usar todavía) un PAC configurado.
+ */
+async function previsualizarXml(id) {
+  const cfdi = await ComprobanteFiscal.findById(id);
+  if (!cfdi) throw new AppError("Comprobante fiscal no encontrado", 404);
+  const xml = cfdiBuilder.construirXml(cfdi.toObject());
+  return { xml, nombre: `${cfdi.folioInterno}-preview.xml` };
+}
+
 async function obtenerPdf(id) {
   const cfdi = await ComprobanteFiscal.findById(id);
   if (!cfdi) throw new AppError("Comprobante fiscal no encontrado", 404);
@@ -366,5 +379,5 @@ async function obtenerPdf(id) {
 
 module.exports = {
   calcularTotales, listar, obtener, crear, actualizar, timbrar, cancelar, obtenerXml, obtenerPdf,
-  obtenerEmisorFiscal, obtenerReceptorFiscal,
+  previsualizarXml, obtenerEmisorFiscal, obtenerReceptorFiscal,
 };
