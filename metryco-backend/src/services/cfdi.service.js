@@ -7,7 +7,14 @@ const Reporte = require("../models/Reporte");
 const AppError = require("../utils/AppError");
 const { siguienteFolio } = require("../utils/folio");
 const configuracionService = require("./configuracion.service");
-const { obtenerPac } = require("./pac/pacFactory");
+// Referencia al módulo completo (no destructurada) para que las pruebas de
+// integración puedan sustituir `pacFactory.obtenerPac` por un PAC falso sin
+// tocar este archivo — ver scripts de prueba en docs/FACTURACION.md §9.
+const pacFactory = require("./pac/pacFactory");
+const PacError = require("./pac/PacError");
+const cfdiBuilder = require("./cfdiBuilder");
+
+const RETRY_DELAY_MS = 800;
 
 const oid = (v) => (mongoose.isValidObjectId(v) ? new mongoose.Types.ObjectId(v) : null);
 const redondear = (n) => Math.round((Number(n) + Number.EPSILON) * 100) / 100;
@@ -150,7 +157,7 @@ async function crear(datos, usuarioId) {
 
   const folioInterno = await siguienteFolio("CFDI");
 
-  const cfdi = await ComprobanteFiscal.create({
+  const datosComprobante = {
     factura: datos.factura || undefined,
     cotizacion: datos.cotizacion || undefined,
     reporte: datos.reporte || undefined,
@@ -173,8 +180,14 @@ async function crear(datos, usuarioId) {
     estado: "borrador",
     comentarios: datos.comentarios,
     registradoPor: usuarioId,
-  });
+  };
 
+  // Se valida el FORMATO CFDI 4.0 completo (no solo "el campo existe") antes
+  // de guardar — un RFC/CP mal escrito se detecta aquí, no hasta que se
+  // intente timbrar (o peor, hasta que el PAC lo rechace).
+  cfdiBuilder.validarComprobante(datosComprobante);
+
+  const cfdi = await ComprobanteFiscal.create(datosComprobante);
   return cfdi.populate("cliente", "nombre rfc");
 }
 
@@ -205,40 +218,106 @@ async function actualizar(id, datos) {
   return cfdi.populate("cliente", "nombre rfc");
 }
 
+const esperar = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
 /**
  * Timbra ante el PAC configurado. Si no hay PAC configurado, lanza
  * PacNotConfiguredError (503, code PAC_NOT_CONFIGURED) — NUNCA marca el
  * comprobante como timbrado sin una respuesta real del proveedor.
+ *
+ * Idempotencia: la transición a "timbrando" es un compare-and-swap atómico
+ * en Mongo (`findOneAndUpdate` con el estado anterior como filtro). Si dos
+ * clics/requests llegan casi al mismo tiempo, solo uno logra el update —
+ * el segundo recibe `null` y se rechaza con 409 en vez de timbrar dos veces
+ * el mismo comprobante ante el SAT (un timbrado duplicado no se puede
+ * deshacer, así que esto se valida ANTES de llamar al PAC, no después).
+ *
+ * Reintentos: solo para errores marcados `retryable` (red/timeout) por el
+ * adaptador — un error de validación del PAC (RFC inválido, etc.) nunca se
+ * reintenta solo, porque reintentar no corrige el dato.
  */
-async function timbrar(id, usuarioId) {
-  const cfdi = await ComprobanteFiscal.findById(id);
-  if (!cfdi) throw new AppError("Comprobante fiscal no encontrado", 404);
-  if (!ESTADOS_TIMBRABLES.includes(cfdi.estado)) {
-    throw new AppError(`No se puede timbrar un comprobante en estado "${cfdi.estado}"`, 409);
+async function timbrar(id) {
+  const cfdi = await ComprobanteFiscal.findOneAndUpdate(
+    { _id: id, estado: { $in: ESTADOS_TIMBRABLES } },
+    { $set: { estado: "timbrando" } },
+    { new: false } // el doc ANTES del cambio — solo para confirmar que existía
+  );
+  if (!cfdi) {
+    const existente = await ComprobanteFiscal.findById(id).select("estado");
+    if (!existente) throw new AppError("Comprobante fiscal no encontrado", 404);
+    throw new AppError(
+      `No se puede timbrar: el comprobante está en estado "${existente.estado}" (¿ya se está timbrando o cambió de estado en otra pestaña?)`,
+      409
+    );
   }
 
-  // Se revisa el PAC ANTES de tocar el estado — si no está configurado, el
-  // comprobante se queda intacto en borrador, no "timbrando" para siempre.
-  const pac = obtenerPac();
+  // Se revisa el PAC DESPUÉS del compare-and-swap pero el comprobante ya
+  // quedó en "timbrando" — si no hay PAC, se revierte a su estado original
+  // en vez de dejarlo atorado.
+  let pac;
+  try {
+    pac = pacFactory.obtenerPac();
+  } catch (err) {
+    await ComprobanteFiscal.updateOne({ _id: id }, { $set: { estado: cfdi.estado } });
+    throw err;
+  }
 
-  cfdi.estado = "timbrando";
-  await cfdi.save();
+  const snapshot = cfdi.toObject();
 
   try {
-    const resultado = await pac.timbrarFactura(cfdi.toObject());
-    cfdi.estado = "timbrada";
-    cfdi.uuid = resultado.uuid;
-    cfdi.xml = resultado.xml;
-    cfdi.selloSat = resultado.selloSat;
-    cfdi.cadenaOriginal = resultado.cadenaOriginal;
-    cfdi.fechaTimbrado = resultado.fechaTimbrado || new Date();
-    cfdi.errorTimbrado = undefined;
-    await cfdi.save();
-    return cfdi.populate("cliente", "nombre rfc");
+    // Se valida el formato y se arma el XML real del comprobante (sin
+    // firmar) justo antes de mandarlo — si algo quedó mal (p. ej. se editó
+    // un dato fiscal del cliente después de crear el borrador y ya no
+    // cumple formato), se detecta aquí y NUNCA llega a contactar al PAC con
+    // un CFDI inválido. Si falla, cae en el catch de abajo igual que
+    // cualquier otro error de timbrado — el comprobante no se queda atorado
+    // en "timbrando".
+    const xmlSinTimbrar = cfdiBuilder.construirXml(snapshot);
+    const intentar = () => pac.timbrarFactura({ ...snapshot, estado: "timbrando", xmlSinTimbrar });
+
+    let resultado;
+    try {
+      resultado = await intentar();
+    } catch (err) {
+      if (err.retryable) {
+        await esperar(RETRY_DELAY_MS);
+        resultado = await intentar(); // un único reintento — no reintentar en bucle contra un PAC caído
+      } else {
+        throw err;
+      }
+    }
+
+    // El adaptador "resolvió" sin lanzar error, pero si le faltan uuid/xml no
+    // es un timbrado real — no confiar en que "no lanzó excepción" equivale
+    // a éxito. Esto es lo que de verdad impide "marcar timbrada sin PAC real".
+    if (!resultado?.uuid || !resultado?.xml) {
+      throw new PacError(
+        "El proveedor de timbrado devolvió una respuesta sin uuid/xml — no se puede considerar timbrado",
+        { retryable: false }
+      );
+    }
+
+    const actualizado = await ComprobanteFiscal.findByIdAndUpdate(
+      id,
+      {
+        $set: {
+          estado: "timbrada",
+          uuid: resultado.uuid,
+          xml: resultado.xml,
+          selloSat: resultado.selloSat,
+          cadenaOriginal: resultado.cadenaOriginal,
+          fechaTimbrado: resultado.fechaTimbrado || new Date(),
+        },
+        $unset: { errorTimbrado: 1 },
+      },
+      { new: true }
+    ).populate("cliente", "nombre rfc");
+    return actualizado;
   } catch (err) {
-    cfdi.estado = "error_timbrado";
-    cfdi.errorTimbrado = { codigo: err.code || "PAC_ERROR", mensaje: err.message, fecha: new Date() };
-    await cfdi.save();
+    await ComprobanteFiscal.updateOne(
+      { _id: id },
+      { $set: { estado: "error_timbrado", errorTimbrado: { codigo: err.code || "PAC_ERROR", mensaje: err.message, fecha: new Date() } } }
+    );
     throw err;
   }
 }
@@ -250,7 +329,7 @@ async function cancelar(id, { motivo, folioSustitucion }) {
     throw new AppError(`Solo se puede cancelar un comprobante timbrado (estado actual: "${cfdi.estado}")`, 409);
   }
 
-  const pac = obtenerPac(); // lanza PacNotConfiguredError si no hay proveedor
+  const pac = pacFactory.obtenerPac(); // lanza PacNotConfiguredError si no hay proveedor
 
   const resultado = await pac.cancelarFactura({ uuid: cfdi.uuid, motivo, folioSustitucion });
   cfdi.estado = "cancelada";
@@ -265,17 +344,22 @@ async function cancelar(id, { motivo, folioSustitucion }) {
 }
 
 async function obtenerXml(id) {
-  const cfdi = await ComprobanteFiscal.findById(id).select("xml estado folioInterno");
+  const cfdi = await ComprobanteFiscal.findById(id).select("xml uuid estado folioInterno");
   if (!cfdi) throw new AppError("Comprobante fiscal no encontrado", 404);
-  if (!cfdi.xml) throw new AppError("Este comprobante todavía no tiene XML timbrado", 409);
-  return { xml: cfdi.xml, nombre: `${cfdi.folioInterno}.xml` };
+  if (cfdi.xml) return { xml: cfdi.xml, nombre: `${cfdi.folioInterno}.xml` };
+  if (!cfdi.uuid) throw new AppError("Este comprobante todavía no tiene XML timbrado", 409);
+  // El XML normalmente ya se guardó al timbrar — esto es solo un respaldo si
+  // el campo local se perdiera, consultando de nuevo al PAC con el uuid.
+  const pac = pacFactory.obtenerPac();
+  const xml = await pac.obtenerXml(cfdi.uuid);
+  return { xml, nombre: `${cfdi.folioInterno}.xml` };
 }
 
 async function obtenerPdf(id) {
   const cfdi = await ComprobanteFiscal.findById(id);
   if (!cfdi) throw new AppError("Comprobante fiscal no encontrado", 404);
   if (!cfdi.uuid) throw new AppError("Este comprobante todavía no está timbrado", 409);
-  const pac = obtenerPac(); // el PDF fiscal lo genera/devuelve el PAC, no este sistema
+  const pac = pacFactory.obtenerPac(); // el PDF fiscal lo genera/devuelve el PAC, no este sistema
   const buffer = await pac.obtenerPdf(cfdi.uuid);
   return { buffer, nombre: `${cfdi.folioInterno}.pdf` };
 }

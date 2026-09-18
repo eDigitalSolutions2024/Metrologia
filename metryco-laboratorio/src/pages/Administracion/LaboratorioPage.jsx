@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Box, TextField, Alert, Paper, Grid, Typography, Avatar } from "@mui/material";
+import { Box, TextField, Alert, Paper, Grid, Typography, Avatar, MenuItem, Select, FormControl, InputLabel } from "@mui/material";
 import DomainOutlinedIcon from "@mui/icons-material/DomainOutlined";
 import ImageOutlinedIcon from "@mui/icons-material/ImageOutlined";
 import DeleteOutlineIcon from "@mui/icons-material/DeleteOutlined";
@@ -12,6 +12,7 @@ import {
   obtenerLogo, subirLogo, eliminarLogo, logoUrl,
 } from "../../services/configuracion";
 import { useLogoMarca } from "../../theme/AppThemeProvider";
+import { REGIMENES_FISCALES } from "../../shared/constants/regimenFiscal";
 
 const CAMPOS = [
   { key: "nombre", label: "Nombre del laboratorio", placeholder: "Ej. Laboratorio de Metrología y Consultoría", md: 12 },
@@ -39,9 +40,10 @@ const CAMPOS_CERT = [
 ];
 
 const CAMPOS_FISCALES = [
-  { key: "regimenFiscal", label: "Régimen fiscal (SAT)", placeholder: "Ej. 601 - General de Ley Personas Morales", md: 6 },
-  { key: "codigoPostalFiscal", label: "Código postal fiscal (lugar de expedición)", placeholder: "Ej. 32340", md: 3 },
-  { key: "serieCFDI", label: "Serie CFDI (opcional)", placeholder: "Ej. A", md: 3 },
+  { key: "codigoPostalFiscal", label: "Código postal fiscal (lugar de expedición)", placeholder: "Ej. 32340", md: 3,
+    ayuda: "El CP del domicilio fiscal real del laboratorio ante el SAT (el de su Constancia de Situación Fiscal) — no siempre es igual al \"Domicilio\" de arriba." },
+  { key: "serieCFDI", label: "Serie CFDI (opcional)", placeholder: "Ej. A", md: 3,
+    ayuda: "Texto libre que ustedes definen para llevar su propio control interno de folios (ej. \"A\", \"LAB\") — el SAT no publica un catálogo para esto, así que no aplica un select. Si no manejan series, déjalo vacío." },
 ];
 
 const VACIO = {
@@ -193,10 +195,30 @@ export default function LaboratorioPage() {
             "RFC" de arriba.
           </Typography>
           <Grid container spacing={2.5}>
+            <Grid size={12}>
+              <FormControl fullWidth size="small">
+                <InputLabel>Régimen fiscal (SAT)</InputLabel>
+                <Select
+                  label="Régimen fiscal (SAT)"
+                  value={datos.regimenFiscal || ""}
+                  onChange={(e) => cambiar("regimenFiscal", e.target.value)}
+                  sx={{ borderRadius: 2 }}
+                  MenuProps={{ PaperProps: { sx: { maxHeight: 320 } } }}
+                >
+                  {REGIMENES_FISCALES.map((r) => (
+                    <MenuItem key={r.value} value={r.value} sx={{ whiteSpace: "normal" }}>{r.label}</MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
+              <Typography variant="caption" color="text.secondary" sx={{ display: "block", mt: 0.5 }}>
+                El régimen bajo el que está dado de alta el laboratorio ante el SAT (lo dice su Constancia de
+                Situación Fiscal) — hay que elegir el real, no se puede adivinar.
+              </Typography>
+            </Grid>
             {CAMPOS_FISCALES.map((c) => (
-              <Grid key={c.key} size={{ xs: 12, md: c.md }}>
+              <Grid key={c.key} size={{ xs: 12, md: 6 }}>
                 <TextField
-                  fullWidth size="small" label={c.label} placeholder={c.placeholder}
+                  fullWidth size="small" label={c.label} placeholder={c.placeholder} helperText={c.ayuda}
                   value={datos[c.key] || ""} onChange={(e) => cambiar(c.key, e.target.value)}
                 />
               </Grid>

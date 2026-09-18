@@ -27,6 +27,7 @@ import {
 } from "../../services/contactos";
 import { generarPasswordSegura } from "../../shared/utils/generarPassword";
 import { SECTORES } from "../../shared/constants/sectores";
+import { REGIMENES_FISCALES } from "../../shared/constants/regimenFiscal";
 import ContactoDialog from "./ContactoDialog";
 import ConfirmDialog from "../../shared/components/ConfirmDialog";
 
@@ -288,11 +289,24 @@ export default function ClienteForm() {
               />
             </Grid>
             <Grid size={{ xs: 12, sm: 6, md: 4 }}>
-              <AppInput
-                label="Regimen Fiscal *"
-                error={errors.regimenFiscal}
-                {...register("regimenFiscal", { required: "Campo obligatorio" })}
-              />
+              <FormControl fullWidth size="small" error={!!errors.regimenFiscal}>
+                <InputLabel>Régimen Fiscal *</InputLabel>
+                <Controller
+                  name="regimenFiscal"
+                  control={control}
+                  rules={{ required: true }}
+                  render={({ field }) => (
+                    <Select
+                      label="Régimen Fiscal *" {...field} value={field.value ?? ""} sx={{ borderRadius: 2 }}
+                      MenuProps={{ PaperProps: { sx: { maxHeight: 320 } } }}
+                    >
+                      {REGIMENES_FISCALES.map((r) => (
+                        <MenuItem key={r.value} value={r.value} sx={{ whiteSpace: "normal" }}>{r.label}</MenuItem>
+                      ))}
+                    </Select>
+                  )}
+                />
+              </FormControl>
             </Grid>
             <Grid size={{ xs: 12, sm: 6, md: 4 }}>
               <FormControl fullWidth size="small" error={!!errors.usoCFDI}>
