@@ -21,6 +21,14 @@ function obtenerPac() {
     // finkok: () => new (require("./providers/finkok"))(pacConfig),
   };
 
+  // Adaptador de desarrollo: NUNCA timbra de verdad, solo sirve para probar
+  // los flujos de la app (timbrar/cancelar/pagos) sin un PAC contratado. Solo
+  // se activa si PAC_PROVIDER="simulado" está explícito en el .env — no
+  // existe riesgo de activarse solo en producción.
+  if (process.env.NODE_ENV !== "production") {
+    adaptadores.simulado = () => new (require("./providers/simulado"))();
+  }
+
   const crear = adaptadores[pacConfig.provider];
   if (!crear) {
     throw new PacNotConfiguredError(

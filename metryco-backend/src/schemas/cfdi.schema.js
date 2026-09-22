@@ -41,9 +41,31 @@ const actualizarCfdiSchema = crearCfdiSchema.partial().extend({
   cliente: objectId.optional(),
 });
 
-const cancelarCfdiSchema = z.object({
-  motivo: z.string().trim().min(1, "El motivo de cancelación es obligatorio"),
-  folioSustitucion: z.string().trim().optional(),
+const cancelarCfdiSchema = z
+  .object({
+    motivoCodigo: z.enum(["01", "02", "03", "04"], { error: "Motivo de cancelación inválido (catálogo SAT c_MotivoCancelacion)" }),
+    motivo: z.string().trim().optional(), // nota interna adicional, no la exige el SAT
+    folioSustitucion: z.string().trim().optional(),
+  })
+  .refine((d) => d.motivoCodigo !== "01" || !!d.folioSustitucion, {
+    message: "El motivo 01 (con relación) exige el UUID del CFDI que sustituye a este",
+    path: ["folioSustitucion"],
+  });
+
+const resolverSolicitudCancelacionSchema = z.object({
+  aceptar: z.boolean(),
 });
 
-module.exports = { crearCfdiSchema, actualizarCfdiSchema, cancelarCfdiSchema };
+const emitirComplementoPagoSchema = z.object({
+  comprobante: objectId, // el CFDI de Ingreso (PPD) que se está pagando
+  fechaPago: z.coerce.date({ error: "Fecha de pago inválida" }),
+  formaPago: z.string().trim().min(1, "La forma de pago SAT es obligatoria"),
+  monto: z.coerce.number().positive("El monto pagado debe ser mayor a 0"),
+  numOperacion: z.string().trim().optional(),
+  comentarios: z.string().trim().optional(),
+});
+
+module.exports = {
+  crearCfdiSchema, actualizarCfdiSchema, cancelarCfdiSchema,
+  resolverSolicitudCancelacionSchema, emitirComplementoPagoSchema,
+};

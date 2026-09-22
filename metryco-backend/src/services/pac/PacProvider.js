@@ -25,7 +25,7 @@ class PacProvider {
   }
 
   /**
-   * @param {{uuid: string, motivo: string, folioSustitucion?: string}} datos
+   * @param {{uuid: string, motivoCodigo: "01"|"02"|"03"|"04", folioSustitucion?: string}} datos
    * @returns {Promise<{estatus: string, fechaCancelacion: Date, acuseXml?: string}>}
    */
   async cancelarFactura(datos) {

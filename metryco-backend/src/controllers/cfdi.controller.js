@@ -27,6 +27,14 @@ const cancelar = asyncHandler(async (req, res) => {
   res.json({ success: true, data: await service.cancelar(req.params.id, req.body) });
 });
 
+const resolverSolicitudCancelacion = asyncHandler(async (req, res) => {
+  res.json({ success: true, data: await service.resolverSolicitudCancelacion(req.params.id, req.body.aceptar) });
+});
+
+const emitirComplementoPago = asyncHandler(async (req, res) => {
+  res.status(201).json({ success: true, data: await service.emitirComplementoPago(req.body, req.user?.id) });
+});
+
 const previsualizarXml = asyncHandler(async (req, res) => {
   res.json({ success: true, data: await service.previsualizarXml(req.params.id) });
 });
@@ -45,4 +53,7 @@ const descargarPdf = asyncHandler(async (req, res) => {
   res.send(buffer);
 });
 
-module.exports = { listar, obtener, crear, actualizar, timbrar, cancelar, previsualizarXml, descargarXml, descargarPdf };
+module.exports = {
+  listar, obtener, crear, actualizar, timbrar, cancelar, resolverSolicitudCancelacion, emitirComplementoPago,
+  previsualizarXml, descargarXml, descargarPdf,
+};

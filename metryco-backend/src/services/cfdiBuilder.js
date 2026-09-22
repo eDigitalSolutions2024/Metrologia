@@ -92,6 +92,17 @@ function validarComprobante(cfdi) {
   if (!(Number(cfdi.subtotal) >= 0)) errores.push("Subtotal inválido");
   if (!(Number(cfdi.total) >= 0)) errores.push("Total inválido");
 
+  if (cfdi.tipoComprobante === "P") {
+    const dr = cfdi.pago?.docRelacionado;
+    if (!cfdi.pago?.fechaPago) errores.push("Complemento de Pago: falta la fecha de pago");
+    if (!cfdi.pago?.formaPago?.trim()) errores.push("Complemento de Pago: falta la forma de pago");
+    if (!(Number(cfdi.pago?.monto) > 0)) errores.push("Complemento de Pago: el monto debe ser mayor a 0");
+    if (!dr?.idDocumento) errores.push("Complemento de Pago: falta el UUID del comprobante que se está pagando");
+    if (!(Number(dr?.impSaldoAnterior) >= 0)) errores.push("Complemento de Pago: falta el saldo anterior del documento relacionado");
+    if (!(Number(dr?.impPagado) > 0)) errores.push("Complemento de Pago: falta el importe pagado del documento relacionado");
+    if (!(Number(dr?.impSaldoInsoluto) >= 0)) errores.push("Complemento de Pago: falta el saldo insoluto resultante");
+  }
+
   if (errores.length) {
     throw new AppError(
       `El comprobante no cumple el formato CFDI 4.0 — no se puede generar el XML: ${errores.join(" | ")}`,
@@ -115,6 +126,37 @@ function agruparImpuestos(conceptos) {
     }
   }
   return [...grupos.values()];
+}
+
+/**
+ * Nodo Complemento/Pagos (versión 2.0) — solo para comprobantes tipo "P".
+ * Estructura real del Anexo 20 / Complemento de Pago 2.0 del SAT: un CFDI de
+ * Pago va con Subtotal="0"/Total="0" y un concepto genérico (ver
+ * cfdi.service.emitirComplementoPago), y el pago real se declara aquí, con
+ * el saldo antes/después de ESTE pago sobre el documento que se está
+ * liquidando (`DoctoRelacionado`).
+ *
+ * Alcance actual: un solo `Pago` con un solo `DoctoRelacionado` — no cubre
+ * pagos que abonan a varios CFDI a la vez, ni multi-moneda con equivalencia.
+ */
+function construirComplementoPago(cfdi) {
+  const p = cfdi.pago;
+  const dr = p.docRelacionado;
+  return (
+    `<cfdi:Complemento>` +
+    `<pago20:Pagos xmlns:pago20="http://www.sat.gob.mx/Pagos20" Version="2.0">` +
+    `<pago20:Pago FechaPago="${formatearFecha(p.fechaPago)}" FormaDePagoP="${escaparXml(p.formaPago)}" ` +
+    `MonedaP="${escaparXml(p.moneda || "MXN")}" Monto="${num(p.monto, 2)}">` +
+    `<pago20:DoctoRelacionado IdDocumento="${escaparXml(dr.idDocumento)}"` +
+    (dr.serie ? ` Serie="${escaparXml(dr.serie)}"` : "") +
+    (dr.folio ? ` Folio="${escaparXml(dr.folio)}"` : "") +
+    ` MonedaDR="${escaparXml(dr.moneda || "MXN")}" NumParcialidad="${dr.numParcialidad || 1}" ` +
+    `ImpSaldoAnt="${num(dr.impSaldoAnterior, 2)}" ImpPagado="${num(dr.impPagado, 2)}" ` +
+    `ImpSaldoInsoluto="${num(dr.impSaldoInsoluto, 2)}" ObjetoImpDR="${escaparXml(dr.objetoImpDR || "02")}"/>` +
+    `</pago20:Pago>` +
+    `</pago20:Pagos>` +
+    `</cfdi:Complemento>`
+  );
 }
 
 /**
@@ -173,6 +215,7 @@ function construirXml(cfdi) {
     `UsoCFDI="${escaparXml(cfdi.receptor.usoCFDI)}"/>` +
     `<cfdi:Conceptos>${conceptosXml}</cfdi:Conceptos>` +
     impuestosResumenXml +
+    (cfdi.tipoComprobante === "P" && cfdi.pago ? construirComplementoPago(cfdi) : "") +
     `</cfdi:Comprobante>`;
 
   return xml;

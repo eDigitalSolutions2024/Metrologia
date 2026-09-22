@@ -3,7 +3,10 @@ const auth = require("../middleware/auth");
 const requireRole = require("../middleware/requireRole");
 const validate = require("../middleware/validate");
 const auditar = require("../middleware/auditar");
-const { crearCfdiSchema, actualizarCfdiSchema, cancelarCfdiSchema } = require("../schemas/cfdi.schema");
+const {
+  crearCfdiSchema, actualizarCfdiSchema, cancelarCfdiSchema,
+  resolverSolicitudCancelacionSchema, emitirComplementoPagoSchema,
+} = require("../schemas/cfdi.schema");
 const c = require("../controllers/cfdi.controller");
 
 const router = Router();
@@ -21,5 +24,19 @@ router.post("/", requireRole("admin", "coordinador"), validate(crearCfdiSchema),
 router.put("/:id", requireRole("admin", "coordinador"), validate(actualizarCfdiSchema), auditar("cfdi_editado", "ComprobanteFiscal"), c.actualizar);
 router.post("/:id/timbrar", requireRole("admin", "coordinador"), auditar("cfdi_timbrado", "ComprobanteFiscal"), c.timbrar);
 router.post("/:id/cancelar", requireRole("admin", "coordinador"), validate(cancelarCfdiSchema), auditar("cfdi_cancelado", "ComprobanteFiscal"), c.cancelar);
+router.patch(
+  "/:id/cancelacion",
+  requireRole("admin", "coordinador"),
+  validate(resolverSolicitudCancelacionSchema),
+  auditar("cfdi_cancelacion_resuelta", "ComprobanteFiscal"),
+  c.resolverSolicitudCancelacion
+);
+router.post(
+  "/pagos",
+  requireRole("admin", "coordinador"),
+  validate(emitirComplementoPagoSchema),
+  auditar("cfdi_complemento_pago_creado", "ComprobanteFiscal"),
+  c.emitirComplementoPago
+);
 
 module.exports = router;

@@ -31,6 +31,17 @@ const TIPOS_COMPROBANTE = ["I", "E", "T", "N", "P"]; // Ingreso, Egreso, Traslad
 const MONEDAS = ["MXN", "USD"];
 const OBJETOS_IMPUESTO = ["01", "02", "03"]; // No objeto / Sí objeto / Sí objeto y no obligado a desglosar
 
+// Catálogo SAT c_MotivoCancelacion — vigente desde la reforma de cancelación
+// de 2018 (antes de eso no existía "motivo", por eso el legacy en CFDI 3.2
+// no lo maneja).
+const MOTIVOS_CANCELACION = ["01", "02", "03", "04"];
+// 01 = Comprobante emitido con errores CON relación (exige folioSustitucion)
+// 02 = Comprobante emitido con errores SIN relación
+// 03 = No se llevó a cabo la operación
+// 04 = Operación nominativa relacionada en una factura global
+
+const ESTADOS_SOLICITUD_CANCELACION = ["no_aplica", "pendiente", "aceptada", "rechazada"];
+
 const impuestoSchema = new Schema(
   {
     tipo: { type: String, enum: ["traslado", "retencion"], required: true },
@@ -119,10 +130,51 @@ const comprobanteFiscalSchema = new Schema(
     fechaTimbrado: Date,
 
     cancelacion: {
-      motivo: String,
-      folioSustitucion: String,
+      motivoCodigo: { type: String, enum: MOTIVOS_CANCELACION },
+      motivo: String, // texto libre adicional, para nuestra propia bitácora
+      folioSustitucion: String, // UUID del CFDI que sustituye a este — obligatorio si motivoCodigo="01"
       fecha: Date,
       acuseXml: String,
+      // Desde 2022 el SAT exige que el RECEPTOR acepte o rechace la
+      // cancelación cuando el comprobante supera $5,000 MXN (salvo
+      // excepciones que este sistema no modela todas — ver docs/FACTURACION.md).
+      // Mientras la solicitud esté "pendiente", el CFDI sigue vigente ante
+      // el SAT (estado="cancelacion_pendiente", NO "cancelada").
+      requiereAceptacion: { type: Boolean, default: false },
+      estadoSolicitud: { type: String, enum: ESTADOS_SOLICITUD_CANCELACION, default: "no_aplica" },
+      fechaLimiteRespuesta: Date, // fecha + 72 horas
+      fechaResolucion: Date,
+    },
+
+    // Solo aplica a comprobantes tipo "I" con MetodoPago "PPD" — cuánto le
+    // falta por cobrar. Se inicializa = total al timbrarse; cada Complemento
+    // de Pago exitoso contra este comprobante lo reduce (ver
+    // cfdi.service.emitirComplementoPago). No es lo mismo que Factura
+    // (Cobranza) — esto es específicamente el saldo que exige rastrear el
+    // Anexo 20 para el nodo DoctoRelacionado del Complemento de Pago.
+    saldoPendiente: { type: Number, min: 0 },
+
+    // Solo aplica a comprobantes tipo "P" (Complemento de Pago) — un CFDI de
+    // Pago SIEMPRE lleva Subtotal=0/Total=0 y un solo concepto genérico
+    // ("Pago", ClaveProdServ 84111506); el dato real del pago vive aquí.
+    pago: {
+      fechaPago: Date,
+      formaPago: String, // catálogo SAT c_FormaPago
+      moneda: { type: String, enum: MONEDAS },
+      monto: Number,
+      numOperacion: String,
+      docRelacionado: {
+        comprobante: { type: Schema.Types.ObjectId, ref: "ComprobanteFiscal" }, // el CFDI de Ingreso que se está pagando
+        idDocumento: String, // UUID timbrado de ese CFDI
+        serie: String,
+        folio: String,
+        moneda: String,
+        numParcialidad: Number,
+        impSaldoAnterior: Number,
+        impPagado: Number,
+        impSaldoInsoluto: Number,
+        objetoImpDR: { type: String, enum: OBJETOS_IMPUESTO },
+      },
     },
 
     errorTimbrado: {
@@ -141,5 +193,7 @@ comprobanteFiscalSchema.statics.ESTADOS = ESTADOS;
 comprobanteFiscalSchema.statics.TIPOS_COMPROBANTE = TIPOS_COMPROBANTE;
 comprobanteFiscalSchema.statics.MONEDAS = MONEDAS;
 comprobanteFiscalSchema.statics.OBJETOS_IMPUESTO = OBJETOS_IMPUESTO;
+comprobanteFiscalSchema.statics.MOTIVOS_CANCELACION = MOTIVOS_CANCELACION;
+comprobanteFiscalSchema.statics.ESTADOS_SOLICITUD_CANCELACION = ESTADOS_SOLICITUD_CANCELACION;
 
 module.exports = model("ComprobanteFiscal", comprobanteFiscalSchema);

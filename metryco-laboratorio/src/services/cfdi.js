@@ -25,8 +25,18 @@ export async function timbrarCfdi(id) {
   return data.data;
 }
 
-export async function cancelarCfdi(id, motivo, folioSustitucion) {
-  const { data } = await api.post(`${ENDPOINTS.CFDI}/${id}/cancelar`, { motivo, folioSustitucion });
+export async function cancelarCfdi(id, motivoCodigo, motivo, folioSustitucion) {
+  const { data } = await api.post(`${ENDPOINTS.CFDI}/${id}/cancelar`, { motivoCodigo, motivo, folioSustitucion });
+  return data.data;
+}
+
+export async function resolverSolicitudCancelacionCfdi(id, aceptar) {
+  const { data } = await api.patch(`${ENDPOINTS.CFDI}/${id}/cancelacion`, { aceptar });
+  return data.data;
+}
+
+export async function emitirComplementoPago(payload) {
+  const { data } = await api.post(`${ENDPOINTS.CFDI}/pagos`, payload);
   return data.data;
 }
 

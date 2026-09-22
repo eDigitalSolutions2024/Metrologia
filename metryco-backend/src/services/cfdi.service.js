@@ -13,6 +13,7 @@ const configuracionService = require("./configuracion.service");
 const pacFactory = require("./pac/pacFactory");
 const PacError = require("./pac/PacError");
 const cfdiBuilder = require("./cfdiBuilder");
+const { generarPdfCfdi } = require("./cfdiPdf");
 
 const RETRY_DELAY_MS = 800;
 
@@ -21,6 +22,15 @@ const redondear = (n) => Math.round((Number(n) + Number.EPSILON) * 100) / 100;
 
 const ESTADOS_EDITABLES = ["borrador", "error_timbrado"];
 const ESTADOS_TIMBRABLES = ["borrador", "pendiente_timbrar", "error_timbrado"];
+
+// Regla del SAT (vigente desde 2022): cancelar un CFDI de más de $5,000 MXN
+// exige que el RECEPTOR acepte o rechace la solicitud (72 horas; si no
+// responde, se considera aceptada). No modela TODAS las excepciones del SAT
+// (p. ej. CFDI de nómina, cancelación el mismo día de emisión, RFC genérico
+// de público en general) — solo el umbral general, que es el caso normal
+// para un laboratorio facturando a clientes identificados.
+const UMBRAL_ACEPTACION_CANCELACION = 5000;
+const HORAS_LIMITE_ACEPTACION_CANCELACION = 72;
 
 /**
  * Recalcula subtotal/impuestos/total SIEMPRE en el backend a partir de
@@ -188,6 +198,15 @@ async function crear(datos, usuarioId) {
   cfdiBuilder.validarComprobante(datosComprobante);
 
   const cfdi = await ComprobanteFiscal.create(datosComprobante);
+
+  // Mismo criterio que factura.service.crear (Cobranza): si el CFDI nace de
+  // una cotización aprobada, se marca "facturada" para que no se reutilice
+  // por error para otro comprobante — sin esto quedaba "aprobada" para
+  // siempre aunque ya se hubiera facturado.
+  if (datos.cotizacion && oid(datos.cotizacion)) {
+    await Cotizacion.updateOne({ _id: datos.cotizacion }, { status: "facturada" });
+  }
+
   return cfdi.populate("cliente", "nombre rfc");
 }
 
@@ -297,21 +316,36 @@ async function timbrar(id) {
       );
     }
 
+    const camposTimbrado = {
+      estado: "timbrada",
+      uuid: resultado.uuid,
+      xml: resultado.xml,
+      selloSat: resultado.selloSat,
+      cadenaOriginal: resultado.cadenaOriginal,
+      fechaTimbrado: resultado.fechaTimbrado || new Date(),
+    };
+    // Un CFDI de Ingreso con MetodoPago PPD empieza a deber su total completo
+    // en cuanto se timbra — de ahí en adelante los Complementos de Pago lo
+    // van reduciendo (ver emitirComplementoPago).
+    if (snapshot.tipoComprobante === "I" && snapshot.metodoPago === "PPD" && snapshot.saldoPendiente == null) {
+      camposTimbrado.saldoPendiente = snapshot.total;
+    }
+
     const actualizado = await ComprobanteFiscal.findByIdAndUpdate(
       id,
-      {
-        $set: {
-          estado: "timbrada",
-          uuid: resultado.uuid,
-          xml: resultado.xml,
-          selloSat: resultado.selloSat,
-          cadenaOriginal: resultado.cadenaOriginal,
-          fechaTimbrado: resultado.fechaTimbrado || new Date(),
-        },
-        $unset: { errorTimbrado: 1 },
-      },
+      { $set: camposTimbrado, $unset: { errorTimbrado: 1 } },
       { new: true }
     ).populate("cliente", "nombre rfc");
+
+    // Si lo que se acaba de timbrar es un Complemento de Pago, se descuenta
+    // el monto pagado del saldo del CFDI original que se está liquidando.
+    if (snapshot.tipoComprobante === "P" && snapshot.pago?.docRelacionado?.comprobante) {
+      await ComprobanteFiscal.updateOne(
+        { _id: snapshot.pago.docRelacionado.comprobante },
+        { $set: { saldoPendiente: snapshot.pago.docRelacionado.impSaldoInsoluto } }
+      );
+    }
+
     return actualizado;
   } catch (err) {
     await ComprobanteFiscal.updateOne(
@@ -322,24 +356,166 @@ async function timbrar(id) {
   }
 }
 
-async function cancelar(id, { motivo, folioSustitucion }) {
+/**
+ * Solicita la cancelación ante el PAC. Si el comprobante supera el umbral
+ * que exige aceptación del receptor, el CFDI NO queda cancelado todavía —
+ * pasa a "cancelacion_pendiente" (sigue vigente ante el SAT hasta que el
+ * receptor conteste o pasen 72 horas). Ver `resolverSolicitudCancelacion`.
+ */
+async function cancelar(id, { motivoCodigo, motivo, folioSustitucion }) {
   const cfdi = await ComprobanteFiscal.findById(id);
   if (!cfdi) throw new AppError("Comprobante fiscal no encontrado", 404);
   if (cfdi.estado !== "timbrada") {
     throw new AppError(`Solo se puede cancelar un comprobante timbrado (estado actual: "${cfdi.estado}")`, 409);
   }
+  if (motivoCodigo === "01" && !folioSustitucion) {
+    throw new AppError('El motivo "01 - Con relación" exige el UUID del CFDI que sustituye a este', 400);
+  }
 
   const pac = pacFactory.obtenerPac(); // lanza PacNotConfiguredError si no hay proveedor
 
-  const resultado = await pac.cancelarFactura({ uuid: cfdi.uuid, motivo, folioSustitucion });
-  cfdi.estado = "cancelada";
+  const resultado = await pac.cancelarFactura({ uuid: cfdi.uuid, motivoCodigo, folioSustitucion });
+  const requiereAceptacion = Number(cfdi.total) > UMBRAL_ACEPTACION_CANCELACION;
+
   cfdi.cancelacion = {
+    motivoCodigo,
     motivo,
     folioSustitucion,
     fecha: resultado.fechaCancelacion || new Date(),
     acuseXml: resultado.acuseXml,
+    requiereAceptacion,
+    estadoSolicitud: requiereAceptacion ? "pendiente" : "no_aplica",
+    fechaLimiteRespuesta: requiereAceptacion
+      ? new Date(Date.now() + HORAS_LIMITE_ACEPTACION_CANCELACION * 3600 * 1000)
+      : undefined,
   };
+  // Mientras el receptor no conteste, el comprobante SIGUE VIGENTE ante el
+  // SAT — no se marca "cancelada" todavía.
+  cfdi.estado = requiereAceptacion ? "cancelacion_pendiente" : "cancelada";
+
   await cfdi.save();
+  return cfdi.populate("cliente", "nombre rfc");
+}
+
+/**
+ * Registra la respuesta del receptor a una solicitud de cancelación
+ * pendiente. En un flujo real, esta respuesta llega del receptor a través
+ * del portal del SAT o del PAC (no hay ningún endpoint de METRYCO por el que
+ * un cliente externo conteste todavía) — por ahora esto sirve para que
+ * Calidad/Administración registre manualmente lo que el cliente respondió
+ * (por ejemplo, por correo o teléfono), o lo que reporte el PAC cuando se
+ * conecte uno con webhook de este evento.
+ */
+async function resolverSolicitudCancelacion(id, aceptar) {
+  const cfdi = await ComprobanteFiscal.findById(id);
+  if (!cfdi) throw new AppError("Comprobante fiscal no encontrado", 404);
+  if (cfdi.estado !== "cancelacion_pendiente") {
+    throw new AppError(`Este comprobante no tiene una solicitud de cancelación pendiente (estado actual: "${cfdi.estado}")`, 409);
+  }
+
+  cfdi.estado = aceptar ? "cancelada" : "timbrada";
+  cfdi.cancelacion.estadoSolicitud = aceptar ? "aceptada" : "rechazada";
+  cfdi.cancelacion.fechaResolucion = new Date();
+  await cfdi.save();
+  return cfdi.populate("cliente", "nombre rfc");
+}
+
+/**
+ * Emite un Complemento de Pago (CFDI tipo "P") contra un CFDI de Ingreso ya
+ * timbrado con MetodoPago "PPD". Crea el borrador con Subtotal/Total en 0 y
+ * el concepto genérico "Pago" que exige el Anexo 20 — el timbrado real se
+ * hace después con `timbrar()`, igual que cualquier otro comprobante.
+ *
+ * El saldo se calcula del `saldoPendiente` real guardado en el comprobante
+ * original (no de lo que mande el frontend) — evita pagar más de lo que se
+ * debe o desincronizar el saldo por un cálculo hecho en el cliente.
+ */
+async function emitirComplementoPago(datos, usuarioId) {
+  if (!oid(datos.comprobante)) throw new AppError("Comprobante a pagar inválido", 400);
+  const original = await ComprobanteFiscal.findById(datos.comprobante).populate("cliente", "nombre rfc");
+  if (!original) throw new AppError("Comprobante a pagar no encontrado", 404);
+  if (original.estado !== "timbrada") {
+    throw new AppError(`Solo se puede pagar un comprobante timbrado (estado actual: "${original.estado}")`, 409);
+  }
+  if (original.metodoPago !== "PPD") {
+    throw new AppError('El Complemento de Pago solo aplica a comprobantes con Método de Pago "PPD"', 409);
+  }
+  const saldoAnterior = original.saldoPendiente ?? original.total;
+  if (saldoAnterior <= 0) throw new AppError("Este comprobante ya está completamente pagado", 409);
+  const monto = Number(datos.monto);
+  if (monto > saldoAnterior) {
+    throw new AppError(`El monto pagado ($${monto}) no puede ser mayor al saldo pendiente ($${saldoAnterior})`, 400);
+  }
+  const saldoInsoluto = redondear(saldoAnterior - monto);
+  const numParcialidad = (await ComprobanteFiscal.countDocuments({
+    "pago.docRelacionado.comprobante": original._id,
+    estado: { $ne: "cancelada" },
+  })) + 1;
+
+  const emisor = await obtenerEmisorFiscal();
+  const folioInterno = await siguienteFolio("CFDI");
+
+  const conceptoPago = {
+    claveProdServ: "84111506", // catálogo SAT: "Servicios de facturación" (clave genérica usada para CFDI de Pago)
+    descripcion: "Pago",
+    cantidad: 1,
+    claveUnidad: "ACT", // "Actividad"
+    valorUnitario: 0,
+    importe: 0,
+    objetoImpuesto: "01", // Un CFDI de Pago no es objeto de impuesto
+    impuestos: [],
+  };
+
+  const datosComprobante = {
+    factura: original.factura || undefined,
+    cotizacion: original.cotizacion || undefined,
+    reporte: original.reporte || undefined,
+    cliente: original.cliente._id,
+    folioInterno,
+    tipoComprobante: "P",
+    moneda: original.moneda,
+    formaPago: datos.formaPago,
+    metodoPago: "PUE", // el propio Complemento de Pago siempre se emite como PUE
+    lugarExpedicion: emisor.codigoPostalFiscal,
+    emisor: { rfc: emisor.rfc, nombre: emisor.nombre, regimenFiscal: emisor.regimenFiscal },
+    receptor: {
+      rfc: original.receptor.rfc, nombre: original.receptor.nombre,
+      codigoPostal: original.receptor.codigoPostal, regimenFiscal: original.receptor.regimenFiscal,
+      usoCFDI: "CP01", // "Pagos" — uso de CFDI fijo para el Complemento de Pago
+    },
+    conceptos: [conceptoPago],
+    subtotal: 0,
+    totalImpuestosTrasladados: 0,
+    totalImpuestosRetenidos: 0,
+    descuento: 0,
+    total: 0,
+    estado: "borrador",
+    comentarios: datos.comentarios,
+    registradoPor: usuarioId,
+    pago: {
+      fechaPago: datos.fechaPago,
+      formaPago: datos.formaPago,
+      moneda: original.moneda,
+      monto,
+      numOperacion: datos.numOperacion,
+      docRelacionado: {
+        comprobante: original._id,
+        idDocumento: original.uuid,
+        serie: original.serie,
+        folio: original.folioInterno,
+        moneda: original.moneda,
+        numParcialidad,
+        impSaldoAnterior: saldoAnterior,
+        impPagado: monto,
+        impSaldoInsoluto: saldoInsoluto,
+        objetoImpDR: original.totalImpuestosTrasladados > 0 ? "02" : "01",
+      },
+    },
+  };
+
+  cfdiBuilder.validarComprobante(datosComprobante);
+
+  const cfdi = await ComprobanteFiscal.create(datosComprobante);
   return cfdi.populate("cliente", "nombre rfc");
 }
 
@@ -372,12 +548,14 @@ async function obtenerPdf(id) {
   const cfdi = await ComprobanteFiscal.findById(id);
   if (!cfdi) throw new AppError("Comprobante fiscal no encontrado", 404);
   if (!cfdi.uuid) throw new AppError("Este comprobante todavía no está timbrado", 409);
-  const pac = pacFactory.obtenerPac(); // el PDF fiscal lo genera/devuelve el PAC, no este sistema
-  const buffer = await pac.obtenerPdf(cfdi.uuid);
+  // Representación impresa generada localmente (branding del laboratorio,
+  // configurable en Administración) — no depende de que el PAC ofrezca PDF.
+  const buffer = await generarPdfCfdi(cfdi.toObject());
   return { buffer, nombre: `${cfdi.folioInterno}.pdf` };
 }
 
 module.exports = {
   calcularTotales, listar, obtener, crear, actualizar, timbrar, cancelar, obtenerXml, obtenerPdf,
   previsualizarXml, obtenerEmisorFiscal, obtenerReceptorFiscal,
+  resolverSolicitudCancelacion, emitirComplementoPago,
 };

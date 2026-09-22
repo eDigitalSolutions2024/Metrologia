@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { useForm, useFieldArray, Controller } from "react-hook-form";
 import {
   Dialog, DialogTitle, DialogContent, DialogActions, Box, Typography, Grid,
-  IconButton, Table, TableHead, TableRow, TableCell, TableBody, Paper, Checkbox,
+  IconButton, Table, TableHead, TableRow, TableCell, TableBody, Paper,
   MenuItem, Select, FormControl, InputLabel, Alert, Tooltip,
 } from "@mui/material";
 import AddCircleOutlineIcon from "@mui/icons-material/AddCircleOutlined";
@@ -17,7 +17,9 @@ import AppInput from "../../shared/components/AppInput";
 import AppCard from "../../shared/components/AppCard";
 import { formatCurrency } from "../../shared/utils/currency";
 import { listarClientes } from "../../services/clientes";
+import { listarCotizaciones, obtenerCotizacion } from "../../services/cotizaciones";
 import { crearCfdi } from "../../services/cfdi";
+import ReceiptLongOutlinedIcon from "@mui/icons-material/ReceiptLongOutlined";
 
 const FORMAS_PAGO_SAT = [
   { v: "01", l: "01 - Efectivo" },
@@ -28,13 +30,24 @@ const FORMAS_PAGO_SAT = [
   { v: "99", l: "99 - Por definir" },
 ];
 
+// "16" y "0" son ambos "Sí objeto de impuesto" (ObjetoImp 02) con distinta
+// tasa — el SAT los trata distinto de "exento" (ObjetoImp 01, sin nodo de
+// impuestos), así que no basta un checkbox sí/no de IVA. La tasa de 8% de
+// zona fronteriza ya no existe (se homologó a 16% desde 2021), así que no se
+// incluye aquí.
+const TASAS_IVA = [
+  { v: "16", l: "IVA 16%" },
+  { v: "0", l: "IVA Tasa 0% (exportación, etc.)" },
+  { v: "exento", l: "Exento / no objeto" },
+];
+
 const CONCEPTO_VACIO = {
   claveProdServ: "", descripcion: "", cantidad: 1, claveUnidad: "", unidad: "",
-  valorUnitario: 0, objetoImpuesto: "02", aplicaIva: true,
+  valorUnitario: 0, tasaIva: "16",
 };
 
 const DEFAULT_VALUES = {
-  cliente: "", formaPago: "03", metodoPago: "PUE", comentarios: "",
+  cliente: "", cotizacion: "", formaPago: "03", metodoPago: "PUE", comentarios: "",
   conceptos: [CONCEPTO_VACIO],
 };
 
@@ -44,14 +57,18 @@ const DEFAULT_VALUES = {
  */
 export default function CrearCfdiDialog({ open, onClose, onCreado }) {
   const [clientes, setClientes] = useState([]);
+  const [cotizacionesAprobadas, setCotizacionesAprobadas] = useState([]);
+  const [cargandoCotizacion, setCargandoCotizacion] = useState(false);
   const [submitError, setSubmitError] = useState("");
 
   const {
-    register, control, handleSubmit, watch, reset,
+    register, control, handleSubmit, watch, reset, setValue, getValues,
     formState: { errors, isSubmitting },
   } = useForm({ defaultValues: DEFAULT_VALUES });
-  const { fields, append, remove } = useFieldArray({ control, name: "conceptos" });
+  const { fields, append, remove, replace } = useFieldArray({ control, name: "conceptos" });
   const conceptos = watch("conceptos");
+  const clienteId = watch("cliente");
+  const cotizacionId = watch("cotizacion");
 
   useEffect(() => {
     if (!open) return;
@@ -60,8 +77,55 @@ export default function CrearCfdiDialog({ open, onClose, onCreado }) {
     listarClientes({ pageSize: 300 }).then(({ items }) => setClientes(items)).catch(() => setClientes([]));
   }, [open, reset]);
 
+  // Cotizaciones aprobadas del cliente elegido — para poder jalar sus
+  // partidas en vez de volver a capturarlas a mano. Se recarga cada vez que
+  // cambia el cliente y se limpia la selección previa (una cotización de
+  // otro cliente ya no aplica).
+  useEffect(() => {
+    setValue("cotizacion", "");
+    if (!clienteId) { setCotizacionesAprobadas([]); return; }
+    listarCotizaciones({ clienteId, status: "aprobada", pageSize: 100 })
+      .then(({ items }) => setCotizacionesAprobadas(items))
+      .catch(() => setCotizacionesAprobadas([]));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [clienteId]);
+
+  const cargarDesdeCotizacion = async (id) => {
+    setValue("cotizacion", id);
+    if (!id) return;
+    setCargandoCotizacion(true);
+    try {
+      const cot = await obtenerCotizacion(id);
+      // Cotizaciones solo maneja un % de IVA general, no distingue tasa 0% —
+      // si trae IVA se asume 16% (lo más común), si no, exento.
+      const tasaIva = Number(cot.ivaPorcentaje) > 0 ? "16" : "exento";
+      replace(
+        cot.items.map((it) => ({
+          claveProdServ: "", // el catálogo SAT no se captura en Cotizaciones — hay que completarlo aquí
+          descripcion: it.descripcion,
+          cantidad: it.cantidad,
+          claveUnidad: "",
+          unidad: "",
+          valorUnitario: it.precioUnitario,
+          tasaIva,
+        }))
+      );
+      if (!getValues("comentarios")) {
+        setValue("comentarios", `Cotización ${cot.folio}${cot.ordenCompra ? ` · OC ${cot.ordenCompra}` : ""}`);
+      }
+    } catch {
+      setSubmitError("No se pudo cargar la cotización seleccionada.");
+    } finally {
+      setCargandoCotizacion(false);
+    }
+  };
+
   const subtotal = conceptos.reduce((s, c) => s + (Number(c.cantidad) * Number(c.valorUnitario) || 0), 0);
-  const iva = conceptos.reduce((s, c) => s + (c.aplicaIva ? (Number(c.cantidad) * Number(c.valorUnitario) || 0) * 0.16 : 0), 0);
+  const iva = conceptos.reduce((s, c) => {
+    if (c.tasaIva === "exento") return s;
+    const importe = Number(c.cantidad) * Number(c.valorUnitario) || 0;
+    return s + importe * (c.tasaIva === "16" ? 0.16 : 0);
+  }, 0);
 
   const onSubmit = async (data) => {
     setSubmitError("");
@@ -73,13 +137,14 @@ export default function CrearCfdiDialog({ open, onClose, onCreado }) {
         claveUnidad: c.claveUnidad,
         unidad: c.unidad,
         valorUnitario: Number(c.valorUnitario),
-        objetoImpuesto: c.aplicaIva ? "02" : "01",
-        impuestos: c.aplicaIva
-          ? [{ tipo: "traslado", impuesto: "002", tipoFactor: "Tasa", tasaOCuota: 0.16, base: 0, importe: 0 }]
-          : [],
+        objetoImpuesto: c.tasaIva === "exento" ? "01" : "02",
+        impuestos: c.tasaIva === "exento"
+          ? []
+          : [{ tipo: "traslado", impuesto: "002", tipoFactor: "Tasa", tasaOCuota: c.tasaIva === "16" ? 0.16 : 0, base: 0, importe: 0 }],
       }));
       const creado = await crearCfdi({
-        cliente: data.cliente, formaPago: data.formaPago, metodoPago: data.metodoPago,
+        cliente: data.cliente, cotizacion: data.cotizacion || undefined,
+        formaPago: data.formaPago, metodoPago: data.metodoPago,
         comentarios: data.comentarios, conceptos: conceptosPayload,
       });
       onCreado(creado);
@@ -143,6 +208,33 @@ export default function CrearCfdiDialog({ open, onClose, onCreado }) {
                   />
                 </FormControl>
               </Grid>
+              {cotizacionesAprobadas.length > 0 && (
+                <Grid size={12}>
+                  <FormControl fullWidth size="small">
+                    <InputLabel>Cargar conceptos desde cotización aprobada (opcional)</InputLabel>
+                    <Select
+                      label="Cargar conceptos desde cotización aprobada (opcional)"
+                      value={cotizacionId ?? ""}
+                      onChange={(e) => cargarDesdeCotizacion(e.target.value)}
+                      disabled={cargandoCotizacion}
+                      sx={{ borderRadius: 2 }}
+                    >
+                      <MenuItem value="">— No usar ninguna, capturar a mano —</MenuItem>
+                      {cotizacionesAprobadas.map((c) => (
+                        <MenuItem key={c._id} value={c._id}>
+                          {c.folio} · {formatCurrency(c.total)}{c.ordenCompra ? ` · OC ${c.ordenCompra}` : ""}
+                        </MenuItem>
+                      ))}
+                    </Select>
+                  </FormControl>
+                  {cotizacionId && (
+                    <Alert severity="info" icon={<ReceiptLongOutlinedIcon fontSize="small" />} sx={{ mt: 1.5, borderRadius: 2 }}>
+                      Se cargaron las partidas de la cotización. Faltan las <b>claves SAT</b> (prod/serv y unidad) de
+                      cada concepto — no se capturan en Cotizaciones, complétalas abajo antes de guardar.
+                    </Alert>
+                  )}
+                </Grid>
+              )}
               <Grid size={{ xs: 6, md: 4 }}>
                 <FormControl fullWidth size="small">
                   <InputLabel>Método de pago</InputLabel>
@@ -186,7 +278,7 @@ export default function CrearCfdiDialog({ open, onClose, onCreado }) {
                     </TableCell>
                     <TableCell sx={{ fontWeight: 700 }} width={90}>Cantidad</TableCell>
                     <TableCell sx={{ fontWeight: 700 }} width={130}>Valor unitario</TableCell>
-                    <TableCell sx={{ fontWeight: 700 }} width={80} align="center">IVA 16%</TableCell>
+                    <TableCell sx={{ fontWeight: 700 }} width={150}>IVA</TableCell>
                     <TableCell sx={{ fontWeight: 700 }} width={120}>Importe</TableCell>
                     <TableCell width={44} />
                   </TableRow>
@@ -209,17 +301,22 @@ export default function CrearCfdiDialog({ open, onClose, onCreado }) {
                       <TableCell>
                         <AppInput type="number" {...register(`conceptos.${idx}.valorUnitario`, { required: true, min: 0 })} inputProps={{ min: 0, step: "0.01" }} />
                       </TableCell>
-                      <TableCell align="center">
+                      <TableCell>
                         <Controller
-                          name={`conceptos.${idx}.aplicaIva`} control={control}
+                          name={`conceptos.${idx}.tasaIva`} control={control}
                           render={({ field: f }) => (
-                            <Checkbox size="small" checked={!!f.value} onChange={(e) => f.onChange(e.target.checked)} sx={{ p: 0.5 }} />
+                            <Select {...f} size="small" fullWidth sx={{ borderRadius: 2 }}>
+                              {TASAS_IVA.map((t) => <MenuItem key={t.v} value={t.v}>{t.l}</MenuItem>)}
+                            </Select>
                           )}
                         />
                       </TableCell>
                       <TableCell>
                         <Typography fontWeight={700} fontSize={13} sx={{ pt: 1 }}>
-                          {formatCurrency((Number(conceptos[idx]?.cantidad) * Number(conceptos[idx]?.valorUnitario) || 0) * (conceptos[idx]?.aplicaIva ? 1.16 : 1))}
+                          {formatCurrency(
+                            (Number(conceptos[idx]?.cantidad) * Number(conceptos[idx]?.valorUnitario) || 0)
+                            * (1 + (conceptos[idx]?.tasaIva === "16" ? 0.16 : 0))
+                          )}
                         </Typography>
                       </TableCell>
                       <TableCell>
@@ -243,7 +340,13 @@ export default function CrearCfdiDialog({ open, onClose, onCreado }) {
           </AppCard>
 
           <AppCard dense title="Comentarios" icon={<ChatBubbleOutlineOutlinedIcon />} sx={{ mt: 2.5 }}>
-            <AppInput label="Comentarios (opcional)" multiline minRows={2} {...register("comentarios")} />
+            {/* El texto se puede rellenar por código al cargar una cotización (no
+                escrito por el usuario), y sin esto la etiqueta no sube sola y
+                queda encimada con el texto — se fuerza siempre que ya tenga valor. */}
+            <AppInput
+              label="Comentarios (opcional)" multiline minRows={2} {...register("comentarios")}
+              slotProps={{ inputLabel: { shrink: !!watch("comentarios") } }}
+            />
           </AppCard>
         </DialogContent>
         <DialogActions sx={{ px: 3, pb: 2 }}>

@@ -2,15 +2,21 @@ import { useState } from "react";
 import {
   Dialog, DialogTitle, DialogContent, DialogActions, Box, Typography, Chip,
   Table, TableHead, TableRow, TableCell, TableBody, Alert, TextField,
+  MenuItem, Select, FormControl, InputLabel,
 } from "@mui/material";
 import WarningAmberOutlinedIcon from "@mui/icons-material/WarningAmberOutlined";
 import AppButton from "../../shared/components/AppButton";
 import { formatCurrency } from "../../shared/utils/currency";
 import { formatDate } from "../../shared/utils/formatDate";
-import { timbrarCfdi, cancelarCfdi, descargarXmlCfdi, descargarPdfCfdi, previsualizarXmlCfdi } from "../../services/cfdi";
+import {
+  timbrarCfdi, cancelarCfdi, descargarXmlCfdi, descargarPdfCfdi, previsualizarXmlCfdi,
+  resolverSolicitudCancelacionCfdi,
+} from "../../services/cfdi";
 import CodeOutlinedIcon from "@mui/icons-material/CodeOutlined";
 import DownloadOutlinedIcon from "@mui/icons-material/DownloadOutlined";
-import { ESTADO_CFDI_CHIP } from "./estadosCfdi";
+import PaymentsOutlinedIcon from "@mui/icons-material/PaymentsOutlined";
+import { ESTADO_CFDI_CHIP, MOTIVOS_CANCELACION } from "./estadosCfdi";
+import RegistrarPagoDialog from "./RegistrarPagoDialog";
 
 function descargarBlob(blob, nombre) {
   const url = URL.createObjectURL(blob);
@@ -23,11 +29,13 @@ function descargarBlob(blob, nombre) {
 export default function CfdiDetalleDialog({ cfdi, onClose, onCambiado }) {
   const [error, setError] = useState(null); // { message, code }
   const [cargando, setCargando] = useState(false);
-  const [motivoCancelacion, setMotivoCancelacion] = useState("");
+  const [motivoCodigoCancelacion, setMotivoCodigoCancelacion] = useState("");
+  const [folioSustitucion, setFolioSustitucion] = useState("");
   const [pidiendoCancelacion, setPidiendoCancelacion] = useState(false);
   const [preview, setPreview] = useState(null); // { xml, nombre } | null
   const [previewDeId, setPreviewDeId] = useState(null);
   const [cargandoPreview, setCargandoPreview] = useState(false);
+  const [pagando, setPagando] = useState(false);
 
   // Si se abre un comprobante distinto, se descarta el XML mostrado del
   // anterior — sin esto quedaba viendo el XML de otro CFDI hasta volver a
@@ -41,6 +49,10 @@ export default function CfdiDetalleDialog({ cfdi, onClose, onCambiado }) {
   const s = ESTADO_CFDI_CHIP[cfdi.estado] || { label: cfdi.estado, color: "default" };
   const puedeTimbrar = ["borrador", "pendiente_timbrar", "error_timbrado"].includes(cfdi.estado);
   const puedeCancelar = cfdi.estado === "timbrada";
+  const esperandoAceptacion = cfdi.estado === "cancelacion_pendiente";
+  const esFacturaPPD = cfdi.tipoComprobante === "I" && cfdi.metodoPago === "PPD";
+  const saldo = cfdi.saldoPendiente ?? (esFacturaPPD ? cfdi.total : null);
+  const puedeRegistrarPago = cfdi.estado === "timbrada" && esFacturaPPD && saldo > 0;
 
   // Con responseType:"blob" (descargas de XML/PDF), axios entrega el cuerpo
   // del error como Blob, no como JSON — sin esto, cualquier error al
@@ -69,12 +81,24 @@ export default function CfdiDetalleDialog({ cfdi, onClose, onCambiado }) {
   };
 
   const cancelar = async () => {
-    if (!motivoCancelacion.trim()) { setError({ message: "Indica el motivo de cancelación." }); return; }
+    if (!motivoCodigoCancelacion) { setError({ message: "Selecciona el motivo de cancelación." }); return; }
+    if (motivoCodigoCancelacion === "01" && !folioSustitucion.trim()) {
+      setError({ message: "El motivo 01 requiere el folio fiscal (UUID) del CFDI que sustituye a este." });
+      return;
+    }
     setCargando(true); setError(null);
     try {
-      const actualizado = await cancelarCfdi(cfdi._id, motivoCancelacion.trim());
+      const actualizado = await cancelarCfdi(cfdi._id, motivoCodigoCancelacion, undefined, folioSustitucion.trim() || undefined);
       onCambiado(actualizado);
       setPidiendoCancelacion(false);
+    } catch (err) { manejarError(err); } finally { setCargando(false); }
+  };
+
+  const resolverCancelacion = async (aceptar) => {
+    setCargando(true); setError(null);
+    try {
+      const actualizado = await resolverSolicitudCancelacionCfdi(cfdi._id, aceptar);
+      onCambiado(actualizado);
     } catch (err) { manejarError(err); } finally { setCargando(false); }
   };
 
@@ -155,10 +179,41 @@ export default function CfdiDetalleDialog({ cfdi, onClose, onCambiado }) {
           </Box>
         )}
 
-        {cfdi.estado === "cancelada" && cfdi.cancelacion?.motivo && (
+        {cfdi.estado === "cancelada" && cfdi.cancelacion && (
           <Alert severity="info" sx={{ mb: 2.5, borderRadius: 2 }}>
-            Cancelada el {formatDate(cfdi.cancelacion.fecha)} — motivo: {cfdi.cancelacion.motivo}
+            Cancelada el {formatDate(cfdi.cancelacion.fecha)} — motivo {cfdi.cancelacion.motivoCodigo}
+            {cfdi.cancelacion.folioSustitucion && <> · sustituye a {cfdi.cancelacion.folioSustitucion}</>}
           </Alert>
+        )}
+
+        {esperandoAceptacion && (
+          <Alert severity="warning" sx={{ mb: 2.5, borderRadius: 2 }}>
+            Solicitud de cancelación pendiente de aceptación del receptor (monto superior a $5,000).
+            {cfdi.cancelacion?.fechaLimiteRespuesta && (
+              <> Vence el {formatDate(cfdi.cancelacion.fechaLimiteRespuesta)}; si no hay respuesta se acepta automáticamente.</>
+            )}
+          </Alert>
+        )}
+
+        {esFacturaPPD && cfdi.estado === "timbrada" && (
+          <Alert severity={saldo > 0 ? "info" : "success"} sx={{ mb: 2.5, borderRadius: 2 }}>
+            Pago en parcialidades o diferido — saldo pendiente: <b>{formatCurrency(saldo)}</b>
+          </Alert>
+        )}
+
+        {cfdi.tipoComprobante === "P" && cfdi.pago && (
+          <Box sx={{ mb: 2.5, p: 1.5, borderRadius: 2, bgcolor: "background.default", border: 1, borderColor: "divider" }}>
+            <Typography variant="subtitle2" fontWeight={700} sx={{ mb: 0.5 }}>Complemento de Pago</Typography>
+            <Typography variant="caption" sx={{ display: "block" }}>
+              Fecha de pago: {formatDate(cfdi.pago.fechaPago)} · Forma de pago: {cfdi.pago.formaPago} · Monto: {formatCurrency(cfdi.pago.monto)}
+            </Typography>
+            {cfdi.pago.docRelacionado && (
+              <Typography variant="caption" sx={{ display: "block" }}>
+                Documento relacionado: {cfdi.pago.docRelacionado.serie || ""}{cfdi.pago.docRelacionado.folio || ""} · Parcialidad {cfdi.pago.docRelacionado.numParcialidad} ·
+                {" "}Saldo anterior {formatCurrency(cfdi.pago.docRelacionado.impSaldoAnterior)} → insoluto {formatCurrency(cfdi.pago.docRelacionado.impSaldoInsoluto)}
+              </Typography>
+            )}
+          </Box>
         )}
 
         <Table size="small" sx={{ mb: 2 }}>
@@ -191,10 +246,27 @@ export default function CfdiDetalleDialog({ cfdi, onClose, onCambiado }) {
         </Box>
 
         {pidiendoCancelacion && (
-          <TextField
-            fullWidth size="small" sx={{ mt: 2 }} label="Motivo de cancelación (obligatorio)"
-            value={motivoCancelacion} onChange={(e) => setMotivoCancelacion(e.target.value)}
-          />
+          <Box sx={{ display: "flex", flexDirection: "column", gap: 2, mt: 2 }}>
+            <FormControl size="small" fullWidth>
+              <InputLabel>Motivo de cancelación (SAT)</InputLabel>
+              <Select
+                label="Motivo de cancelación (SAT)"
+                value={motivoCodigoCancelacion}
+                onChange={(e) => setMotivoCodigoCancelacion(e.target.value)}
+                sx={{ borderRadius: 2 }}
+              >
+                {MOTIVOS_CANCELACION.map((m) => (
+                  <MenuItem key={m.value} value={m.value}>{m.label}</MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+            {motivoCodigoCancelacion === "01" && (
+              <TextField
+                fullWidth size="small" label="Folio fiscal (UUID) que sustituye a este CFDI"
+                value={folioSustitucion} onChange={(e) => setFolioSustitucion(e.target.value)}
+              />
+            )}
+          </Box>
         )}
 
         {preview && (
@@ -234,6 +306,21 @@ export default function CfdiDetalleDialog({ cfdi, onClose, onCambiado }) {
           <AppButton type="button" variant="outlined" onClick={descargarPdf} sx={{ borderRadius: 2 }}>PDF</AppButton>
         )}
         <Box sx={{ flex: 1 }} />
+        {puedeRegistrarPago && (
+          <AppButton type="button" variant="outlined" startIcon={<PaymentsOutlinedIcon />} onClick={() => setPagando(true)} sx={{ borderRadius: 2 }}>
+            Registrar pago
+          </AppButton>
+        )}
+        {esperandoAceptacion && (
+          <>
+            <AppButton type="button" variant="outlined" color="error" loading={cargando} onClick={() => resolverCancelacion(false)} sx={{ borderRadius: 2 }}>
+              Rechazar cancelación
+            </AppButton>
+            <AppButton type="button" color="success" loading={cargando} onClick={() => resolverCancelacion(true)} sx={{ borderRadius: 2 }}>
+              Aceptar cancelación
+            </AppButton>
+          </>
+        )}
         {puedeCancelar && !pidiendoCancelacion && (
           <AppButton type="button" variant="outlined" color="error" onClick={() => setPidiendoCancelacion(true)} sx={{ borderRadius: 2 }}>
             Cancelar CFDI
@@ -251,6 +338,11 @@ export default function CfdiDetalleDialog({ cfdi, onClose, onCambiado }) {
         )}
         <AppButton type="button" variant="outlined" onClick={onClose} sx={{ borderRadius: 2 }}>Cerrar</AppButton>
       </DialogActions>
+      <RegistrarPagoDialog
+        cfdi={pagando ? cfdi : null}
+        onClose={() => setPagando(false)}
+        onCreado={(creado) => { setPagando(false); onCambiado(creado); }}
+      />
     </Dialog>
   );
 }
