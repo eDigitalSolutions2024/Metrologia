@@ -3,7 +3,7 @@ const { mongoUri } = require("./env");
 
 async function connectDB() {
   mongoose.connection.on("connected", () => {
-    console.log("MongoDB conectado");
+    console.log("MongoDB Conectado con Exito");
   });
   mongoose.connection.on("error", (err) => {
     console.error("Error de conexión a MongoDB:", err.message);

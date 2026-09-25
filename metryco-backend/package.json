@@ -27,8 +27,10 @@
     "mammoth": "^1.12.2",
     "mongoose": "^8.6.0",
     "multer": "^2.2.0",
+    "node-cron": "^4.6.0",
     "pdf-parse": "^1.1.1",
     "pdfkit": "^0.20.2",
+    "puppeteer": "^25.12.0",
     "qrcode": "^1.5.4",
     "zod": "^4.5.4"
   },
@@ -37,5 +39,8 @@
   },
   "overrides": {
     "uuid": "^11.1.1"
+  },
+  "allowScripts": {
+    "puppeteer@25.12.0": true
   }
 }

@@ -15,6 +15,7 @@ import VerifiedOutlinedIcon from "@mui/icons-material/VerifiedOutlined";
 import ScheduleOutlinedIcon from "@mui/icons-material/ScheduleOutlined";
 import ReportGmailerrorredOutlinedIcon from "@mui/icons-material/ReportGmailerrorredOutlined";
 import WorkspacePremiumOutlinedIcon from "@mui/icons-material/WorkspacePremiumOutlined";
+import WhatsAppIcon from "@mui/icons-material/WhatsApp";
 
 import AppButton from "../../shared/components/AppButton";
 import AppTable from "../../shared/components/AppTable";
@@ -25,7 +26,7 @@ import { useAuth } from "../../core/auth/useAuth";
 import { listarClientes } from "../../services/clientes";
 import {
   listarCertificados, emitirCertificado, cambiarEstadoCertificado, anularCertificado,
-  listarCertificadosPorVencer,
+  listarCertificadosPorVencer, enviarRecordatorioWhatsApp,
 } from "../../services/certificados";
 import { listarAsignaciones } from "../../services/reportes";
 import { obtenerDirectorio } from "../../services/usuarios";
@@ -68,6 +69,8 @@ export default function CertificadosPage() {
   const [vencEstado, setVencEstado] = useState("");
   const [vencRows, setVencRows] = useState([]);
   const [vencLoading, setVencLoading] = useState(false);
+  const [enviandoWspId, setEnviandoWspId] = useState(null); // id del certificado cuyo WhatsApp está en curso
+  const [wspFeedback, setWspFeedback] = useState(null); // { tipo: "ok"|"error", mensaje }
 
   const cargar = useCallback(() => {
     setLoading(true);
@@ -207,6 +210,17 @@ export default function CertificadosPage() {
               <ArticleOutlinedIcon fontSize="small" sx={{ color: "secondary.main" }} />
             </IconButton>
           </Tooltip>
+          <Tooltip title={r.cliente?.contacto?.telefono ? "Enviar recordatorio por WhatsApp (con el certificado en PDF)" : "El cliente no tiene teléfono capturado"}>
+            <span>
+              <IconButton
+                size="small"
+                disabled={!r.cliente?.contacto?.telefono || enviandoWspId === r._id}
+                onClick={() => enviarWhatsApp(r)}
+              >
+                <WhatsAppIcon fontSize="small" sx={{ color: r.cliente?.contacto?.telefono ? "#25D366" : "text.disabled" }} />
+              </IconButton>
+            </span>
+          </Tooltip>
           {esAdmin && (
             <Tooltip title="Editar certificado (servicio, condiciones, comentarios)">
               <IconButton size="small" onClick={() => setEditarCertId(r._id)}>
@@ -218,6 +232,25 @@ export default function CertificadosPage() {
       ),
     },
   ];
+
+  const enviarWhatsApp = async (cert) => {
+    setEnviandoWspId(cert._id);
+    setWspFeedback(null);
+    try {
+      await enviarRecordatorioWhatsApp(cert._id);
+      setWspFeedback({ tipo: "ok", mensaje: `Recordatorio enviado por WhatsApp a ${cert.cliente?.nombre || "el cliente"}.` });
+    } catch (err) {
+      const data = err.response?.data;
+      setWspFeedback({
+        tipo: "error",
+        mensaje: data?.code === "WHATSAPP_NOT_CONFIGURED"
+          ? "WhatsApp todavía no está configurado en el servidor."
+          : (data?.message || "No se pudo enviar el recordatorio por WhatsApp."),
+      });
+    } finally {
+      setEnviandoWspId(null);
+    }
+  };
 
   return (
     <Box>
@@ -293,6 +326,11 @@ export default function CertificadosPage() {
           <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
             Certificados vigentes cuya vigencia ya venció o vence dentro de los próximos 30 días.
           </Typography>
+          {wspFeedback && (
+            <Alert severity={wspFeedback.tipo === "ok" ? "success" : "error"} sx={{ mb: 2, borderRadius: 2 }} onClose={() => setWspFeedback(null)}>
+              {wspFeedback.mensaje}
+            </Alert>
+          )}
           <Box sx={{ display: "flex", gap: 2, mb: 2, flexWrap: "wrap" }}>
             <FormControl size="small" sx={{ minWidth: 220 }}>
               <InputLabel>Cliente</InputLabel>

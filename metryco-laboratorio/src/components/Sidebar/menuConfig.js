@@ -146,6 +146,7 @@ const menu = [
           { title: "Razones Sociales", path: "/administracion/razones-sociales", roles: ["admin"] },
           { title: "Colores", path: "/administracion/colores", roles: ["admin"] },
           { title: "Auditoría", path: "/administracion/auditoria", roles: ["admin"] },
+          { title: "WhatsApp (pruebas)", path: "/administracion/whatsapp-pruebas", roles: ["admin"] },
         ],
       },
     ],

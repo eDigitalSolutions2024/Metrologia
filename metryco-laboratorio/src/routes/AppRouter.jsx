@@ -25,6 +25,7 @@ import LaboratorioPage from "../pages/Administracion/LaboratorioPage";
 import ColoresPage from "../pages/Administracion/ColoresPage";
 import RazonesSocialesPage from "../pages/Administracion/RazonesSocialesPage";
 import AuditoriaPage from "../pages/Administracion/AuditoriaPage";
+import WhatsAppPruebasPage from "../pages/Administracion/WhatsAppPruebasPage";
 import ClientesPage from "../pages/Clientes/ClientesPage";
 import ClienteForm from "../pages/Clientes/ClienteForm";
 import CotizacionesPage from "../pages/Cotizaciones/CotizacionesPage";
@@ -141,6 +142,7 @@ export default function AppRouter() {
         <Route path="administracion/colores" element={<ColoresPage />} />
         <Route path="administracion/razones-sociales" element={<RazonesSocialesPage />} />
         <Route path="administracion/auditoria" element={<AuditoriaPage />} />
+        <Route path="administracion/whatsapp-pruebas" element={<WhatsAppPruebasPage />} />
         <Route path="clientes" element={<ClientesPage />} />
         <Route path="clientes/nuevo" element={<ClienteForm />} />
         <Route path="clientes/:id/editar" element={<ClienteForm />} />

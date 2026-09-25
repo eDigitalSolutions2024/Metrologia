@@ -62,6 +62,16 @@ export async function regenerarTokenCertificado(id) {
   return data.data;
 }
 
+export async function enviarRecordatorioWhatsApp(id, telefonoPrueba) {
+  const { data } = await api.post(`${ENDPOINTS.CERTIFICADOS}/${id}/whatsapp`, telefonoPrueba ? { telefonoPrueba } : {});
+  return data.data;
+}
+
+export async function ejecutarRecordatoriosWhatsAppLote() {
+  const { data } = await api.post(`${ENDPOINTS.CERTIFICADOS}/whatsapp/ejecutar-lote`);
+  return data.data;
+}
+
 export async function adjuntarPdfCertificado(id, file) {
   const form = new FormData();
   form.append("archivo", file);

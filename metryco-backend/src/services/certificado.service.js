@@ -15,6 +15,7 @@ const { crearEvento } = require("../utils/historial");
 const qr = require("../utils/qr");
 const { publicWebUrl, uploadsDir } = require("../config/env");
 const configuracionService = require("./configuracion.service");
+const whatsappService = require("./whatsapp.service");
 
 const oid = (v) => (mongoose.isValidObjectId(v) ? new mongoose.Types.ObjectId(v) : null);
 
@@ -86,7 +87,7 @@ async function listarPorVencer({ clienteId = "", estado = "", dias = 30 } = {}) 
   if (clienteId && oid(clienteId)) match.cliente = oid(clienteId);
 
   let items = await Certificado.find(match)
-    .populate("cliente", "nombre rfc")
+    .populate("cliente", "nombre rfc contacto.telefono") // contacto.telefono: para el botón de recordatorio por WhatsApp
     .sort({ vigencia: 1 })
     .limit(2000);
 
@@ -95,6 +96,52 @@ async function listarPorVencer({ clienteId = "", estado = "", dias = 30 } = {}) 
     items = items.filter((c) => c.estadoEfectivo === estado);
   }
   return items;
+}
+
+/**
+ * Manda el recordatorio de vencimiento de UN certificado por WhatsApp al
+ * teléfono capturado en el Cliente — usado desde el botón de la pantalla
+ * "Certificados por vencer". El texto lo define la plantilla aprobada en
+ * Meta (ver whatsapp.service.js); el PDF adjunto es el certificado REAL,
+ * generado en el momento con el mismo diseño de "Informe de calibración"
+ * (ver certificadoPdf.js) — no el archivo que a veces se sube a mano
+ * (adjuntarPdf), que es un documento distinto (firmado/escaneado).
+ *
+ * `telefonoPrueba` es solo para el panel de pruebas de Administración: manda
+ * el mismo mensaje real de este certificado a un número distinto al del
+ * cliente, para poder probar sin arriesgarse a mandarle algo a un cliente de
+ * verdad por accidente.
+ */
+async function enviarRecordatorioWhatsApp(certificadoId, { telefonoPrueba } = {}) {
+  const cert = await Certificado.findById(certificadoId).populate("cliente", "nombre contacto.telefono");
+  if (!cert) throw new AppError("Certificado no encontrado", 404);
+
+  const telefono = telefonoPrueba || cert.cliente?.contacto?.telefono;
+  if (!telefono) {
+    throw new AppError("El cliente de este certificado no tiene teléfono capturado", 400);
+  }
+
+  const equipo = [cert.equipoSnapshot?.idInterno, cert.equipoSnapshot?.descripcion].filter(Boolean).join(" — ") || "equipo";
+  const vigencia = cert.vigencia ? new Date(cert.vigencia).toLocaleDateString("es-MX") : "sin fecha";
+  // require() diferido (no arriba del archivo): certificadoPdf.js a su vez
+  // requiere este mismo archivo (necesita `obtener`/`urlPublica`) — con un
+  // ciclo así, un require de nivel superior podría capturar el
+  // module.exports de certificado.service.js todavía vacío, ya que este
+  // archivo lo reasigna por completo al final en vez de mutarlo. Requerirlo
+  // aquí adentro, en el momento de la llamada (no al cargar el módulo),
+  // siempre resuelve bien porque para entonces ambos módulos ya terminaron
+  // de cargar.
+  const pdfBuffer = await require("./certificadoPdf").generarPdfCertificado(certificadoId);
+
+  return whatsappService.enviarRecordatorioCertificado({
+    telefono,
+    nombreCliente: cert.cliente?.nombre || "cliente",
+    folio: cert.folio,
+    equipo,
+    vigencia,
+    pdfBuffer,
+    pdfNombre: `${cert.folio}.pdf`,
+  });
 }
 
 /**
@@ -612,5 +659,5 @@ async function archivoStream(id) {
 module.exports = {
   listar, obtener, exportar, emitir, actualizar, cambiarEstado, adjuntarPdf,
   anular, regenerarToken, qrPng, qrSvg, archivoStream, porVencer, listarPorVencer, porReporte,
-  urlPublica, rutaArchivo, previsualizar,
+  urlPublica, rutaArchivo, previsualizar, enviarRecordatorioWhatsApp,
 };

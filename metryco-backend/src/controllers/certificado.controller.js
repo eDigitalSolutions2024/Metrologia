@@ -1,5 +1,6 @@
 const asyncHandler = require("../utils/asyncHandler");
 const service = require("../services/certificado.service");
+const { ejecutarRecordatorios } = require("../jobs/recordatoriosWhatsApp.job");
 
 const previsualizar = asyncHandler(async (req, res) => {
   res.json({ success: true, data: await service.previsualizar(req.params.asignacionId) });
@@ -16,6 +17,15 @@ const listar = asyncHandler(async (req, res) => {
 const porVencer = asyncHandler(async (req, res) => {
   const { clienteId = "", estado = "", dias = 30 } = req.query;
   res.json({ success: true, data: await service.listarPorVencer({ clienteId, estado, dias: Number(dias) }) });
+});
+
+const enviarRecordatorioWhatsApp = asyncHandler(async (req, res) => {
+  const resultado = await service.enviarRecordatorioWhatsApp(req.params.id, { telefonoPrueba: req.body?.telefonoPrueba });
+  res.json({ success: true, data: resultado });
+});
+
+const ejecutarRecordatoriosWhatsApp = asyncHandler(async (req, res) => {
+  res.json({ success: true, data: await ejecutarRecordatorios() });
 });
 
 const exportar = asyncHandler(async (req, res) => {
@@ -73,4 +83,5 @@ const descargarPdf = asyncHandler(async (req, res) => {
 module.exports = {
   listar, obtener, exportar, emitir, actualizar, cambiarEstado, adjuntarPdf,
   anular, regenerarToken, qrPng, qrSvg, descargarPdf, porReporte, porVencer, previsualizar,
+  enviarRecordatorioWhatsApp, ejecutarRecordatoriosWhatsApp,
 };

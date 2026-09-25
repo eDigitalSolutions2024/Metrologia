@@ -149,6 +149,17 @@ const certificadoSchema = new Schema(
       },
     ],
 
+    // Seguimiento del recordatorio automático por WhatsApp (ver
+    // jobs/recordatoriosWhatsApp.job.js) — permite saber cuándo se mandó el
+    // último para no repetirlo antes de que pase una semana, y separa el
+    // envío automático del manual (botón en pantalla / panel de pruebas, que
+    // no tocan este campo).
+    recordatorioWhatsApp: {
+      ultimoEnvio: Date,
+      ultimoResultado: { type: String, enum: ["enviado", "error"] },
+      ultimoError: String,
+    },
+
     anulacion: {
       motivo: String,
       usuario: { id: { type: Schema.Types.ObjectId, ref: "Usuario" }, nombre: String },
