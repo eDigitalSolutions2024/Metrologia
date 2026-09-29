@@ -6,6 +6,10 @@ const itemSchema = new Schema(
     marca: { type: String, trim: true },
     modelo: { type: String, trim: true },
     tiempoEntrega: { type: String, trim: true }, // texto libre: "5 días hábiles", "2 semanas"...
+    // Catálogo SAT — se capturan aquí para que al facturar la cotización el
+    // CFDI ya traiga las claves y no haya que teclearlas de nuevo.
+    claveProdServ: { type: String, trim: true }, // c_ClaveProdServ, ej. 80101504
+    claveUnidad: { type: String, trim: true }, // c_ClaveUnidad, ej. E48
     cantidad: { type: Number, required: true, min: 0 },
     precioUnitario: { type: Number, required: true, min: 0 },
   },

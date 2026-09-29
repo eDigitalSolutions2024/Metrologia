@@ -58,7 +58,8 @@ const STATUS_MAP = {
   vencida: { label: "Vencida", color: "default" },
 };
 
-const ITEM_VACIO = { descripcion: "", marca: "", modelo: "", tiempoEntrega: "", cantidad: 1, precioUnitario: 0 };
+// 80101504 / E48: "Servicios de calibración" / "Unidad de servicio" del catálogo SAT — valores típicos de un laboratorio, editables por partida.
+const ITEM_VACIO = { descripcion: "", marca: "", modelo: "", tiempoEntrega: "", claveProdServ: "80101504", claveUnidad: "E48", cantidad: 1, precioUnitario: 0 };
 
 const DEFAULT_VALUES = {
   cliente: "",
@@ -165,7 +166,8 @@ export default function CotizacionDialog({ open, cotizacionId, duplicarDesdeId, 
             ivaPorcentaje: cotizacion.ivaPorcentaje ?? 16,
             items: cotizacion.items.map((i) => ({
               descripcion: i.descripcion, marca: i.marca || "", modelo: i.modelo || "",
-              tiempoEntrega: i.tiempoEntrega || "", cantidad: i.cantidad, precioUnitario: i.precioUnitario,
+              tiempoEntrega: i.tiempoEntrega || "", claveProdServ: i.claveProdServ || "80101504", claveUnidad: i.claveUnidad || "E48",
+              cantidad: i.cantidad, precioUnitario: i.precioUnitario,
             })),
           });
           setCotizacionData(null);
@@ -585,6 +587,18 @@ export default function CotizacionDialog({ open, cotizacionId, duplicarDesdeId, 
                                 placeholder="Ej: 3 días hábiles"
                                 slotProps={{ inputLabel: { shrink: !!items[idx]?.tiempoEntrega } }}
                                 {...register(`items.${idx}.tiempoEntrega`)}
+                              />
+                            </Box>
+                            <Box sx={{ display: "flex", gap: 1, mt: 1.25 }}>
+                              <AppInput
+                                label="Clave SAT prod/serv" size="small" fullWidth placeholder="80101504"
+                                slotProps={{ inputLabel: { shrink: true } }}
+                                {...register(`items.${idx}.claveProdServ`, { pattern: /^\d{6,8}$/ })}
+                              />
+                              <AppInput
+                                label="Clave unidad SAT" size="small" fullWidth placeholder="E48"
+                                slotProps={{ inputLabel: { shrink: true } }}
+                                {...register(`items.${idx}.claveUnidad`)}
                               />
                             </Box>
                           </TableCell>

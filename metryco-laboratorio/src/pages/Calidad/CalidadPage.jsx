@@ -21,6 +21,7 @@ import { exportCsv } from "../../shared/utils/exportCsv";
 import { listarCalidad, cambiarEstadoAsignacion } from "../../services/reportes";
 import { pedirRefrescoAlertas } from "../../shared/utils/alertasBus";
 import { useNavigate } from "react-router-dom";
+import { usePolling } from "../../shared/hooks/usePolling";
 
 const MESES = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
   "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"];
@@ -102,18 +103,19 @@ function ConsultarTab() {
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(10);
 
-  const cargar = () => {
-    setLoading(true);
+  const cargar = (silencioso = false) => {
+    if (!silencioso) setLoading(true);
     listarCalidad({ clienteId: clienteFiltro })
       .then(setAsignaciones)
-      .catch(() => setError("No se pudo cargar la cola de Calidad."))
-      .finally(() => setLoading(false));
+      .catch(() => { if (!silencioso) setError("No se pudo cargar la cola de Calidad."); })
+      .finally(() => { if (!silencioso) setLoading(false); });
   };
 
   useEffect(() => {
     listarClientes({ pageSize: 200 }).then(({ items }) => setClientes(items)).catch(() => {});
   }, []);
   useEffect(() => { cargar(); setPage(0); }, [clienteFiltro]); // eslint-disable-line react-hooks/exhaustive-deps
+  usePolling(() => cargar(true));
 
   const autorizar = async (a) => {
     setError("");

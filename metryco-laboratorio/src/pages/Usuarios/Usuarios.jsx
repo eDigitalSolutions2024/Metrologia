@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import {
   Box,
   Typography,
@@ -42,6 +42,7 @@ import EditarUsuario from "../../shared/components/EditarUsuario/EditarUsuario";
 import ObservacionesUsuario from "../../shared/components/ObservacionesUsuario/ObservacionesUsuario";
 import { listarUsuarios, desactivarUsuario, reactivarUsuario, eliminarUsuario } from "../../services/usuarios";
 import { useDebounce } from "../../shared/hooks/useDebounce";
+import { usePolling } from "../../shared/hooks/usePolling";
 
 const ROL_MAP = {
   admin: { label: "Administrador", color: "error" },
@@ -79,32 +80,25 @@ export default function Usuarios() {
     setPage(0);
   }
 
-  useEffect(() => {
-    let cancelado = false;
+  const cargarUsuarios = useCallback(async (silencioso = false) => {
+    if (!silencioso) { setLoading(true); setError(""); }
+    try {
+      const { items, total } = await listarUsuarios({
+        search: debouncedSearch,
+        page,
+        pageSize: rowsPerPage,
+      });
+      setRows(items.map((u) => ({ ...u, id: u._id })));
+      setTotalCount(total);
+    } catch {
+      if (!silencioso) setError("No se pudieron cargar los usuarios. Intenta de nuevo.");
+    } finally {
+      if (!silencioso) setLoading(false);
+    }
+  }, [debouncedSearch, page, rowsPerPage]);
 
-    (async () => {
-      setLoading(true);
-      setError("");
-      try {
-        const { items, total } = await listarUsuarios({
-          search: debouncedSearch,
-          page,
-          pageSize: rowsPerPage,
-        });
-        if (cancelado) return;
-        setRows(items.map((u) => ({ ...u, id: u._id })));
-        setTotalCount(total);
-      } catch {
-        if (!cancelado) setError("No se pudieron cargar los usuarios. Intenta de nuevo.");
-      } finally {
-        if (!cancelado) setLoading(false);
-      }
-    })();
-
-    return () => {
-      cancelado = true;
-    };
-  }, [debouncedSearch, page, rowsPerPage, reloadKey]);
+  useEffect(() => { cargarUsuarios(); }, [cargarUsuarios, reloadKey]);
+  usePolling(() => cargarUsuarios(true));
 
   useEffect(() => {
     let cancelado = false;

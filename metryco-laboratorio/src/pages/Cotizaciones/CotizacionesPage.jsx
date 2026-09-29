@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import {
   Box, Typography, TextField, InputAdornment, IconButton,
@@ -26,8 +26,9 @@ import CotizacionDialog from "./CotizacionDialog";
 import { formatDate } from "../../shared/utils/formatDate";
 import { formatCurrency } from "../../shared/utils/currency";
 import { listarCotizaciones, eliminarCotizacion } from "../../services/cotizaciones";
-import { listarClientes } from "../../services/clientes";
+import { listarClientes, obtenerCliente } from "../../services/clientes";
 import { useDebounce } from "../../shared/hooks/useDebounce";
+import { usePolling } from "../../shared/hooks/usePolling";
 
 const STATUS_MAP = {
   pendiente: { label: "Pendiente",  color: "warning" },
@@ -97,36 +98,36 @@ export default function CotizacionesPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  useEffect(() => {
-    let cancelado = false;
+  // Protege contra condiciones de carrera: con filtros que cambian rápido
+  // + el refresco automático de fondo (usePolling) puede haber más de una
+  // petición en vuelo a la vez — si una vieja resuelve después de una más
+  // nueva, no debe pisar los datos ya actualizados.
+  const cargaIdRef = useRef(0);
+  const cargar = useCallback(async (silencioso = false) => {
+    const miId = ++cargaIdRef.current;
+    if (!silencioso) { setLoading(true); setError(""); }
+    try {
+      const { items, total } = await listarCotizaciones({
+        search: debouncedSearch,
+        status: statusFilter,
+        mes: mesFilter,
+        anio: anioFilter,
+        clienteId: clienteFilter,
+        page,
+        pageSize: rowsPerPage,
+      });
+      if (cargaIdRef.current !== miId) return;
+      setRows(items.map((c) => ({ ...c, id: c._id })));
+      setTotalCount(total);
+    } catch {
+      if (cargaIdRef.current === miId && !silencioso) setError("No se pudieron cargar las cotizaciones. Intenta de nuevo.");
+    } finally {
+      if (cargaIdRef.current === miId && !silencioso) setLoading(false);
+    }
+  }, [debouncedSearch, statusFilter, mesFilter, anioFilter, clienteFilter, page, rowsPerPage]);
 
-    (async () => {
-      setLoading(true);
-      setError("");
-      try {
-        const { items, total } = await listarCotizaciones({
-          search: debouncedSearch,
-          status: statusFilter,
-          mes: mesFilter,
-          anio: anioFilter,
-          clienteId: clienteFilter,
-          page,
-          pageSize: rowsPerPage,
-        });
-        if (cancelado) return;
-        setRows(items.map((c) => ({ ...c, id: c._id })));
-        setTotalCount(total);
-      } catch {
-        if (!cancelado) setError("No se pudieron cargar las cotizaciones. Intenta de nuevo.");
-      } finally {
-        if (!cancelado) setLoading(false);
-      }
-    })();
-
-    return () => {
-      cancelado = true;
-    };
-  }, [debouncedSearch, statusFilter, mesFilter, anioFilter, clienteFilter, page, rowsPerPage, reloadKey]);
+  useEffect(() => { cargar(); }, [cargar, reloadKey]);
+  usePolling(() => cargar(true));
 
   const totalAprobado = rows
     .filter((c) => c.status === "aprobada" || c.status === "facturada")
@@ -164,14 +165,28 @@ export default function CotizacionesPage() {
 
   const cerrarDialog = () => { setDialogAbierto(false); setDuplicarDesde(null); };
 
-  const generarFactura = (row) => {
-    const params = new URLSearchParams({
-      cotizacion: row.id,
-      cliente: row.cliente,
-      monto: row.total,
-      folio: row.folio,
-    });
-    navigate(`/cobranza?${params.toString()}`);
+  // Lleva la cotización aprobada a Facturación con el CFDI ya armado — antes
+  // de salir se revisa que el cliente tenga datos fiscales completos, para
+  // no descubrirlo hasta el momento de guardar el borrador.
+  const generarFactura = async (row) => {
+    setError("");
+    try {
+      const cliente = await obtenerCliente(row.cliente);
+      const faltantes = [
+        !cliente.rfc && "RFC",
+        !cliente.regimenFiscal && "régimen fiscal",
+        !cliente.usoCFDI && "uso de CFDI",
+        !cliente.domicilioFiscal?.cp && "código postal fiscal",
+      ].filter(Boolean);
+      if (faltantes.length) {
+        setError(`No se puede facturar ${row.folio}: a "${cliente.nombre}" le faltan datos fiscales (${faltantes.join(", ")}). Complétalos en Clientes.`);
+        return;
+      }
+    } catch {
+      setError("No se pudo verificar los datos fiscales del cliente. Intenta de nuevo.");
+      return;
+    }
+    navigate(`/facturacion?${new URLSearchParams({ cotizacion: row.id, cliente: row.cliente }).toString()}`);
   };
 
   const alGuardar = () => {

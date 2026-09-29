@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   Box, Typography, TextField, InputAdornment, IconButton,
@@ -20,6 +20,31 @@ import PasswordConfirmDialog from "../../shared/components/PasswordConfirmDialog
 import { listarClientes, actualizarCliente, eliminarCliente } from "../../services/clientes";
 import { useDebounce } from "../../shared/hooks/useDebounce";
 import { SECTORES, SECTOR_MAP } from "../../shared/constants/sectores";
+import { usePolling } from "../../shared/hooks/usePolling";
+import BusinessOutlinedIcon from "@mui/icons-material/BusinessOutlined";
+import PersonOutlineOutlinedIcon from "@mui/icons-material/PersonOutlineOutlined";
+import MailOutlineOutlinedIcon from "@mui/icons-material/MailOutlineOutlined";
+import VerifiedOutlinedIcon from "@mui/icons-material/VerifiedOutlined";
+import ReportProblemOutlinedIcon from "@mui/icons-material/ReportProblemOutlined";
+
+function CeldaIcono({ icon: Icon, bold = false, children }) {
+  return (
+    <Box sx={{ display: "flex", alignItems: "center", gap: 0.9, minWidth: 0 }}>
+      <Icon sx={{ fontSize: 16, color: "text.secondary", flexShrink: 0 }} />
+      <Typography variant="body2" fontSize={13} fontWeight={bold ? 700 : 400} noWrap sx={{ minWidth: 0 }}>{children}</Typography>
+    </Box>
+  );
+}
+
+// Datos que el SAT exige del receptor para poder facturarle un CFDI 4.0.
+function faltantesFiscales(c) {
+  return [
+    !c.rfc && "RFC",
+    !c.regimenFiscal && "régimen fiscal",
+    !c.usoCFDI && "uso de CFDI",
+    !c.domicilioFiscal?.cp && "CP fiscal",
+  ].filter(Boolean);
+}
 
 export default function ClientesPage() {
   const navigate = useNavigate();
@@ -46,33 +71,33 @@ export default function ClientesPage() {
     setPage(0);
   }
 
-  useEffect(() => {
-    let cancelado = false;
+  // Protege contra condiciones de carrera entre filtros que cambian rápido
+  // y el refresco automático de fondo (usePolling) — ver misma nota en
+  // CotizacionesPage.jsx.
+  const cargaIdRef = useRef(0);
+  const cargar = useCallback(async (silencioso = false) => {
+    const miId = ++cargaIdRef.current;
+    if (!silencioso) { setLoading(true); setError(""); }
+    try {
+      const { items, total } = await listarClientes({
+        search: debouncedSearch,
+        sector: sectorFilter,
+        page,
+        pageSize: rowsPerPage,
+      });
+      if (cargaIdRef.current !== miId) return;
+      setRows(items.map((c) => ({ ...c, id: c._id })));
+      setTotalCount(total);
+    } catch {
+      if (cargaIdRef.current === miId && !silencioso) setError("No se pudieron cargar los clientes. Intenta de nuevo.");
+    } finally {
+      if (cargaIdRef.current === miId && !silencioso) setLoading(false);
+    }
+  }, [debouncedSearch, sectorFilter, page, rowsPerPage]);
 
-    (async () => {
-      setLoading(true);
-      setError("");
-      try {
-        const { items, total } = await listarClientes({
-          search: debouncedSearch,
-          sector: sectorFilter,
-          page,
-          pageSize: rowsPerPage,
-        });
-        if (cancelado) return;
-        setRows(items.map((c) => ({ ...c, id: c._id })));
-        setTotalCount(total);
-      } catch {
-        if (!cancelado) setError("No se pudieron cargar los clientes. Intenta de nuevo.");
-      } finally {
-        if (!cancelado) setLoading(false);
-      }
-    })();
+  useEffect(() => { cargar(); }, [cargar, reloadKey]);
 
-    return () => {
-      cancelado = true;
-    };
-  }, [debouncedSearch, sectorFilter, page, rowsPerPage, reloadKey]);
+  usePolling(() => cargar(true));
 
   const handleEliminar = async () => {
     const target = deleteTarget;
@@ -94,12 +119,55 @@ export default function ClientesPage() {
   };
 
   const columns = [
-    { field: "nombre",   headerName: "Razón Social" },
-    { field: "rfc",      headerName: "RFC" },
-    { field: "contacto", headerName: "Contacto", renderCell: (row) => row.contacto?.nombre || "—" },
-    { field: "telefono", headerName: "Teléfono", renderCell: (row) => row.contacto?.telefono || "—" },
-    { field: "email",    headerName: "Correo", renderCell: (row) => row.contacto?.emailCotizaciones || "—" },
-    { field: "ciudad",   headerName: "Ciudad", renderCell: (row) => row.domicilioFiscal?.ciudad || "—" },
+    {
+      field: "nombre", headerName: "Cliente", minWidth: 220,
+      renderCell: (row) => (
+        <Box sx={{ minWidth: 0, maxWidth: 280 }}>
+          <CeldaIcono icon={BusinessOutlinedIcon} bold>{row.nombre}</CeldaIcono>
+          <Typography variant="caption" color="text.secondary" noWrap sx={{ display: "block", pl: 2.6 }}>
+            {[row.rfc, row.domicilioFiscal?.ciudad].filter(Boolean).join(" · ") || "—"}
+          </Typography>
+        </Box>
+      ),
+    },
+    {
+      field: "contacto", headerName: "Contacto", minWidth: 170,
+      renderCell: (row) => (
+        <Box sx={{ minWidth: 0, maxWidth: 200 }}>
+          <CeldaIcono icon={PersonOutlineOutlinedIcon}>{row.contacto?.nombre || "—"}</CeldaIcono>
+          <Typography variant="caption" color="text.secondary" noWrap sx={{ display: "block", pl: 2.6 }}>
+            {row.contacto?.telefono || "Sin teléfono"}
+          </Typography>
+        </Box>
+      ),
+    },
+    {
+      field: "email", headerName: "Correo", minWidth: 180,
+      renderCell: (row) => (
+        <Tooltip title={row.contacto?.emailCotizaciones || ""}>
+          <Box sx={{ minWidth: 0, maxWidth: 210 }}>
+            <CeldaIcono icon={MailOutlineOutlinedIcon}>{row.contacto?.emailCotizaciones || "—"}</CeldaIcono>
+          </Box>
+        </Tooltip>
+      ),
+    },
+    {
+      field: "fiscal", headerName: "Fiscal",
+      renderCell: (row) => {
+        const faltan = faltantesFiscales(row);
+        return faltan.length === 0
+          ? (
+            <Tooltip title="RFC, régimen, uso de CFDI y CP fiscal completos">
+              <Chip size="small" color="success" variant="outlined" icon={<VerifiedOutlinedIcon />} label="Listo" />
+            </Tooltip>
+          )
+          : (
+            <Tooltip title={`Falta: ${faltan.join(", ")}`}>
+              <Chip size="small" color="warning" variant="outlined" icon={<ReportProblemOutlinedIcon />} label={`Falta ${faltan.length}`} />
+            </Tooltip>
+          );
+      },
+    },
     {
       field: "sector",
       headerName: "Sector",
@@ -123,6 +191,7 @@ export default function ClientesPage() {
       field: "acciones",
       headerName: "Acciones",
       align: "center",
+      width: 120,
       renderCell: (row) => (
         <Box sx={{ display: "flex", gap: 0.5, justifyContent: "center" }}>
           <Tooltip title="Editar">

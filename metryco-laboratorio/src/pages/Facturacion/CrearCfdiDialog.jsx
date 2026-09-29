@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useForm, useFieldArray, Controller } from "react-hook-form";
 import {
   Dialog, DialogTitle, DialogContent, DialogActions, Box, Typography, Grid,
@@ -55,7 +55,9 @@ const DEFAULT_VALUES = {
  * Crea un CFDI en estado "borrador" (nunca timbra directamente). El timbrado
  * real se hace después, desde el detalle, y requiere un PAC configurado.
  */
-export default function CrearCfdiDialog({ open, onClose, onCreado }) {
+export default function CrearCfdiDialog({ open, onClose, onCreado, prefill }) {
+  // Cotización pendiente de cargar cuando se abre desde el botón "Generar factura" de Cotizaciones.
+  const cotizacionPendienteRef = useRef(null);
   const [clientes, setClientes] = useState([]);
   const [cotizacionesAprobadas, setCotizacionesAprobadas] = useState([]);
   const [cargandoCotizacion, setCargandoCotizacion] = useState(false);
@@ -72,9 +74,11 @@ export default function CrearCfdiDialog({ open, onClose, onCreado }) {
 
   useEffect(() => {
     if (!open) return;
-    reset(DEFAULT_VALUES);
+    reset({ ...DEFAULT_VALUES, cliente: prefill?.cliente || "" });
+    cotizacionPendienteRef.current = prefill?.cotizacion || null;
     setSubmitError("");
     listarClientes({ pageSize: 300 }).then(({ items }) => setClientes(items)).catch(() => setClientes([]));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, reset]);
 
   // Cotizaciones aprobadas del cliente elegido — para poder jalar sus
@@ -82,11 +86,18 @@ export default function CrearCfdiDialog({ open, onClose, onCreado }) {
   // cambia el cliente y se limpia la selección previa (una cotización de
   // otro cliente ya no aplica).
   useEffect(() => {
-    setValue("cotizacion", "");
+    const pendiente = cotizacionPendienteRef.current;
+    if (!pendiente) setValue("cotizacion", "");
     if (!clienteId) { setCotizacionesAprobadas([]); return; }
     listarCotizaciones({ clienteId, status: "aprobada", pageSize: 100 })
       .then(({ items }) => setCotizacionesAprobadas(items))
-      .catch(() => setCotizacionesAprobadas([]));
+      .catch(() => setCotizacionesAprobadas([]))
+      .finally(() => {
+        if (pendiente && cotizacionPendienteRef.current === pendiente) {
+          cotizacionPendienteRef.current = null;
+          cargarDesdeCotizacion(pendiente);
+        }
+      });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [clienteId]);
 
@@ -101,10 +112,10 @@ export default function CrearCfdiDialog({ open, onClose, onCreado }) {
       const tasaIva = Number(cot.ivaPorcentaje) > 0 ? "16" : "exento";
       replace(
         cot.items.map((it) => ({
-          claveProdServ: "", // el catálogo SAT no se captura en Cotizaciones — hay que completarlo aquí
+          claveProdServ: it.claveProdServ || "", // viene de la cotización; las anteriores a esa captura quedan vacías
           descripcion: it.descripcion,
           cantidad: it.cantidad,
-          claveUnidad: "",
+          claveUnidad: it.claveUnidad || "",
           unidad: "",
           valorUnitario: it.precioUnitario,
           tasaIva,
@@ -201,7 +212,7 @@ export default function CrearCfdiDialog({ open, onClose, onCreado }) {
                   <Controller
                     name="formaPago" control={control}
                     render={({ field }) => (
-                      <Select label="Forma de pago (SAT)" {...field} sx={{ borderRadius: 2 }}>
+                      <Select label="Forma de pago (SAT)" {...field} disabled={watch("metodoPago") === "PPD"} sx={{ borderRadius: 2 }}>
                         {FORMAS_PAGO_SAT.map((f) => <MenuItem key={f.v} value={f.v}>{f.l}</MenuItem>)}
                       </Select>
                     )}
@@ -228,9 +239,13 @@ export default function CrearCfdiDialog({ open, onClose, onCreado }) {
                     </Select>
                   </FormControl>
                   {cotizacionId && (
-                    <Alert severity="info" icon={<ReceiptLongOutlinedIcon fontSize="small" />} sx={{ mt: 1.5, borderRadius: 2 }}>
-                      Se cargaron las partidas de la cotización. Faltan las <b>claves SAT</b> (prod/serv y unidad) de
-                      cada concepto — no se capturan en Cotizaciones, complétalas abajo antes de guardar.
+                    <Alert
+                      severity={conceptos.some((c) => !c.claveProdServ || !c.claveUnidad) ? "warning" : "success"}
+                      icon={<ReceiptLongOutlinedIcon fontSize="small" />} sx={{ mt: 1.5, borderRadius: 2 }}
+                    >
+                      {conceptos.some((c) => !c.claveProdServ || !c.claveUnidad)
+                        ? <>Se cargaron las partidas de la cotización, pero a alguna le faltan las <b>claves SAT</b> (prod/serv y unidad) — complétalas abajo antes de guardar.</>
+                        : <>Se cargaron las partidas de la cotización con sus claves SAT. Revisa y guarda el borrador.</>}
                     </Alert>
                   )}
                 </Grid>
@@ -241,7 +256,14 @@ export default function CrearCfdiDialog({ open, onClose, onCreado }) {
                   <Controller
                     name="metodoPago" control={control}
                     render={({ field }) => (
-                      <Select label="Método de pago" {...field} sx={{ borderRadius: 2 }}>
+                      <Select
+                        label="Método de pago" {...field} sx={{ borderRadius: 2 }}
+                        onChange={(e) => {
+                          field.onChange(e);
+                          // Regla SAT: PPD exige forma de pago "99 - Por definir".
+                          setValue("formaPago", e.target.value === "PPD" ? "99" : "03");
+                        }}
+                      >
                         <MenuItem value="PUE">PUE - Pago en una sola exhibición</MenuItem>
                         <MenuItem value="PPD">PPD - Pago en parcialidades o diferido</MenuItem>
                       </Select>

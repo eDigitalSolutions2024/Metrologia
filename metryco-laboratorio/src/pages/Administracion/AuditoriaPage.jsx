@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import {
   Box, TextField, MenuItem, Select, FormControl, InputLabel, Chip, Typography,
 } from "@mui/material";
@@ -8,6 +8,7 @@ import AppButton from "../../shared/components/AppButton";
 import AppTable from "../../shared/components/AppTable";
 import PageHeader from "../../shared/components/PageHeader";
 import { listarAuditoria } from "../../services/auditoria";
+import { usePolling } from "../../shared/hooks/usePolling";
 
 const ACCIONES = [
   "login_exitoso", "login_fallido", "permiso_denegado",
@@ -42,13 +43,16 @@ export default function AuditoriaPage() {
   const [buscarUsuario, setBuscarUsuario] = useState("");
   const [exito, setExito] = useState("");
 
-  useEffect(() => {
-    setLoading(true);
+  const cargar = useCallback((silencioso = false) => {
+    if (!silencioso) setLoading(true);
     listarAuditoria({ accion, usuario: buscarUsuario, exito, page, pageSize: rowsPerPage })
       .then(({ items, total }) => { setItems(items); setTotal(total); })
-      .catch(() => { setItems([]); setTotal(0); })
-      .finally(() => setLoading(false));
+      .catch(() => { if (!silencioso) { setItems([]); setTotal(0); } })
+      .finally(() => { if (!silencioso) setLoading(false); });
   }, [accion, buscarUsuario, exito, page, rowsPerPage]);
+
+  useEffect(() => { cargar(); }, [cargar]);
+  usePolling(() => cargar(true));
 
   const columns = [
     { field: "fecha", headerName: "Fecha", renderCell: (r) => formatFecha(r.fecha) },

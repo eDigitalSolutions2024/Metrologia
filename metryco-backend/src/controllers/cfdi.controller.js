@@ -2,8 +2,8 @@ const asyncHandler = require("../utils/asyncHandler");
 const service = require("../services/cfdi.service");
 
 const listar = asyncHandler(async (req, res) => {
-  const { clienteId = "", estado = "", page = 0, pageSize = 20 } = req.query;
-  const { items, total } = await service.listar({ clienteId, estado, page: Number(page), pageSize: Number(pageSize) });
+  const { clienteId = "", estado = "", tipoPago = "", search = "", page = 0, pageSize = 20 } = req.query;
+  const { items, total } = await service.listar({ clienteId, estado, tipoPago, search, page: Number(page), pageSize: Number(pageSize) });
   res.json({ success: true, data: items, total });
 });
 
@@ -19,6 +19,11 @@ const actualizar = asyncHandler(async (req, res) => {
   res.json({ success: true, data: await service.actualizar(req.params.id, req.body) });
 });
 
+const eliminar = asyncHandler(async (req, res) => {
+  await service.eliminar(req.params.id);
+  res.json({ success: true });
+});
+
 const timbrar = asyncHandler(async (req, res) => {
   res.json({ success: true, data: await service.timbrar(req.params.id, req.user?.id) });
 });
@@ -29,6 +34,10 @@ const cancelar = asyncHandler(async (req, res) => {
 
 const resolverSolicitudCancelacion = asyncHandler(async (req, res) => {
   res.json({ success: true, data: await service.resolverSolicitudCancelacion(req.params.id, req.body.aceptar) });
+});
+
+const confirmarCancelacionEnProceso = asyncHandler(async (req, res) => {
+  res.json({ success: true, data: await service.confirmarCancelacionEnProceso(req.params.id) });
 });
 
 const emitirComplementoPago = asyncHandler(async (req, res) => {
@@ -54,6 +63,7 @@ const descargarPdf = asyncHandler(async (req, res) => {
 });
 
 module.exports = {
-  listar, obtener, crear, actualizar, timbrar, cancelar, resolverSolicitudCancelacion, emitirComplementoPago,
+  listar, obtener, crear, actualizar, eliminar, timbrar, cancelar, resolverSolicitudCancelacion,
+  confirmarCancelacionEnProceso, emitirComplementoPago,
   previsualizarXml, descargarXml, descargarPdf,
 };

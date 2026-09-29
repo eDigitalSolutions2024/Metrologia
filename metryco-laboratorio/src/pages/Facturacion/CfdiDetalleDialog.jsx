@@ -2,7 +2,7 @@ import { useState } from "react";
 import {
   Dialog, DialogTitle, DialogContent, DialogActions, Box, Typography, Chip,
   Table, TableHead, TableRow, TableCell, TableBody, Alert, TextField,
-  MenuItem, Select, FormControl, InputLabel,
+  MenuItem, Select, FormControl, InputLabel, Snackbar,
 } from "@mui/material";
 import WarningAmberOutlinedIcon from "@mui/icons-material/WarningAmberOutlined";
 import AppButton from "../../shared/components/AppButton";
@@ -10,13 +10,15 @@ import { formatCurrency } from "../../shared/utils/currency";
 import { formatDate } from "../../shared/utils/formatDate";
 import {
   timbrarCfdi, cancelarCfdi, descargarXmlCfdi, descargarPdfCfdi, previsualizarXmlCfdi,
-  resolverSolicitudCancelacionCfdi,
+  resolverSolicitudCancelacionCfdi, confirmarCancelacionEnProcesoCfdi, eliminarCfdi,
 } from "../../services/cfdi";
 import CodeOutlinedIcon from "@mui/icons-material/CodeOutlined";
 import DownloadOutlinedIcon from "@mui/icons-material/DownloadOutlined";
 import PaymentsOutlinedIcon from "@mui/icons-material/PaymentsOutlined";
+import DeleteOutlineIcon from "@mui/icons-material/DeleteOutlined";
 import { ESTADO_CFDI_CHIP, MOTIVOS_CANCELACION } from "./estadosCfdi";
 import RegistrarPagoDialog from "./RegistrarPagoDialog";
+import ConfirmDialog from "../../shared/components/ConfirmDialog";
 
 function descargarBlob(blob, nombre) {
   const url = URL.createObjectURL(blob);
@@ -26,7 +28,7 @@ function descargarBlob(blob, nombre) {
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
-export default function CfdiDetalleDialog({ cfdi, onClose, onCambiado }) {
+export default function CfdiDetalleDialog({ cfdi, onClose, onCambiado, onEliminado, accionInicial }) {
   const [error, setError] = useState(null); // { message, code }
   const [cargando, setCargando] = useState(false);
   const [motivoCodigoCancelacion, setMotivoCodigoCancelacion] = useState("");
@@ -36,6 +38,10 @@ export default function CfdiDetalleDialog({ cfdi, onClose, onCambiado }) {
   const [previewDeId, setPreviewDeId] = useState(null);
   const [cargandoPreview, setCargandoPreview] = useState(false);
   const [pagando, setPagando] = useState(false);
+  const [toast, setToast] = useState(null); // { message, severity } | null
+  const [accionAplicadaPara, setAccionAplicadaPara] = useState(null);
+  const [pidiendoEliminar, setPidiendoEliminar] = useState(false);
+  const [eliminando, setEliminando] = useState(false);
 
   // Si se abre un comprobante distinto, se descarta el XML mostrado del
   // anterior — sin esto quedaba viendo el XML de otro CFDI hasta volver a
@@ -45,11 +51,22 @@ export default function CfdiDetalleDialog({ cfdi, onClose, onCambiado }) {
     setPreviewDeId(null);
   }
 
+  // Permite abrir el diálogo directo en "Cancelar" o "Registrar pago" desde
+  // el menú de acciones de la tabla, sin obligar a un clic extra dentro del
+  // detalle — se aplica una sola vez por comprobante abierto.
+  if (cfdi && accionInicial && accionAplicadaPara !== cfdi._id) {
+    setAccionAplicadaPara(cfdi._id);
+    if (accionInicial === "cancelar") setPidiendoCancelacion(true);
+    if (accionInicial === "pagar") setPagando(true);
+  }
+
   if (!cfdi) return null;
   const s = ESTADO_CFDI_CHIP[cfdi.estado] || { label: cfdi.estado, color: "default" };
   const puedeTimbrar = ["borrador", "pendiente_timbrar", "error_timbrado"].includes(cfdi.estado);
+  const puedeEliminar = ["borrador", "error_timbrado"].includes(cfdi.estado);
   const puedeCancelar = cfdi.estado === "timbrada";
   const esperandoAceptacion = cfdi.estado === "cancelacion_pendiente";
+  const cancelacionEnProceso = cfdi.estado === "cancelacion_en_proceso";
   const esFacturaPPD = cfdi.tipoComprobante === "I" && cfdi.metodoPago === "PPD";
   const saldo = cfdi.saldoPendiente ?? (esFacturaPPD ? cfdi.total : null);
   const puedeRegistrarPago = cfdi.estado === "timbrada" && esFacturaPPD && saldo > 0;
@@ -77,7 +94,14 @@ export default function CfdiDetalleDialog({ cfdi, onClose, onCambiado }) {
     try {
       const actualizado = await timbrarCfdi(cfdi._id);
       onCambiado(actualizado);
-    } catch (err) { manejarError(err); } finally { setCargando(false); }
+      setToast({
+        message: `Factura ${actualizado.folioInterno} timbrada correctamente${actualizado.uuid ? ` — UUID ${actualizado.uuid}` : ""}`,
+        severity: "success",
+      });
+    } catch (err) {
+      manejarError(err);
+      setToast({ message: "No se pudo timbrar el comprobante.", severity: "error" });
+    } finally { setCargando(false); }
   };
 
   const cancelar = async () => {
@@ -91,7 +115,16 @@ export default function CfdiDetalleDialog({ cfdi, onClose, onCambiado }) {
       const actualizado = await cancelarCfdi(cfdi._id, motivoCodigoCancelacion, undefined, folioSustitucion.trim() || undefined);
       onCambiado(actualizado);
       setPidiendoCancelacion(false);
-    } catch (err) { manejarError(err); } finally { setCargando(false); }
+      setToast({
+        message: actualizado.estado === "cancelacion_pendiente"
+          ? `Solicitud de cancelación enviada — pendiente de aceptación del receptor.`
+          : `Factura ${actualizado.folioInterno} cancelada correctamente.`,
+        severity: "success",
+      });
+    } catch (err) {
+      manejarError(err);
+      setToast({ message: "No se pudo cancelar el comprobante.", severity: "error" });
+    } finally { setCargando(false); }
   };
 
   const resolverCancelacion = async (aceptar) => {
@@ -99,7 +132,26 @@ export default function CfdiDetalleDialog({ cfdi, onClose, onCambiado }) {
     try {
       const actualizado = await resolverSolicitudCancelacionCfdi(cfdi._id, aceptar);
       onCambiado(actualizado);
-    } catch (err) { manejarError(err); } finally { setCargando(false); }
+      setToast({
+        message: aceptar ? "Cancelación aceptada." : "Cancelación rechazada — el comprobante sigue vigente.",
+        severity: "success",
+      });
+    } catch (err) {
+      manejarError(err);
+      setToast({ message: "No se pudo resolver la solicitud de cancelación.", severity: "error" });
+    } finally { setCargando(false); }
+  };
+
+  const confirmarCancelacion = async () => {
+    setCargando(true); setError(null);
+    try {
+      const actualizado = await confirmarCancelacionEnProcesoCfdi(cfdi._id);
+      onCambiado(actualizado);
+      setToast({ message: `Factura ${actualizado.folioInterno} marcada como cancelada.`, severity: "success" });
+    } catch (err) {
+      manejarError(err);
+      setToast({ message: "No se pudo confirmar la cancelación.", severity: "error" });
+    } finally { setCargando(false); }
   };
 
   const verPreview = async () => {
@@ -119,6 +171,18 @@ export default function CfdiDetalleDialog({ cfdi, onClose, onCambiado }) {
   const descargarPreview = () => {
     if (!preview) return;
     descargarBlob(new Blob([preview.xml], { type: "application/xml" }), preview.nombre);
+  };
+
+  const eliminar = async () => {
+    setEliminando(true); setError(null);
+    try {
+      await eliminarCfdi(cfdi._id);
+      setPidiendoEliminar(false);
+      onEliminado?.(cfdi);
+    } catch (err) {
+      manejarError(err);
+      setToast({ message: "No se pudo eliminar el comprobante.", severity: "error" });
+    } finally { setEliminando(false); }
   };
 
   const descargarPdf = async () => {
@@ -195,9 +259,19 @@ export default function CfdiDetalleDialog({ cfdi, onClose, onCambiado }) {
           </Alert>
         )}
 
+        {cancelacionEnProceso && (
+          <Alert severity="warning" sx={{ mb: 2.5, borderRadius: 2 }}>
+            Cancelación enviada al PAC, pero <b>todavía no está confirmada ante el SAT</b> — el proveedor solo la
+            encoló (puede tardar unos minutos). Este comprobante sigue vigente fiscalmente hasta confirmarla.
+            Verifica el folio como cancelado en el portal del SAT o en el panel del PAC antes de confirmar aquí.
+          </Alert>
+        )}
+
         {esFacturaPPD && cfdi.estado === "timbrada" && (
           <Alert severity={saldo > 0 ? "info" : "success"} sx={{ mb: 2.5, borderRadius: 2 }}>
-            Pago en parcialidades o diferido — saldo pendiente: <b>{formatCurrency(saldo)}</b>
+            {saldo > 0
+              ? <>Pago en parcialidades o diferido — saldo pendiente: <b>{formatCurrency(saldo)}</b></>
+              : <b>Pagada totalmente — sin saldo pendiente</b>}
           </Alert>
         )}
 
@@ -321,9 +395,19 @@ export default function CfdiDetalleDialog({ cfdi, onClose, onCambiado }) {
             </AppButton>
           </>
         )}
+        {cancelacionEnProceso && (
+          <AppButton type="button" color="success" loading={cargando} onClick={confirmarCancelacion} sx={{ borderRadius: 2 }}>
+            Confirmar cancelación
+          </AppButton>
+        )}
         {puedeCancelar && !pidiendoCancelacion && (
           <AppButton type="button" variant="outlined" color="error" onClick={() => setPidiendoCancelacion(true)} sx={{ borderRadius: 2 }}>
             Cancelar CFDI
+          </AppButton>
+        )}
+        {puedeEliminar && (
+          <AppButton type="button" variant="outlined" color="error" startIcon={<DeleteOutlineIcon />} onClick={() => setPidiendoEliminar(true)} sx={{ borderRadius: 2 }}>
+            Eliminar borrador
           </AppButton>
         )}
         {pidiendoCancelacion && (
@@ -341,8 +425,32 @@ export default function CfdiDetalleDialog({ cfdi, onClose, onCambiado }) {
       <RegistrarPagoDialog
         cfdi={pagando ? cfdi : null}
         onClose={() => setPagando(false)}
-        onCreado={(creado) => { setPagando(false); onCambiado(creado); }}
+        onCreado={(creado) => {
+          setPagando(false);
+          onCambiado(creado);
+          setToast({ message: `Pago registrado — se generó el Complemento de Pago ${creado.folioInterno}.`, severity: "success" });
+        }}
       />
+      <ConfirmDialog
+        open={pidiendoEliminar}
+        title="Eliminar borrador"
+        message={`¿Eliminar el borrador ${cfdi.folioInterno}? Esto no se puede deshacer.`}
+        loading={eliminando}
+        onCancel={() => setPidiendoEliminar(false)}
+        onConfirm={eliminar}
+      />
+      <Snackbar
+        open={!!toast}
+        autoHideDuration={5000}
+        onClose={() => setToast(null)}
+        anchorOrigin={{ vertical: "bottom", horizontal: "center" }}
+      >
+        {toast && (
+          <Alert severity={toast.severity} variant="filled" onClose={() => setToast(null)} sx={{ borderRadius: 2 }}>
+            {toast.message}
+          </Alert>
+        )}
+      </Snackbar>
     </Dialog>
   );
 }

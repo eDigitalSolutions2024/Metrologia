@@ -31,7 +31,11 @@ export default function AppTable({
           <TableHead>
             <TableRow>
               {columns.map((col) => (
-                <TableCell key={col.field} align={col.align || "left"} sx={{ py: 1.75, px: 2.25 }}>
+                <TableCell
+                  key={col.field}
+                  align={col.align || "left"}
+                  sx={{ py: 1.75, px: 2.25, width: col.width, minWidth: col.minWidth }}
+                >
                   {col.headerName}
                 </TableCell>
               ))}
@@ -63,7 +67,11 @@ export default function AppTable({
                   }}
                 >
                   {columns.map((col) => (
-                    <TableCell key={col.field} align={col.align || "left"} sx={{ fontSize: 13, py: 1.35, px: 2.25 }}>
+                    <TableCell
+                      key={col.field}
+                      align={col.align || "left"}
+                      sx={{ fontSize: 13, py: 1.35, px: 2.25, width: col.width, minWidth: col.minWidth, verticalAlign: "middle" }}
+                    >
                       {col.renderCell ? col.renderCell(row) : row[col.field] ?? "—"}
                     </TableCell>
                   ))}

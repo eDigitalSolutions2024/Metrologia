@@ -8,6 +8,8 @@ const itemSchema = z.object({
   marca: z.string().trim().optional(),
   modelo: z.string().trim().optional(),
   tiempoEntrega: z.string().trim().optional(),
+  claveProdServ: vacio(z.string().trim().regex(/^\d{6,8}$/, "La clave SAT de producto/servicio debe ser de 6 a 8 dígitos")),
+  claveUnidad: vacio(z.string().trim().min(2, "Clave de unidad SAT inválida").max(3, "Clave de unidad SAT inválida")),
   cantidad: z.coerce.number().positive("La cantidad debe ser mayor a 0"),
   precioUnitario: z.coerce.number().min(0, "El precio no puede ser negativo"),
 });

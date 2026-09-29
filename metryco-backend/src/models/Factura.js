@@ -15,6 +15,9 @@ const facturaSchema = new Schema(
     // capturaba cliente/OC/folio sueltos), se agrega para no perder la
     // trazabilidad cuando sí se conoce, sin obligarla.
     cotizacion: { type: Schema.Types.ObjectId, ref: "Cotizacion" },
+    // CFDI del que nació esta cuenta por cobrar (se crea sola al timbrar) —
+    // único para que timbrar dos veces o reintentar nunca duplique la cuenta.
+    comprobante: { type: Schema.Types.ObjectId, ref: "ComprobanteFiscal", unique: true, sparse: true },
 
     oc: { type: String, required: true, trim: true },
     folio: { type: String, required: true, trim: true },

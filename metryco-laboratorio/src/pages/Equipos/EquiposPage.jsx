@@ -22,6 +22,7 @@ import PrecisionManufacturingOutlinedIcon from "@mui/icons-material/PrecisionMan
 import { listarClientes } from "../../services/clientes";
 import { listarEquipos, fetchQrEquipoBlob, eliminarEquipo, reactivarEquipo } from "../../services/equipos";
 import { iconoCategoria, colorCategoria } from "./categorias";
+import { usePolling } from "../../shared/hooks/usePolling";
 
 // Consultar Equipos = php/equipo_buscar.php: el equipo pertenece a un cliente
 // (tabla `equipo`, campo empId). Certificado/Portada/Gráfica van en Historial
@@ -50,14 +51,15 @@ export default function EquiposPage() {
       .catch(() => setClientes([]));
   }, []);
 
-  const cargar = () => {
-    setLoading(true);
+  const cargar = (silencioso = false) => {
+    if (!silencioso) setLoading(true);
     listarEquipos({ search: buscar, clienteId: clienteFiltro, incluirInactivos, page, pageSize: rowsPerPage })
       .then(({ items, total }) => { setItems(items); setTotal(total); })
-      .catch(() => { setItems([]); setTotal(0); })
-      .finally(() => setLoading(false));
+      .catch(() => { if (!silencioso) { setItems([]); setTotal(0); } })
+      .finally(() => { if (!silencioso) setLoading(false); });
   };
-  useEffect(cargar, [buscar, clienteFiltro, incluirInactivos, page, rowsPerPage]);
+  useEffect(() => { cargar(); }, [buscar, clienteFiltro, incluirInactivos, page, rowsPerPage]); // eslint-disable-line react-hooks/exhaustive-deps
+  usePolling(() => cargar(true));
 
   const abrirMenu = (e, row) => { setMenuAnchor(e.currentTarget); setMenuRow(row); };
   const cerrarMenu = () => { setMenuAnchor(null); setMenuRow(null); };

@@ -121,10 +121,25 @@ async function obtenerReceptorFiscal(clienteId) {
   };
 }
 
-async function listar({ clienteId = "", estado = "", page = 0, pageSize = 20 } = {}) {
+// tipoPago: "pue" (una exhibición), "ppd" (parcialidades) o "complemento"
+// (Complemento de Pago, tipo "P") — los complementos van aparte porque su
+// propio metodoPago siempre es PUE y no representan una venta.
+const FILTROS_TIPO_PAGO = {
+  pue: { tipoComprobante: "I", metodoPago: "PUE" },
+  ppd: { tipoComprobante: "I", metodoPago: "PPD" },
+  complemento: { tipoComprobante: "P" },
+};
+
+async function listar({ clienteId = "", estado = "", tipoPago = "", search = "", page = 0, pageSize = 20 } = {}) {
   const match = {};
   if (clienteId && oid(clienteId)) match.cliente = oid(clienteId);
   if (estado) match.estado = estado;
+  if (FILTROS_TIPO_PAGO[tipoPago]) Object.assign(match, FILTROS_TIPO_PAGO[tipoPago]);
+  const q = String(search).trim();
+  if (q) {
+    const rx = new RegExp(q.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "i");
+    match.$or = [{ folioInterno: rx }, { uuid: rx }, { "receptor.rfc": rx }, { "receptor.nombre": rx }];
+  }
 
   const [items, total] = await Promise.all([
     ComprobanteFiscal.find(match)
@@ -208,6 +223,29 @@ async function crear(datos, usuarioId) {
   }
 
   return cfdi.populate("cliente", "nombre rfc");
+}
+
+/**
+ * Elimina (de verdad, no soft-delete) un comprobante que nunca llegó a
+ * timbrarse — solo aplica a "borrador"/"error_timbrado" (mismo criterio que
+ * ESTADOS_EDITABLES): un CFDI timbrado tiene UUID ante el SAT y no se puede
+ * "borrar", solo cancelar (ver `cancelar`). Si nació de una cotización
+ * aprobada, la regresa a "aprobada" para que se pueda volver a facturar —
+ * si no, quedaría "facturada" para siempre sin ningún CFDI real detrás.
+ */
+async function eliminar(id) {
+  const cfdi = await ComprobanteFiscal.findById(id);
+  if (!cfdi) throw new AppError("Comprobante fiscal no encontrado", 404);
+  if (!ESTADOS_EDITABLES.includes(cfdi.estado)) {
+    throw new AppError(
+      `No se puede eliminar un comprobante en estado "${cfdi.estado}" — ya fue timbrado ante el SAT, solo se puede cancelar.`,
+      409
+    );
+  }
+  if (cfdi.cotizacion) {
+    await Cotizacion.updateOne({ _id: cfdi.cotizacion, status: "facturada" }, { status: "aprobada" });
+  }
+  await ComprobanteFiscal.deleteOne({ _id: cfdi._id });
 }
 
 async function actualizar(id, datos) {
@@ -346,6 +384,8 @@ async function timbrar(id) {
       );
     }
 
+    await sincronizarCuentaPorCobrar(actualizado, snapshot);
+
     return actualizado;
   } catch (err) {
     await ComprobanteFiscal.updateOne(
@@ -353,6 +393,52 @@ async function timbrar(id) {
       { $set: { estado: "error_timbrado", errorTimbrado: { codigo: err.code || "PAC_ERROR", mensaje: err.message, fecha: new Date() } } }
     );
     throw err;
+  }
+}
+
+/**
+ * Mantiene Cobranza (cuentas por cobrar) al día a partir del CFDI, sin que
+ * nadie capture el mismo dato dos veces:
+ *  - CFDI de Ingreso timbrado → nace su cuenta por cobrar (PUE: vence al
+ *    momento; PPD: a 30 días). Idempotente por `comprobante`.
+ *  - Complemento de Pago timbrado que deja el saldo en 0 → la cuenta de la
+ *    factura original queda pagada.
+ * NUNCA lanza: el CFDI ya está timbrado ante el SAT y eso no debe revertirse
+ * ni marcarse como error porque falló un registro interno.
+ */
+async function sincronizarCuentaPorCobrar(cfdi, snapshot) {
+  try {
+    if (snapshot.tipoComprobante === "I") {
+      if (await Factura.exists({ comprobante: cfdi._id })) return;
+      const cotizacion = snapshot.cotizacion ? await Cotizacion.findById(snapshot.cotizacion).select("ordenCompra") : null;
+      const fechaCr = cfdi.fechaTimbrado || new Date();
+      const diasPago = snapshot.metodoPago === "PPD" ? 30 : 0;
+      const folio = `${snapshot.serie ? `${snapshot.serie}-` : ""}${snapshot.folioInterno}`;
+      const fechaPago = new Date(fechaCr);
+      fechaPago.setDate(fechaPago.getDate() + diasPago);
+      await Factura.create({
+        cliente: snapshot.cliente, cotizacion: snapshot.cotizacion || undefined, comprobante: cfdi._id,
+        oc: cotizacion?.ordenCompra || "S/OC", folio, monto: snapshot.total,
+        fechaCr, diasPago, fechaPago, comentarios: `CFDI ${cfdi.uuid}`, registradoPor: snapshot.registradoPor,
+      });
+      if (snapshot.cotizacion) await Reporte.updateOne({ cotizacion: snapshot.cotizacion }, { factura: folio });
+    } else if (snapshot.tipoComprobante === "P" && Number(snapshot.pago?.docRelacionado?.impSaldoInsoluto) === 0) {
+      await Factura.updateOne(
+        { comprobante: snapshot.pago.docRelacionado.comprobante },
+        { statusPago: 1, fechaPagada: snapshot.pago.fechaPago || new Date() }
+      );
+    }
+  } catch (err) {
+    console.error("[cfdi] No se pudo sincronizar la cuenta por cobrar:", err.message);
+  }
+}
+
+// Un CFDI cancelado ya no se cobra: se retira su cuenta por cobrar si sigue pendiente.
+async function retirarCuentaPorCobrar(comprobanteId) {
+  try {
+    await Factura.deleteOne({ comprobante: comprobanteId, statusPago: 0 });
+  } catch (err) {
+    console.error("[cfdi] No se pudo retirar la cuenta por cobrar:", err.message);
   }
 }
 
@@ -376,12 +462,18 @@ async function cancelar(id, { motivoCodigo, motivo, folioSustitucion }) {
 
   const resultado = await pac.cancelarFactura({ uuid: cfdi.uuid, motivoCodigo, folioSustitucion, emisorRfc: cfdi.emisor.rfc });
   const requiereAceptacion = Number(cfdi.total) > UMBRAL_ACEPTACION_CANCELACION;
+  // Algunos PAC (ej. Dinvbox) solo encolan la cancelación y la resuelven ante
+  // el SAT minutos después — `resultado.fechaCancelacion === null` es la
+  // señal de que el PAC todavía NO confirma. Si se marcara "cancelada" en
+  // ese momento, el sistema mentiría: el CFDI sigue vigente ante el SAT
+  // hasta que el PAC lo confirme de verdad.
+  const pacConfirmoDeInmediato = !!resultado.fechaCancelacion;
 
   cfdi.cancelacion = {
     motivoCodigo,
     motivo,
     folioSustitucion,
-    fecha: resultado.fechaCancelacion || new Date(),
+    fecha: resultado.fechaCancelacion || undefined,
     acuseXml: resultado.acuseXml,
     requiereAceptacion,
     estadoSolicitud: requiereAceptacion ? "pendiente" : "no_aplica",
@@ -389,11 +481,35 @@ async function cancelar(id, { motivoCodigo, motivo, folioSustitucion }) {
       ? new Date(Date.now() + HORAS_LIMITE_ACEPTACION_CANCELACION * 3600 * 1000)
       : undefined,
   };
-  // Mientras el receptor no conteste, el comprobante SIGUE VIGENTE ante el
-  // SAT — no se marca "cancelada" todavía.
-  cfdi.estado = requiereAceptacion ? "cancelacion_pendiente" : "cancelada";
+  // Mientras el receptor no conteste, o mientras el PAC no confirme, el
+  // comprobante SIGUE VIGENTE ante el SAT — no se marca "cancelada" todavía.
+  cfdi.estado = requiereAceptacion
+    ? "cancelacion_pendiente"
+    : (pacConfirmoDeInmediato ? "cancelada" : "cancelacion_en_proceso");
 
   await cfdi.save();
+  if (cfdi.estado === "cancelada") await retirarCuentaPorCobrar(cfdi._id);
+  return cfdi.populate("cliente", "nombre rfc");
+}
+
+/**
+ * Confirma manualmente una cancelación que quedó "en proceso" porque el PAC
+ * solo la encoló (ej. Dinvbox tarda 2-3 minutos). No hay webhook ni consulta
+ * de estatus confiable todavía (ver consultarFactura en el adaptador de
+ * Dinvbox) — por eso esto lo dispara un humano después de verificar el
+ * folio como cancelado en el portal del SAT o en el panel del PAC, en vez de
+ * que el sistema lo dé por hecho solo.
+ */
+async function confirmarCancelacionEnProceso(id) {
+  const cfdi = await ComprobanteFiscal.findById(id);
+  if (!cfdi) throw new AppError("Comprobante fiscal no encontrado", 404);
+  if (cfdi.estado !== "cancelacion_en_proceso") {
+    throw new AppError(`Este comprobante no tiene una cancelación en proceso (estado actual: "${cfdi.estado}")`, 409);
+  }
+  cfdi.estado = "cancelada";
+  cfdi.cancelacion.fecha = new Date();
+  await cfdi.save();
+  await retirarCuentaPorCobrar(cfdi._id);
   return cfdi.populate("cliente", "nombre rfc");
 }
 
@@ -417,6 +533,7 @@ async function resolverSolicitudCancelacion(id, aceptar) {
   cfdi.cancelacion.estadoSolicitud = aceptar ? "aceptada" : "rechazada";
   cfdi.cancelacion.fechaResolucion = new Date();
   await cfdi.save();
+  if (aceptar) await retirarCuentaPorCobrar(cfdi._id);
   return cfdi.populate("cliente", "nombre rfc");
 }
 
@@ -466,17 +583,16 @@ async function emitirComplementoPago(datos, usuarioId) {
     impuestos: [],
   };
 
-  // Desglose de impuestos DEL DOCUMENTO que se paga (completo, sin
-  // prorratear) y DE ESTE PAGO (prorrateado por la proporción que representa
-  // el monto pagado sobre el total del documento) — el Anexo 20 exige ambos
-  // por separado, ver cfdiBuilder.construirComplementoPago.
+  // Desglose de impuestos DEL DOCUMENTO que se paga y DE ESTE PAGO — el
+  // Anexo 20 exige ambos nodos por separado (ver
+  // cfdiBuilder.construirComplementoPago), pero NINGUNO de los dos se
+  // prorratea por lo que se pagó en esta transacción: el validador real de
+  // Dinvbox exige que pago20:TrasladoP (Base e Importe) sea idéntico a
+  // pago20:TrasladoDR del documento relacionado (errores CRP20268/CRP20274
+  // si no coincide exacto) — lo que de verdad representa cuánto se pagó
+  // ahora es el atributo Monto de pago20:Pago, no este desglose de impuestos.
   const impuestosDocumento = cfdiBuilder.agruparImpuestos(original.conceptos);
-  const proporcionPagada = monto / original.total;
-  const impuestosPago = impuestosDocumento.map((t) => ({
-    impuesto: t.impuesto, tipoFactor: t.tipoFactor, tasaOCuota: t.tasaOCuota,
-    base: redondear(t.base * proporcionPagada),
-    importe: redondear(t.importe * proporcionPagada),
-  }));
+  const impuestosPago = impuestosDocumento.map((t) => ({ ...t }));
 
   const datosComprobante = {
     factura: original.factura || undefined,
@@ -569,7 +685,7 @@ async function obtenerPdf(id) {
 }
 
 module.exports = {
-  calcularTotales, listar, obtener, crear, actualizar, timbrar, cancelar, obtenerXml, obtenerPdf,
+  calcularTotales, listar, obtener, crear, actualizar, eliminar, timbrar, cancelar, obtenerXml, obtenerPdf,
   previsualizarXml, obtenerEmisorFiscal, obtenerReceptorFiscal,
-  resolverSolicitudCancelacion, emitirComplementoPago,
+  resolverSolicitudCancelacion, confirmarCancelacionEnProceso, emitirComplementoPago,
 };

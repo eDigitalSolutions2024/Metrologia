@@ -34,6 +34,7 @@ import QrDialog from "./QrDialog";
 import EtiquetaDialog from "./EtiquetaDialog";
 import EditarCertificadoDialog from "./EditarCertificadoDialog";
 import EditOutlinedIcon from "@mui/icons-material/EditOutlined";
+import { usePolling } from "../../shared/hooks/usePolling";
 
 const ESTADO_CHIP = {
   vigente:    { label: "Vigente",     color: "success" },
@@ -72,25 +73,27 @@ export default function CertificadosPage() {
   const [enviandoWspId, setEnviandoWspId] = useState(null); // id del certificado cuyo WhatsApp está en curso
   const [wspFeedback, setWspFeedback] = useState(null); // { tipo: "ok"|"error", mensaje }
 
-  const cargar = useCallback(() => {
-    setLoading(true);
+  const cargar = useCallback((silencioso = false) => {
+    if (!silencioso) setLoading(true);
     listarCertificados({ search, estado, clienteId, page, pageSize: rowsPerPage })
       .then(({ items, total }) => { setRows(items); setTotal(total); })
-      .catch(() => { setRows([]); setTotal(0); })
-      .finally(() => setLoading(false));
+      .catch(() => { if (!silencioso) { setRows([]); setTotal(0); } })
+      .finally(() => { if (!silencioso) setLoading(false); });
   }, [search, estado, clienteId, page, rowsPerPage]);
 
   useEffect(() => { cargar(); }, [cargar]);
+  usePolling(() => cargar(true));
 
-  const cargarPorVencer = useCallback(() => {
-    setVencLoading(true);
+  const cargarPorVencer = useCallback((silencioso = false) => {
+    if (!silencioso) setVencLoading(true);
     listarCertificadosPorVencer({ clienteId: vencClienteId, estado: vencEstado })
       .then(setVencRows)
-      .catch(() => setVencRows([]))
-      .finally(() => setVencLoading(false));
+      .catch(() => { if (!silencioso) setVencRows([]); })
+      .finally(() => { if (!silencioso) setVencLoading(false); });
   }, [vencClienteId, vencEstado]);
 
   useEffect(() => { if (tab === 1) cargarPorVencer(); }, [tab, cargarPorVencer]);
+  usePolling(() => { if (tab === 1) cargarPorVencer(true); });
   useEffect(() => {
     listarClientes({ pageSize: 200 }).then(({ items }) => setClientes(items)).catch(() => {});
   }, []);

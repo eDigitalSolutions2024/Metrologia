@@ -10,6 +10,7 @@ import AppTable from "../../shared/components/AppTable";
 import PageHeader from "../../shared/components/PageHeader";
 import { useAuth } from "../../core/auth/useAuth";
 import { listarAsignaciones } from "../../services/reportes";
+import { usePolling } from "../../shared/hooks/usePolling";
 
 const EST_CALIBRACION = { pendiente: "Pendiente", en_proceso: "En proceso", terminada: "Terminada" };
 const EST_CALIBRACION_COLOR = { pendiente: "default", en_proceso: "warning", terminada: "success" };
@@ -27,9 +28,9 @@ export default function MisAsignacionesPage() {
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(20);
 
-  const cargar = useCallback(() => {
+  const cargar = useCallback((silencioso = false) => {
     if (!userId) return;
-    setLoading(true);
+    if (!silencioso) setLoading(true);
     // El filtro "pendientes" (no-terminada) se aplica en cliente porque el
     // backend no tiene un operador "distinto de" para estadoCalibracion.
     listarAsignaciones({ tecnicoAsignado: userId, page, pageSize: rowsPerPage })
@@ -40,10 +41,11 @@ export default function MisAsignacionesPage() {
         setRows(filtrados);
         setTotal(filtro === "pendientes" ? filtrados.length : total);
       })
-      .catch(() => { setRows([]); setTotal(0); })
-      .finally(() => setLoading(false));
+      .catch(() => { if (!silencioso) { setRows([]); setTotal(0); } })
+      .finally(() => { if (!silencioso) setLoading(false); });
   }, [userId, filtro, page, rowsPerPage]);
   useEffect(() => { cargar(); }, [cargar]);
+  usePolling(() => cargar(true));
 
   const columns = [
     { field: "reporte", headerName: "Reporte", renderCell: (r) => r.reporte?.folio || "—" },

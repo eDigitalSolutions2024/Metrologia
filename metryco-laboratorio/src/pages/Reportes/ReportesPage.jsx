@@ -29,6 +29,7 @@ import { listarReportes, crearReporte } from "../../services/reportes";
 import { listarContactos, crearContacto } from "../../services/contactos";
 import { listarCotizaciones } from "../../services/cotizaciones";
 import { useAuth } from "../../core/auth/useAuth";
+import { usePolling } from "../../shared/hooks/usePolling";
 
 const STATUS = {
   recepcion:  { label: "Recepción",  color: "default" },
@@ -60,14 +61,15 @@ export default function ReportesPage() {
   const [rowsPerPage, setRowsPerPage] = useState(10);
   const [nuevoOpen, setNuevoOpen] = useState(false);
 
-  const cargar = useCallback(() => {
-    setLoading(true);
+  const cargar = useCallback((silencioso = false) => {
+    if (!silencioso) setLoading(true);
     listarReportes({ search, status, mes, anio, page, pageSize: rowsPerPage })
       .then(({ items, total }) => { setRows(items); setTotal(total); })
-      .catch(() => { setRows([]); setTotal(0); })
-      .finally(() => setLoading(false));
+      .catch(() => { if (!silencioso) { setRows([]); setTotal(0); } })
+      .finally(() => { if (!silencioso) setLoading(false); });
   }, [search, status, mes, anio, page, rowsPerPage]);
   useEffect(() => { cargar(); }, [cargar]);
+  usePolling(() => cargar(true));
 
   const stats = useMemo(() => {
     const c = (s) => rows.filter((r) => r.status === s).length;

@@ -23,7 +23,8 @@ const ESTADOS = [
   "timbrando",
   "timbrada",
   "error_timbrado",
-  "cancelacion_pendiente",
+  "cancelacion_pendiente", // requiere aceptación del RECEPTOR (monto > umbral SAT)
+  "cancelacion_en_proceso", // el PAC (ej. Dinvbox) aún no confirma — no está cancelado ante el SAT todavía
   "cancelada",
 ];
 

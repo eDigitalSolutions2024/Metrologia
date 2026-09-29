@@ -10,6 +10,16 @@ import AddIcon from "@mui/icons-material/Add";
 import CheckCircleOutlineIcon from "@mui/icons-material/CheckCircleOutlineOutlined";
 import ReplayOutlinedIcon from "@mui/icons-material/ReplayOutlined";
 import FileDownloadOutlinedIcon from "@mui/icons-material/FileDownloadOutlined";
+import BusinessOutlinedIcon from "@mui/icons-material/BusinessOutlined";
+import AssignmentOutlinedIcon from "@mui/icons-material/AssignmentOutlined";
+import ReceiptLongOutlinedIcon from "@mui/icons-material/ReceiptLongOutlined";
+import EventOutlinedIcon from "@mui/icons-material/EventOutlined";
+import EventBusyOutlinedIcon from "@mui/icons-material/EventBusyOutlined";
+import EventAvailableOutlinedIcon from "@mui/icons-material/EventAvailableOutlined";
+import ChatBubbleOutlineOutlinedIcon from "@mui/icons-material/ChatBubbleOutlineOutlined";
+import ErrorOutlineOutlinedIcon from "@mui/icons-material/ErrorOutlineOutlined";
+import ScheduleOutlinedIcon from "@mui/icons-material/ScheduleOutlined";
+import TaskAltOutlinedIcon from "@mui/icons-material/TaskAltOutlined";
 
 import AppButton from "../../shared/components/AppButton";
 import AppCard from "../../shared/components/AppCard";
@@ -26,6 +36,7 @@ import { listarClientes } from "../../services/clientes";
 import { crearFactura, listarFacturas, aplicarPagoFactura, reabrirFactura } from "../../services/cobranza";
 import { pedirRefrescoAlertas } from "../../shared/utils/alertasBus";
 import { DIAS_PAGO_OPCIONES } from "./constantes";
+import { usePolling } from "../../shared/hooks/usePolling";
 
 function NuevoRegistroDialog({ open, onClose, onCreated, prefill }) {
   const [clientes, setClientes] = useState([]);
@@ -190,6 +201,17 @@ const HOY = new Date().toISOString().slice(0, 10);
 // Refleja el flujo real de php/calendario_generar.php + calendario_consultar.php:
 // alta de registro + 3 pestañas (Atrasadas / Por Pagar / Pagadas) sobre la misma
 // tabla `events`, con acciones Aplicar pago / Reabrir.
+function CeldaIcono({ icon: Icon, color = "text.secondary", bold = false, top = false, children }) {
+  return (
+    <Box sx={{ display: "flex", alignItems: top ? "flex-start" : "center", gap: 0.9 }}>
+      <Icon sx={{ fontSize: 16, color, mt: top ? 0.25 : 0, flexShrink: 0 }} />
+      <Typography variant="body2" fontSize={13} fontWeight={bold ? 700 : 400} sx={{ color: color === "text.secondary" ? "text.primary" : color }}>
+        {children}
+      </Typography>
+    </Box>
+  );
+}
+
 export default function CobranzaPage() {
   const theme = useTheme();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -203,15 +225,16 @@ export default function CobranzaPage() {
   const [aplicarTarget, setAplicarTarget] = useState(null);
   const [error, setError] = useState("");
 
-  const cargar = () => {
-    setLoading(true);
+  const cargar = (silencioso = false) => {
+    if (!silencioso) setLoading(true);
     listarFacturas()
       .then(setRegistros)
-      .catch(() => setError("No se pudieron cargar las facturas."))
-      .finally(() => setLoading(false));
+      .catch(() => { if (!silencioso) setError("No se pudieron cargar las facturas."); })
+      .finally(() => { if (!silencioso) setLoading(false); });
   };
 
   useEffect(() => { cargar(); }, []);
+  usePolling(() => cargar(true));
 
   // Llega desde Cotizaciones → "Generar factura" (cotización aprobada) con
   // cliente/monto/folio ya resueltos — se prellena el diálogo y se abre solo.
@@ -236,9 +259,9 @@ export default function CobranzaPage() {
   const pagadas = useMemo(() => registros.filter((r) => r.statusPago === 1), [registros]);
 
   const tabs = [
-    { label: "Facturas Atrasadas", rows: atrasadas, color: "error" },
-    { label: "Facturas x Pagar", rows: porPagar, color: "warning" },
-    { label: "Facturas Pagadas", rows: pagadas, color: "success" },
+    { label: "Facturas Atrasadas", rows: atrasadas, color: "error", icon: <ErrorOutlineOutlinedIcon fontSize="small" /> },
+    { label: "Facturas x Pagar", rows: porPagar, color: "warning", icon: <ScheduleOutlinedIcon fontSize="small" /> },
+    { label: "Facturas Pagadas", rows: pagadas, color: "success", icon: <TaskAltOutlinedIcon fontSize="small" /> },
   ];
   const rowsActuales = tabs[tab].rows;
   const totalActual = rowsActuales.reduce((s, r) => s + r.monto, 0);
@@ -267,24 +290,33 @@ export default function CobranzaPage() {
   };
 
   const columns = [
-    { field: "cliente", headerName: "Cliente", renderCell: (r) => r.cliente?.nombre || "—" },
-    { field: "oc", headerName: "OC" },
-    { field: "folio", headerName: "Folio" },
-    { field: "monto", headerName: "Monto", renderCell: (r) => formatCurrency(r.monto) },
-    { field: "fechaCr", headerName: "Fecha C/R", renderCell: (r) => formatDate(r.fechaCr) },
+    { field: "cliente", headerName: "Cliente", renderCell: (r) => <CeldaIcono icon={BusinessOutlinedIcon}>{r.cliente?.nombre || "—"}</CeldaIcono> },
+    { field: "oc", headerName: "OC", renderCell: (r) => <CeldaIcono icon={AssignmentOutlinedIcon}>{r.oc || "—"}</CeldaIcono> },
+    { field: "folio", headerName: "Folio", renderCell: (r) => <CeldaIcono icon={ReceiptLongOutlinedIcon}>{r.folio || "—"}</CeldaIcono> },
+    { field: "monto", headerName: "Monto", renderCell: (r) => <Typography variant="body2" fontWeight={700} fontSize={13}>{formatCurrency(r.monto)}</Typography> },
+    { field: "fechaCr", headerName: "Fecha C/R", renderCell: (r) => <CeldaIcono icon={EventOutlinedIcon}>{formatDate(r.fechaCr)}</CeldaIcono> },
     {
       field: "fechaPago",
       headerName: "Fecha de Pago",
       renderCell: (r) => (
-        <Typography variant="body2" color={tab === 0 ? "error.main" : "text.primary"} fontWeight={tab === 0 ? 700 : 400}>
+        <CeldaIcono
+          icon={tab === 0 ? EventBusyOutlinedIcon : EventAvailableOutlinedIcon}
+          color={tab === 0 ? "error.main" : "text.primary"}
+          bold={tab === 0}
+        >
           {formatDate(r.fechaPago)}
-        </Typography>
+        </CeldaIcono>
       ),
     },
-    { field: "comentarios", headerName: "Comentarios" },
+    {
+      field: "comentarios", headerName: "Comentarios",
+      renderCell: (r) => r.comentarios
+        ? <CeldaIcono icon={ChatBubbleOutlineOutlinedIcon} top>{r.comentarios}</CeldaIcono>
+        : <Typography variant="caption" color="text.secondary">—</Typography>,
+    },
     ...(tab === 2
       ? [
-          { field: "fechaPagada", headerName: "Fecha Pagada", renderCell: (r) => formatDate(r.fechaPagada) },
+          { field: "fechaPagada", headerName: "Fecha Pagada", renderCell: (r) => <CeldaIcono icon={TaskAltOutlinedIcon} color="success.main">{formatDate(r.fechaPagada)}</CeldaIcono> },
           {
             field: "acciones", headerName: "Acción", align: "center",
             renderCell: (r) => (
@@ -342,19 +374,19 @@ export default function CobranzaPage() {
 
       <Grid container spacing={2.5} mb={3}>
         {[
-          { label: "Total Atrasado", valor: atrasadas.reduce((s, r) => s + r.monto, 0), color: theme.palette.error.main },
-          { label: "Total por Pagar", valor: porPagar.reduce((s, r) => s + r.monto, 0), color: theme.palette.warning.main },
-          { label: "Total Cobrado", valor: pagadas.reduce((s, r) => s + r.monto, 0), color: theme.palette.success.main },
+          { label: "Total Atrasado", valor: atrasadas.reduce((s, r) => s + r.monto, 0), color: theme.palette.error.main, icon: <ErrorOutlineOutlinedIcon /> },
+          { label: "Total por Pagar", valor: porPagar.reduce((s, r) => s + r.monto, 0), color: theme.palette.warning.main, icon: <ScheduleOutlinedIcon /> },
+          { label: "Total Cobrado", valor: pagadas.reduce((s, r) => s + r.monto, 0), color: theme.palette.success.main, icon: <TaskAltOutlinedIcon /> },
         ].map((s) => (
           <Grid key={s.label} size={{ xs: 12, sm: 4 }}>
-            <StatCard label={s.label} value={formatCurrency(s.valor)} color={s.color} />
+            <StatCard label={s.label} value={formatCurrency(s.valor)} color={s.color} icon={s.icon} />
           </Grid>
         ))}
       </Grid>
 
       <Tabs value={tab} onChange={(_, v) => { setTab(v); setPage(0); }} sx={{ mb: 2, borderBottom: 1, borderColor: "divider" }}>
         {tabs.map((t) => (
-          <Tab key={t.label} label={<Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>{t.label} <Chip label={t.rows.length} size="small" color={t.color} /></Box>} />
+          <Tab key={t.label} label={<Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>{t.icon}{t.label} <Chip label={t.rows.length} size="small" color={t.color} /></Box>} />
         ))}
       </Tabs>
 

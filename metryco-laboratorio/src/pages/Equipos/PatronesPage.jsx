@@ -30,6 +30,7 @@ import { exportCsv } from "../../shared/utils/exportCsv";
 import { CATEGORIAS, iconoCategoria, colorCategoria } from "./categorias";
 import { listarPatrones, actualizarPatron, eliminarPatron, eliminarPatronPermanente, fetchQrPatronBlob } from "../../services/patrones";
 import { useAuth } from "../../core/auth/useAuth";
+import { usePolling } from "../../shared/hooks/usePolling";
 
 const VIG = {
   vigente: { label: "Vigente", color: "success" },
@@ -63,14 +64,15 @@ export default function PatronesPage() {
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [error, setError] = useState("");
 
-  const cargar = useCallback(() => {
-    setLoading(true);
+  const cargar = useCallback((silencioso = false) => {
+    if (!silencioso) setLoading(true);
     listarPatrones({ search, categoria, vigencia, page, pageSize: rowsPerPage })
       .then(({ items, total }) => { setRows(items); setTotal(total); })
-      .catch(() => { setRows([]); setTotal(0); })
-      .finally(() => setLoading(false));
+      .catch(() => { if (!silencioso) { setRows([]); setTotal(0); } })
+      .finally(() => { if (!silencioso) setLoading(false); });
   }, [search, categoria, vigencia, page, rowsPerPage]);
   useEffect(() => { cargar(); }, [cargar]);
+  usePolling(() => cargar(true));
 
   const cuenta = (v) => rows.filter((r) => r.vigencia === v).length;
 

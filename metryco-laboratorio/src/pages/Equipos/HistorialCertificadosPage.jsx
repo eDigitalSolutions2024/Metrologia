@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   Box, Typography, TextField, MenuItem, Select, FormControl, InputLabel, Grid,
@@ -23,6 +23,7 @@ import { listarPatrones } from "../../services/patrones";
 import { listarCertificados } from "../../services/certificados";
 import { formatDate } from "../../shared/utils/formatDate";
 import { iconoCategoria, colorCategoria } from "./categorias";
+import { usePolling } from "../../shared/hooks/usePolling";
 
 const ESTADO_MAP = {
   vigente: { label: "Vigente", color: "success" },
@@ -117,13 +118,16 @@ export default function HistorialCertificadosPage() {
       .catch(() => setClientes([]));
   }, []);
 
-  useEffect(() => {
-    setLoading(true);
+  const cargar = useCallback((silencioso = false) => {
+    if (!silencioso) setLoading(true);
     listarCertificados({ search: buscar, clienteId: clienteFiltro, page, pageSize: rowsPerPage })
       .then(({ items, total }) => { setItems(items); setTotal(total); })
-      .catch(() => { setItems([]); setTotal(0); })
-      .finally(() => setLoading(false));
+      .catch(() => { if (!silencioso) { setItems([]); setTotal(0); } })
+      .finally(() => { if (!silencioso) setLoading(false); });
   }, [buscar, clienteFiltro, page, rowsPerPage]);
+
+  useEffect(() => { cargar(); }, [cargar]);
+  usePolling(() => cargar(true));
 
   const cuenta = (estado) => items.filter((c) => (c.estadoEfectivo || c.estado) === estado).length;
 

@@ -45,6 +45,13 @@ function num(n, decimales = 2) {
   return Number(n ?? 0).toFixed(decimales);
 }
 
+// TipoCambioP/EquivalenciaDR: el SAT exige literal "1" sin decimales cuando
+// no hay conversión real de moneda (ver construirComplementoPago).
+function numTipoCambio(n) {
+  const v = Number(n ?? 1);
+  return v === 1 ? "1" : v.toFixed(6);
+}
+
 /**
  * Valida el comprobante completo contra los requisitos de formato del CFDI
  * 4.0 (no solo "existe", también "tiene la forma correcta") y regresa la
@@ -67,6 +74,13 @@ function validarComprobante(cfdi) {
   if (!CP_REGEX.test(cfdi.lugarExpedicion || "")) errores.push(`Lugar de expedición (CP) con formato inválido: "${cfdi.lugarExpedicion}" (deben ser 5 dígitos)`);
   if (!cfdi.formaPago?.trim()) errores.push("Falta la forma de pago (catálogo SAT c_FormaPago)");
   if (!["PUE", "PPD"].includes(cfdi.metodoPago)) errores.push(`Método de pago inválido: "${cfdi.metodoPago}" (debe ser PUE o PPD)`);
+  // Regla del SAT (solo comprobantes de Ingreso): con PPD la forma de pago
+  // debe ser "99 - Por definir" (la real se declara luego en el Complemento
+  // de Pago); con PUE, "99" no es válida.
+  if (cfdi.tipoComprobante === "I") {
+    if (cfdi.metodoPago === "PPD" && cfdi.formaPago !== "99") errores.push('Con método de pago PPD la forma de pago debe ser "99 - Por definir"');
+    if (cfdi.metodoPago === "PUE" && cfdi.formaPago === "99") errores.push('Con método de pago PUE la forma de pago no puede ser "99 - Por definir"');
+  }
   // "XXX" solo es válido en un Complemento de Pago (tipoComprobante="P") —
   // el Anexo 20 lo exige ahí porque Subtotal/Total del comprobante van en 0.
   const monedasValidas = cfdi.tipoComprobante === "P" ? ["MXN", "USD", "XXX"] : ["MXN", "USD"];
@@ -190,14 +204,19 @@ function construirComplementoPago(cfdi) {
 
   return (
     `<cfdi:Complemento>` +
-    `<pago20:Pagos xmlns:pago20="http://www.sat.gob.mx/Pagos20" Version="2.0">` +
+    `<pago20:Pagos Version="2.0">` +
     nodoTotalesPago(p.impuestos, p.monto) +
     `<pago20:Pago FechaPago="${formatearFecha(p.fechaPago)}" FormaDePagoP="${escaparXml(p.formaPago)}" ` +
-    `MonedaP="${escaparXml(p.moneda || "MXN")}" TipoCambioP="${num(p.tipoCambio || 1, 6)}" Monto="${num(p.monto, 2)}">` +
+    // El SAT exige TipoCambioP/EquivalenciaDR literales "1" (sin decimales)
+    // cuando no hay conversión de moneda real — "1.000000" lo rechaza
+    // (CRP20215), mismo patrón que SubTotal/Total/Cantidad arriba. Este
+    // sistema no maneja tipo de cambio real todavía, así que en la práctica
+    // siempre es 1.
+    `MonedaP="${escaparXml(p.moneda || "MXN")}" TipoCambioP="${numTipoCambio(p.tipoCambio)}" Monto="${num(p.monto, 2)}">` +
     `<pago20:DoctoRelacionado IdDocumento="${escaparXml(dr.idDocumento)}"` +
     (dr.serie ? ` Serie="${escaparXml(dr.serie)}"` : "") +
     (dr.folio ? ` Folio="${escaparXml(dr.folio)}"` : "") +
-    ` MonedaDR="${escaparXml(dr.moneda || "MXN")}" EquivalenciaDR="${num(dr.equivalencia || 1, 6)}" NumParcialidad="${dr.numParcialidad || 1}" ` +
+    ` MonedaDR="${escaparXml(dr.moneda || "MXN")}" EquivalenciaDR="${numTipoCambio(dr.equivalencia)}" NumParcialidad="${dr.numParcialidad || 1}" ` +
     `ImpSaldoAnt="${num(dr.impSaldoAnterior, 2)}" ImpPagado="${num(dr.impPagado, 2)}" ` +
     `ImpSaldoInsoluto="${num(dr.impSaldoInsoluto, 2)}" ObjetoImpDR="${escaparXml(dr.objetoImpDR || "02")}">` +
     (impuestosDRXml ? `<pago20:ImpuestosDR><pago20:TrasladosDR>${impuestosDRXml}</pago20:TrasladosDR></pago20:ImpuestosDR>` : "") +
@@ -217,6 +236,8 @@ function construirComplementoPago(cfdi) {
 function construirXml(cfdi) {
   validarComprobante(cfdi);
 
+  const esPago = cfdi.tipoComprobante === "P" && cfdi.pago;
+
   const conceptosXml = cfdi.conceptos.map((c) => {
     const traslados = (c.impuestos || [])
       .filter((imp) => imp.tipo === "traslado")
@@ -229,11 +250,17 @@ function construirXml(cfdi) {
       : "";
     const descuentoAttr = Number(c.descuento) > 0 ? ` Descuento="${num(c.descuento, 6)}"` : "";
     const unidadAttr = c.unidad ? ` Unidad="${escaparXml(c.unidad)}"` : "";
+    // El concepto genérico "Pago" de un Complemento de Pago exige Cantidad,
+    // ValorUnitario e Importe literales "1"/"0"/"0", sin decimales — igual
+    // que SubTotal/Total del comprobante (ver CRP20103/CRP20115 más abajo).
+    const cantidadAttr = esPago ? "1" : num(c.cantidad, 6);
+    const valorUnitarioAttr = esPago ? "0" : num(c.valorUnitario, 6);
+    const importeAttr = esPago ? "0" : num(c.importe, 6);
 
     return (
-      `<cfdi:Concepto ClaveProdServ="${escaparXml(c.claveProdServ)}" Cantidad="${num(c.cantidad, 6)}" ` +
+      `<cfdi:Concepto ClaveProdServ="${escaparXml(c.claveProdServ)}" Cantidad="${cantidadAttr}" ` +
       `ClaveUnidad="${escaparXml(c.claveUnidad)}"${unidadAttr} Descripcion="${escaparXml(c.descripcion)}" ` +
-      `ValorUnitario="${num(c.valorUnitario, 6)}" Importe="${num(c.importe, 6)}"${descuentoAttr} ObjetoImp="${escaparXml(c.objetoImpuesto)}">` +
+      `ValorUnitario="${valorUnitarioAttr}" Importe="${importeAttr}"${descuentoAttr} ObjetoImp="${escaparXml(c.objetoImpuesto)}">` +
       `${impuestosNodo}</cfdi:Concepto>`
     );
   }).join("");
@@ -249,15 +276,33 @@ function construirXml(cfdi) {
   const descuentoAttr = Number(cfdi.descuento) > 0 ? ` Descuento="${num(cfdi.descuento, 2)}"` : "";
   const serieAttr = cfdi.serie ? ` Serie="${escaparXml(cfdi.serie)}"` : "";
 
+  // El namespace Y la URL del esquema público de un complemento (ej.
+  // pago20) deben declararse en el nodo RAÍZ <cfdi:Comprobante>, no solo en
+  // el nodo del propio complemento — es sintácticamente válido en XML
+  // declararlo más abajo, pero el validador de Dinvbox lo rechaza igual
+  // (errores CO1002/CO1003) si no está también arriba, que es como lo hacen
+  // los ejemplos oficiales del SAT.
+  const pago20NsAttr = esPago ? ` xmlns:pago20="http://www.sat.gob.mx/Pagos20"` : "";
+  const pago20SchemaLocation = esPago
+    ? " http://www.sat.gob.mx/Pagos20 http://www.sat.gob.mx/sitio_internet/cfd/Pagos/Pagos20.xsd"
+    : "";
+
   const xml =
     `<?xml version="1.0" encoding="UTF-8"?>` +
     `<cfdi:Comprobante xmlns:cfdi="http://www.sat.gob.mx/cfd/4" ` +
-    `xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" ` +
-    `xsi:schemaLocation="http://www.sat.gob.mx/cfd/4 http://www.sat.gob.mx/sitio_internet/cfd/4/cfdv40.xsd" ` +
+    `xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"${pago20NsAttr} ` +
+    `xsi:schemaLocation="http://www.sat.gob.mx/cfd/4 http://www.sat.gob.mx/sitio_internet/cfd/4/cfdv40.xsd${pago20SchemaLocation}" ` +
     `Version="4.0"${serieAttr} Folio="${escaparXml(cfdi.folioInterno)}" Fecha="${formatearFecha(cfdi.fechaEmision)}" ` +
-    `FormaPago="${escaparXml(cfdi.formaPago)}" SubTotal="${num(cfdi.subtotal, 2)}"${descuentoAttr} ` +
-    `Moneda="${escaparXml(cfdi.moneda)}" Total="${num(cfdi.total, 2)}" ` +
-    `TipoDeComprobante="${escaparXml(cfdi.tipoComprobante)}" Exportacion="01" MetodoPago="${escaparXml(cfdi.metodoPago)}" ` +
+    // El SAT exige SubTotal/Total literalmente "0" (sin decimales) cuando el
+    // comprobante trae el Complemento de Pago — "0.00" lo rechaza (error
+    // CRP20103), aunque numéricamente sea el mismo valor. Y el atributo
+    // FormaPago NO debe existir en la raíz en ese caso (error CRP20105) — la
+    // forma de pago real va dentro de pago20:Pago, que ya la trae.
+    `${esPago ? "" : `FormaPago="${escaparXml(cfdi.formaPago)}" `}SubTotal="${esPago ? "0" : num(cfdi.subtotal, 2)}"${descuentoAttr} ` +
+    `Moneda="${escaparXml(cfdi.moneda)}" Total="${esPago ? "0" : num(cfdi.total, 2)}" ` +
+    // Mismo caso que FormaPago arriba: MetodoPago tampoco debe existir en la
+    // raíz de un comprobante con Complemento de Pago (error CRP20106).
+    `TipoDeComprobante="${escaparXml(cfdi.tipoComprobante)}" Exportacion="01"${esPago ? "" : ` MetodoPago="${escaparXml(cfdi.metodoPago)}"`} ` +
     `LugarExpedicion="${escaparXml(cfdi.lugarExpedicion)}">` +
     `<cfdi:Emisor Rfc="${escaparXml(cfdi.emisor.rfc)}" Nombre="${escaparXml(cfdi.emisor.nombre)}" RegimenFiscal="${escaparXml(cfdi.emisor.regimenFiscal)}"/>` +
     `<cfdi:Receptor Rfc="${escaparXml(cfdi.receptor.rfc)}" Nombre="${escaparXml(cfdi.receptor.nombre)}" ` +
