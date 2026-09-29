@@ -67,7 +67,10 @@ function validarComprobante(cfdi) {
   if (!CP_REGEX.test(cfdi.lugarExpedicion || "")) errores.push(`Lugar de expedición (CP) con formato inválido: "${cfdi.lugarExpedicion}" (deben ser 5 dígitos)`);
   if (!cfdi.formaPago?.trim()) errores.push("Falta la forma de pago (catálogo SAT c_FormaPago)");
   if (!["PUE", "PPD"].includes(cfdi.metodoPago)) errores.push(`Método de pago inválido: "${cfdi.metodoPago}" (debe ser PUE o PPD)`);
-  if (!["MXN", "USD"].includes(cfdi.moneda)) errores.push(`Moneda inválida: "${cfdi.moneda}"`);
+  // "XXX" solo es válido en un Complemento de Pago (tipoComprobante="P") —
+  // el Anexo 20 lo exige ahí porque Subtotal/Total del comprobante van en 0.
+  const monedasValidas = cfdi.tipoComprobante === "P" ? ["MXN", "USD", "XXX"] : ["MXN", "USD"];
+  if (!monedasValidas.includes(cfdi.moneda)) errores.push(`Moneda inválida: "${cfdi.moneda}"`);
 
   if (!Array.isArray(cfdi.conceptos) || cfdi.conceptos.length === 0) {
     errores.push("El comprobante debe tener al menos un concepto");
@@ -128,31 +131,78 @@ function agruparImpuestos(conceptos) {
   return [...grupos.values()];
 }
 
+// Nombre del atributo de pago20:Totales para cada (tasa, tipo) soportado —
+// el SAT exige un atributo DISTINTO por tasa (TotalTrasladosBaseIVA16,
+// TotalTrasladosBaseIVA8, etc.), no una lista genérica. Este sistema solo
+// maneja IVA 16% y 0% (ver CrearCfdiDialog "Tasa de IVA"), así que solo se
+// contemplan esos dos — un traslado con una tasa distinta no debería poder
+// llegar aquí porque el formulario no la ofrece, pero si llegara, se omite
+// de Totales en vez de inventar un nombre de atributo que no exista.
+const SUFIJO_TOTALES_IVA = { "0.16": "IVA16", "0": "IVA0" };
+
+function nodosTraslados(impuestos, sufijoAttrs) {
+  return (impuestos || [])
+    .filter((t) => t.tasaOCuota != null)
+    .map((t) => (
+      `<pago20:Traslado${sufijoAttrs} Base${sufijoAttrs}="${num(t.base, 2)}" Impuesto${sufijoAttrs}="${escaparXml(t.impuesto || "002")}" ` +
+      `TipoFactor${sufijoAttrs}="${escaparXml(t.tipoFactor || "Tasa")}" TasaOCuota${sufijoAttrs}="${num(t.tasaOCuota, 6)}" Importe${sufijoAttrs}="${num(t.importe, 2)}"/>`
+    )).join("");
+}
+
+/** pago20:Totales — agrega TODOS los pagos del complemento (aquí siempre uno solo) agrupados por tasa. */
+function nodoTotalesPago(impuestosP, montoTotalPagos) {
+  const porTasa = {};
+  for (const t of impuestosP || []) {
+    const suf = SUFIJO_TOTALES_IVA[String(t.tasaOCuota)];
+    if (!suf) continue; // tasa no contemplada por este sistema — se omite en vez de adivinar el nombre del atributo
+    const actual = porTasa[suf] || { base: 0, importe: 0 };
+    actual.base += Number(t.base) || 0;
+    actual.importe += Number(t.importe) || 0;
+    porTasa[suf] = actual;
+  }
+  const attrsTasas = Object.entries(porTasa)
+    .map(([suf, v]) => `TotalTrasladosBase${suf}="${num(v.base, 2)}" TotalTrasladosImpuesto${suf}="${num(v.importe, 2)}"`)
+    .join(" ");
+  return `<pago20:Totales ${attrsTasas}${attrsTasas ? " " : ""}MontoTotalPagos="${num(montoTotalPagos, 2)}"/>`;
+}
+
 /**
  * Nodo Complemento/Pagos (versión 2.0) — solo para comprobantes tipo "P".
  * Estructura real del Anexo 20 / Complemento de Pago 2.0 del SAT: un CFDI de
  * Pago va con Subtotal="0"/Total="0" y un concepto genérico (ver
  * cfdi.service.emitirComplementoPago), y el pago real se declara aquí, con
  * el saldo antes/después de ESTE pago sobre el documento que se está
- * liquidando (`DoctoRelacionado`).
+ * liquidando (`DoctoRelacionado`), el desglose de impuestos DEL DOCUMENTO
+ * (ImpuestosDR, sin prorratear) y el desglose de impuestos DE ESTE PAGO
+ * (ImpuestosP, prorrateado si el pago es parcial — ver
+ * cfdi.service.emitirComplementoPago) y el nodo `Totales` que exige el SAT.
  *
  * Alcance actual: un solo `Pago` con un solo `DoctoRelacionado` — no cubre
- * pagos que abonan a varios CFDI a la vez, ni multi-moneda con equivalencia.
+ * pagos que abonan a varios CFDI a la vez, ni multi-moneda con equivalencia
+ * distinta de 1.
  */
 function construirComplementoPago(cfdi) {
   const p = cfdi.pago;
   const dr = p.docRelacionado;
+
+  const impuestosDRXml = nodosTraslados(dr.impuestos, "DR");
+  const impuestosPXml = nodosTraslados(p.impuestos, "P");
+
   return (
     `<cfdi:Complemento>` +
     `<pago20:Pagos xmlns:pago20="http://www.sat.gob.mx/Pagos20" Version="2.0">` +
+    nodoTotalesPago(p.impuestos, p.monto) +
     `<pago20:Pago FechaPago="${formatearFecha(p.fechaPago)}" FormaDePagoP="${escaparXml(p.formaPago)}" ` +
-    `MonedaP="${escaparXml(p.moneda || "MXN")}" Monto="${num(p.monto, 2)}">` +
+    `MonedaP="${escaparXml(p.moneda || "MXN")}" TipoCambioP="${num(p.tipoCambio || 1, 6)}" Monto="${num(p.monto, 2)}">` +
     `<pago20:DoctoRelacionado IdDocumento="${escaparXml(dr.idDocumento)}"` +
     (dr.serie ? ` Serie="${escaparXml(dr.serie)}"` : "") +
     (dr.folio ? ` Folio="${escaparXml(dr.folio)}"` : "") +
-    ` MonedaDR="${escaparXml(dr.moneda || "MXN")}" NumParcialidad="${dr.numParcialidad || 1}" ` +
+    ` MonedaDR="${escaparXml(dr.moneda || "MXN")}" EquivalenciaDR="${num(dr.equivalencia || 1, 6)}" NumParcialidad="${dr.numParcialidad || 1}" ` +
     `ImpSaldoAnt="${num(dr.impSaldoAnterior, 2)}" ImpPagado="${num(dr.impPagado, 2)}" ` +
-    `ImpSaldoInsoluto="${num(dr.impSaldoInsoluto, 2)}" ObjetoImpDR="${escaparXml(dr.objetoImpDR || "02")}"/>` +
+    `ImpSaldoInsoluto="${num(dr.impSaldoInsoluto, 2)}" ObjetoImpDR="${escaparXml(dr.objetoImpDR || "02")}">` +
+    (impuestosDRXml ? `<pago20:ImpuestosDR><pago20:TrasladosDR>${impuestosDRXml}</pago20:TrasladosDR></pago20:ImpuestosDR>` : "") +
+    `</pago20:DoctoRelacionado>` +
+    (impuestosPXml ? `<pago20:ImpuestosP><pago20:TrasladosP>${impuestosPXml}</pago20:TrasladosP></pago20:ImpuestosP>` : "") +
     `</pago20:Pago>` +
     `</pago20:Pagos>` +
     `</cfdi:Complemento>`

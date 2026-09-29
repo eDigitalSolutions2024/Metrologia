@@ -16,6 +16,7 @@ function obtenerPac() {
 
   // Registro de adaptadores reales — se agregan conforme se contraten.
   const adaptadores = {
+    dinvbox: () => new (require("./providers/dinvbox"))(pacConfig),
     // facturama: () => new (require("./providers/facturama"))(pacConfig),
     // sw: () => new (require("./providers/sw"))(pacConfig),
     // finkok: () => new (require("./providers/finkok"))(pacConfig),

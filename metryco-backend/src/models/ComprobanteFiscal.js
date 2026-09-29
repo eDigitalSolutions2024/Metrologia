@@ -82,7 +82,11 @@ const comprobanteFiscalSchema = new Schema(
     serie: { type: String, trim: true },
 
     tipoComprobante: { type: String, enum: TIPOS_COMPROBANTE, default: "I" },
-    moneda: { type: String, enum: MONEDAS, default: "MXN" },
+    // "XXX" solo aplica a la raíz del comprobante cuando tipoComprobante="P"
+    // (Complemento de Pago) — el Anexo 20 exige ese valor fijo porque
+    // Subtotal/Total del comprobante van en 0 (la moneda real del pago vive
+    // en pago.moneda / MonedaP, no aquí).
+    moneda: { type: String, enum: [...MONEDAS, "XXX"], default: "MXN" },
     formaPago: { type: String, trim: true }, // catálogo SAT c_FormaPago, ej "03"
     metodoPago: { type: String, enum: ["PUE", "PPD"], default: "PUE" },
     lugarExpedicion: { type: String, trim: true }, // CP del emisor al momento de timbrar
@@ -161,19 +165,40 @@ const comprobanteFiscalSchema = new Schema(
       fechaPago: Date,
       formaPago: String, // catálogo SAT c_FormaPago
       moneda: { type: String, enum: MONEDAS },
+      tipoCambio: { type: Number, default: 1 }, // pago20:Pago/@TipoCambioP
       monto: Number,
       numOperacion: String,
+      // Desglose de IMPUESTOS DE ESTE PAGO (pago20:ImpuestosP) — es la
+      // porción de impuesto que corresponde al monto pagado, no el impuesto
+      // completo del documento original (se prorratea si el pago es
+      // parcial). Ver cfdi.service.emitirComplementoPago.
+      impuestos: [
+        {
+          impuesto: String, tipoFactor: String, tasaOCuota: Number,
+          base: Number, importe: Number, _id: false,
+        },
+      ],
       docRelacionado: {
         comprobante: { type: Schema.Types.ObjectId, ref: "ComprobanteFiscal" }, // el CFDI de Ingreso que se está pagando
         idDocumento: String, // UUID timbrado de ese CFDI
         serie: String,
         folio: String,
         moneda: String,
+        equivalencia: { type: Number, default: 1 }, // pago20:DoctoRelacionado/@EquivalenciaDR
         numParcialidad: Number,
         impSaldoAnterior: Number,
         impPagado: Number,
         impSaldoInsoluto: Number,
         objetoImpDR: { type: String, enum: OBJETOS_IMPUESTO },
+        // Desglose de IMPUESTOS DEL DOCUMENTO que se está pagando
+        // (pago20:ImpuestosDR) — el impuesto completo de ESE comprobante,
+        // sin prorratear (a diferencia de `pago.impuestos` de arriba).
+        impuestos: [
+          {
+            impuesto: String, tipoFactor: String, tasaOCuota: Number,
+            base: Number, importe: Number, _id: false,
+          },
+        ],
       },
     },
 

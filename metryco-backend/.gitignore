@@ -2,3 +2,9 @@ node_modules
 .env
 *.log
 uploads/
+
+# CSD (certificado + llave privada del laboratorio) — nunca se sube al
+# repositorio, ni siquiera los de prueba del SAT. Ver pac.config.js.
+csd/
+*.key
+*.cer

@@ -374,7 +374,7 @@ async function cancelar(id, { motivoCodigo, motivo, folioSustitucion }) {
 
   const pac = pacFactory.obtenerPac(); // lanza PacNotConfiguredError si no hay proveedor
 
-  const resultado = await pac.cancelarFactura({ uuid: cfdi.uuid, motivoCodigo, folioSustitucion });
+  const resultado = await pac.cancelarFactura({ uuid: cfdi.uuid, motivoCodigo, folioSustitucion, emisorRfc: cfdi.emisor.rfc });
   const requiereAceptacion = Number(cfdi.total) > UMBRAL_ACEPTACION_CANCELACION;
 
   cfdi.cancelacion = {
@@ -466,6 +466,18 @@ async function emitirComplementoPago(datos, usuarioId) {
     impuestos: [],
   };
 
+  // Desglose de impuestos DEL DOCUMENTO que se paga (completo, sin
+  // prorratear) y DE ESTE PAGO (prorrateado por la proporción que representa
+  // el monto pagado sobre el total del documento) — el Anexo 20 exige ambos
+  // por separado, ver cfdiBuilder.construirComplementoPago.
+  const impuestosDocumento = cfdiBuilder.agruparImpuestos(original.conceptos);
+  const proporcionPagada = monto / original.total;
+  const impuestosPago = impuestosDocumento.map((t) => ({
+    impuesto: t.impuesto, tipoFactor: t.tipoFactor, tasaOCuota: t.tasaOCuota,
+    base: redondear(t.base * proporcionPagada),
+    importe: redondear(t.importe * proporcionPagada),
+  }));
+
   const datosComprobante = {
     factura: original.factura || undefined,
     cotizacion: original.cotizacion || undefined,
@@ -473,7 +485,7 @@ async function emitirComplementoPago(datos, usuarioId) {
     cliente: original.cliente._id,
     folioInterno,
     tipoComprobante: "P",
-    moneda: original.moneda,
+    moneda: "XXX", // fijo por el Anexo 20 cuando tipoComprobante="P" — la moneda real del pago va en pago.moneda/MonedaP
     formaPago: datos.formaPago,
     metodoPago: "PUE", // el propio Complemento de Pago siempre se emite como PUE
     lugarExpedicion: emisor.codigoPostalFiscal,
@@ -498,6 +510,7 @@ async function emitirComplementoPago(datos, usuarioId) {
       moneda: original.moneda,
       monto,
       numOperacion: datos.numOperacion,
+      impuestos: impuestosPago,
       docRelacionado: {
         comprobante: original._id,
         idDocumento: original.uuid,
@@ -509,6 +522,7 @@ async function emitirComplementoPago(datos, usuarioId) {
         impPagado: monto,
         impSaldoInsoluto: saldoInsoluto,
         objetoImpDR: original.totalImpuestosTrasladados > 0 ? "02" : "01",
+        impuestos: impuestosDocumento,
       },
     },
   };
