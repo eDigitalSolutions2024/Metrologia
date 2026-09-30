@@ -1,4 +1,5 @@
 const { Schema, model } = require("mongoose");
+const { cobradoDe, saldoDe } = require("../utils/saldoFactura");
 
 /**
  * Registro de cuenta por cobrar (tabla `events` del legacy: php/calendario_generar.php,
@@ -8,6 +9,20 @@ const { Schema, model } = require("mongoose");
  * del proyecto). El folio de factura es texto libre por ahora (se captura el
  * folio ya timbrado fuera del sistema, o uno provisional).
  */
+// Un abono es un pago parcial (o el último) contra la cuenta. Si nace de un
+// Complemento de Pago timbrado lleva `comprobante` y solo se retira cancelando
+// ese complemento; los demás son manuales.
+const abonoSchema = new Schema(
+  {
+    fecha: { type: Date, required: true },
+    monto: { type: Number, required: true, min: 0.01 },
+    nota: { type: String, trim: true },
+    comprobante: { type: Schema.Types.ObjectId, ref: "ComprobanteFiscal" },
+    registradoPor: { type: Schema.Types.ObjectId, ref: "Usuario" },
+  },
+  { _id: true }
+);
+
 const facturaSchema = new Schema(
   {
     cliente: { type: Schema.Types.ObjectId, ref: "Cliente", required: true, index: true },
@@ -27,13 +42,19 @@ const facturaSchema = new Schema(
     diasPago: { type: Number, enum: [0, 15, 30, 60], default: 30 },
     fechaPago: { type: Date, required: true, index: true }, // = fechaCr + diasPago, calculada al guardar
 
-    statusPago: { type: Number, enum: [0, 1], default: 0 }, // 0 = pendiente, 1 = pagada
+    statusPago: { type: Number, enum: [0, 1], default: 0 }, // 0 = pendiente, 1 = pagada (saldo en 0)
+    abonos: [abonoSchema],
+    // PPD timbrada en el sistema: se cobra registrando Complementos de Pago (Facturación), no a mano.
+    requiereComplemento: { type: Boolean, default: false },
     fechaPagada: Date,
 
     comentarios: String,
     registradoPor: { type: Schema.Types.ObjectId, ref: "Usuario" },
   },
-  { timestamps: true }
+  { timestamps: true, toJSON: { virtuals: true }, toObject: { virtuals: true } }
 );
+
+facturaSchema.virtual("cobrado").get(function () { return cobradoDe(this); });
+facturaSchema.virtual("saldo").get(function () { return saldoDe(this); });
 
 module.exports = model("Factura", facturaSchema);

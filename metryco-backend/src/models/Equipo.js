@@ -25,6 +25,9 @@ const equipoSchema = new Schema(
     rango: String,
     rangoUso: String,
     rangoCalibracion: String,
+    // Cada cuántos meses se recalibra este equipo: con esto el certificado propone su vigencia
+    // (si no se define, se propone 12 meses).
+    intervaloCalibracionMeses: { type: Number, min: 1, max: 60 },
 
     localizacion: String,
     comentarios: String,

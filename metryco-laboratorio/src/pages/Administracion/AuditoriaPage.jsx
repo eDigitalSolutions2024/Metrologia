@@ -55,15 +55,22 @@ export default function AuditoriaPage() {
   usePolling(() => cargar(true));
 
   const columns = [
-    { field: "fecha", headerName: "Fecha", renderCell: (r) => formatFecha(r.fecha) },
-    { field: "accion", headerName: "Acción", renderCell: (r) => ACCION_LABEL[r.accion] || r.accion },
-    { field: "usuario", headerName: "Usuario", renderCell: (r) => r.usuario?.usuario || "—" },
-    { field: "rol", headerName: "Rol", renderCell: (r) => r.usuario?.rol || "—" },
+    { field: "fecha", headerName: "Fecha", nowrap: true, renderCell: (r) => formatFecha(r.fecha) },
+    { field: "accion", headerName: "Acción", minWidth: 180, renderCell: (r) => ACCION_LABEL[r.accion] || r.accion },
     {
-      field: "exito", headerName: "Resultado", align: "center",
+      field: "usuario", headerName: "Usuario", nowrap: true,
+      renderCell: (r) => (
+        <Box>
+          <Typography variant="body2" fontWeight={600}>{r.usuario?.usuario || "—"}</Typography>
+          {r.usuario?.rol && <Typography variant="caption" color="text.secondary">{r.usuario.rol}</Typography>}
+        </Box>
+      ),
+    },
+    {
+      field: "exito", headerName: "Resultado", align: "center", nowrap: true,
       renderCell: (r) => <Chip label={r.exito ? "OK" : "Falló"} color={r.exito ? "success" : "error"} size="small" />,
     },
-    { field: "ip", headerName: "IP" },
+    { field: "ip", headerName: "IP", nowrap: true, hideBelow: "md" },
   ];
 
   return (

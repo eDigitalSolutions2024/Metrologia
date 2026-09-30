@@ -33,6 +33,7 @@ import { listarClientes } from "../../services/clientes";
 import { listarRazonesSociales } from "../../services/razonesSociales";
 import { listarContactos } from "../../services/contactos";
 import { listarEquipos } from "../../services/equipos";
+import AvisoDeuda from "../../shared/components/AvisoDeuda";
 import {
   obtenerCotizacion, crearCotizacion, actualizarCotizacion,
   subirAdjuntoCotizacion, fetchAdjuntoCotizacionBlob, eliminarAdjuntoCotizacion,
@@ -73,7 +74,7 @@ const DEFAULT_VALUES = {
   items: [ITEM_VACIO],
 };
 
-export default function CotizacionDialog({ open, cotizacionId, duplicarDesdeId, onClose, onSaved, onGenerarFactura, onDuplicar }) {
+export default function CotizacionDialog({ open, cotizacionId, duplicarDesdeId, prefill, onClose, onSaved, onGenerarFactura, onDuplicar }) {
   const isEdit = !!cotizacionId;
   const navigate = useNavigate();
 
@@ -167,8 +168,20 @@ export default function CotizacionDialog({ open, cotizacionId, duplicarDesdeId, 
             items: cotizacion.items.map((i) => ({
               descripcion: i.descripcion, marca: i.marca || "", modelo: i.modelo || "",
               tiempoEntrega: i.tiempoEntrega || "", claveProdServ: i.claveProdServ || "80101504", claveUnidad: i.claveUnidad || "E48",
-              cantidad: i.cantidad, precioUnitario: i.precioUnitario,
+              cantidad: i.cantidad, precioUnitario: i.precioUnitario, equipo: i.equipo || "",
             })),
+          });
+          setCotizacionData(null);
+          setAdjuntos([]);
+          setPasoClienteConfirmado(true);
+          setOcAutoGenerada(true);
+        } else if (prefill) {
+          // Datos iniciales desde otro módulo (ej. recalibración desde un certificado).
+          reset({
+            ...DEFAULT_VALUES,
+            cliente: prefill.cliente, contacto: prefill.contacto || "", moneda: prefill.moneda || "MXN",
+            ivaPorcentaje: prefill.ivaPorcentaje ?? 16, observaciones: prefill.observaciones || "",
+            items: prefill.items,
           });
           setCotizacionData(null);
           setAdjuntos([]);
@@ -191,7 +204,7 @@ export default function CotizacionDialog({ open, cotizacionId, duplicarDesdeId, 
     return () => {
       cancelado = true;
     };
-  }, [open, cotizacionId, duplicarDesdeId, isEdit, reset]);
+  }, [open, cotizacionId, duplicarDesdeId, prefill, isEdit, reset]);
 
   // Contactos del cliente elegido — se recargan cada vez que cambia (permite
   // elegir cuál va como "Requisitor" de la cotización, como en el legacy).
@@ -303,6 +316,9 @@ export default function CotizacionDialog({ open, cotizacionId, duplicarDesdeId, 
         ) : (
           <Box component="form" id="cotizacion-form" onSubmit={handleSubmit(onSubmit)}>
             {submitError && <Alert severity="error" sx={{ mb: 3, borderRadius: 2 }}>{submitError}</Alert>}
+            {prefill?.aviso && !isEdit && <Alert severity="info" sx={{ mb: 3, borderRadius: 2 }}>{prefill.aviso}</Alert>}
+
+            {clienteSeleccionado && <AvisoDeuda clienteId={clienteSeleccionado} sx={{ mb: 2.5 }} />}
 
             {clientes.length === 0 && (
               <Alert severity="warning" sx={{ mb: 3, borderRadius: 2 }}>
@@ -377,6 +393,18 @@ export default function CotizacionDialog({ open, cotizacionId, duplicarDesdeId, 
                             Rechazar
                           </AppButton>
                         </>
+                      )}
+                      {cotizacionData.facturacion?.parcial && (
+                        <Typography variant="caption" color="warning.main" fontWeight={700} sx={{ alignSelf: "center" }}>
+                          Facturación parcial: {cotizacionData.facturacion.partidasFacturadas} de {cotizacionData.facturacion.partidasTotal} partidas
+                        </Typography>
+                      )}
+                      {cotizacionData.cfdi && (
+                        <AppButton type="button" size="small" variant="outlined" startIcon={<ReceiptLongOutlinedIcon />}
+                          onClick={() => { onClose(); navigate(`/facturacion?cfdi=${cotizacionData.cfdi._id}`); }}
+                          sx={{ borderRadius: 2 }}>
+                          Factura: {cotizacionData.cfdi.folioInterno}
+                        </AppButton>
                       )}
                       {cotizacionData.reporte && (
                         <AppButton type="button" size="small" variant="outlined" startIcon={<FactCheckOutlinedIcon />}
@@ -559,14 +587,24 @@ export default function CotizacionDialog({ open, cotizacionId, duplicarDesdeId, 
                                       rhf.onChange(`Calibración de ${[val.marca, val.modelo].filter(Boolean).join(" ")} (${val.idInterno})`);
                                       setValue(`items.${idx}.marca`, val.marca || "");
                                       setValue(`items.${idx}.modelo`, val.modelo || "");
+                                      setValue(`items.${idx}.equipo`, val._id); // la partida queda ligada al equipo registrado
                                     } else {
                                       rhf.onChange(val ?? "");
+                                      setValue(`items.${idx}.equipo`, "");
                                     }
                                   }}
-                                  onInputChange={(_, val, reason) => { if (reason !== "reset") rhf.onChange(val); }}
+                                  onInputChange={(_, val, reason) => {
+                                    if (reason !== "reset") rhf.onChange(val);
+                                    if (reason === "input") setValue(`items.${idx}.equipo`, ""); // si edita el texto a mano, se rompe el vínculo
+                                  }}
                                   onBlur={rhf.onBlur}
                                   renderInput={(params) => (
-                                    <TextField {...params} inputRef={rhf.ref} placeholder="Ej: Calibración de vernier" />
+                                    <TextField
+                                      {...params} inputRef={rhf.ref} placeholder="Ej: Calibración de vernier"
+                                      helperText={items[idx]?.equipo
+                                        ? `Equipo registrado: ${equiposCliente.find((e) => e._id === items[idx].equipo)?.idInterno || "vinculado"} — se asignará solo al abrir el reporte`
+                                        : undefined}
+                                    />
                                   )}
                                 />
                               )}

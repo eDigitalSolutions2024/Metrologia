@@ -48,6 +48,9 @@ const clienteSchema = new Schema(
     rfc: { type: String, required: true, trim: true, uppercase: true, unique: true },
     regimenFiscal: String,
     usoCFDI: { type: String, enum: USO_CFDI },
+    // Días de crédito que se le dan al cliente (0 = contado). Sin definir = clientes
+    // anteriores a este campo: se conserva el comportamiento previo (PPD a 30 días).
+    diasCredito: { type: Number, enum: [0, 15, 30, 60] },
     domicilioFiscal: domicilioSchema,
     contacto: contactoSchema,
     facturacion: facturacionSchema,

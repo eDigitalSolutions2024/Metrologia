@@ -34,4 +34,8 @@ const eliminar = asyncHandler(async (req, res) => {
   res.json({ success: true, data: await service.eliminar(req.params.id) });
 });
 
-module.exports = { listar, obtener, crear, actualizar, eliminar, paraImprimir, agregarComentario };
+const asignarEquiposDeCotizacion = asyncHandler(async (req, res) => {
+  res.json({ success: true, data: await service.asignarEquiposDeCotizacion(req.params.id, req.user) });
+});
+
+module.exports = { listar, obtener, crear, actualizar, eliminar, paraImprimir, agregarComentario, asignarEquiposDeCotizacion };

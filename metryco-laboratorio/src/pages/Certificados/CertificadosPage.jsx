@@ -19,10 +19,13 @@ import WhatsAppIcon from "@mui/icons-material/WhatsApp";
 
 import AppButton from "../../shared/components/AppButton";
 import AppTable from "../../shared/components/AppTable";
+import MenuAcciones from "../../shared/components/MenuAcciones";
 import PageHeader from "../../shared/components/PageHeader";
 import StatCard from "../../shared/components/StatCard";
 import { formatDate } from "../../shared/utils/formatDate";
 import { useAuth } from "../../core/auth/useAuth";
+import { useNavigate } from "react-router-dom";
+import RequestQuoteOutlinedIcon from "@mui/icons-material/RequestQuoteOutlined";
 import { listarClientes } from "../../services/clientes";
 import {
   listarCertificados, emitirCertificado, cambiarEstadoCertificado, anularCertificado,
@@ -48,6 +51,8 @@ export default function CertificadosPage() {
   const theme = useTheme();
   const { user } = useAuth();
   const esAdmin = ["admin", "coordinador"].includes(user?.rol);
+  const navigate = useNavigate();
+  const cotizarRecalibracion = (r) => navigate(`/cotizaciones?recotizar=${r._id}`);
 
   const [rows, setRows] = useState([]);
   const [total, setTotal] = useState(0);
@@ -108,25 +113,26 @@ export default function CertificadosPage() {
     ];
   }, [rows, total, theme]);
 
+  const verInforme = (r) => window.open(`/informe/certificado/${r._id}`, "_blank");
+
+  const celdaCertificado = (r) => (
+    <Box>
+      <Typography variant="body2" fontWeight={700}>{r.folio}</Typography>
+      <Typography variant="caption" color="text.secondary" sx={{ display: "block" }}>
+        {[r.equipoSnapshot?.idInterno, r.equipoSnapshot?.descripcion].filter(Boolean).join(" · ")}
+      </Typography>
+    </Box>
+  );
+
   const columns = [
-    {
-      field: "folio",
-      headerName: "Certificado",
-      renderCell: (r) => (
-        <Box>
-          <Typography variant="body2" fontWeight={700}>{r.folio}</Typography>
-          <Typography variant="caption" color="text.secondary">
-            {r.equipoSnapshot?.idInterno} · {r.equipoSnapshot?.descripcion}
-          </Typography>
-        </Box>
-      ),
-    },
-    { field: "cliente", headerName: "Cliente", renderCell: (r) => r.clienteSnapshot?.nombre || r.cliente?.nombre || "—" },
-    { field: "fechaCalibracion", headerName: "Calibración", renderCell: (r) => formatDate(r.fechaCalibracion) },
-    { field: "vigencia", headerName: "Vigencia", renderCell: (r) => formatDate(r.vigencia) },
+    { field: "folio", headerName: "Certificado", minWidth: 220, renderCell: celdaCertificado },
+    { field: "cliente", headerName: "Cliente", minWidth: 150, renderCell: (r) => r.clienteSnapshot?.nombre || r.cliente?.nombre || "—" },
+    { field: "fechaCalibracion", headerName: "Calibración", nowrap: true, hideBelow: "md", renderCell: (r) => formatDate(r.fechaCalibracion) },
+    { field: "vigencia", headerName: "Vigencia", nowrap: true, renderCell: (r) => formatDate(r.vigencia) },
     {
       field: "estado",
       headerName: "Estado",
+      nowrap: true,
       renderCell: (r) => {
         const s = ESTADO_CHIP[r.estadoEfectivo || r.estado] || { label: r.estado, color: "default" };
         return <Chip size="small" label={s.label} color={s.color} />;
@@ -136,8 +142,9 @@ export default function CertificadosPage() {
       field: "acciones",
       headerName: "Acciones",
       align: "center",
+      nowrap: true,
       renderCell: (r) => (
-        <Box sx={{ display: "flex", gap: 0.25, justifyContent: "center" }}>
+        <Box sx={{ display: "flex", gap: 0.5, alignItems: "center", justifyContent: "center" }}>
           {r.estado === "borrador" && (
             <Tooltip title="Marcar vigente">
               <IconButton size="small" onClick={() => cambiarEstadoCertificado(r._id, "vigente").then(cargar)}>
@@ -145,58 +152,29 @@ export default function CertificadosPage() {
               </IconButton>
             </Tooltip>
           )}
-          <Tooltip title="Informe de calibración (PDF)">
-            <IconButton size="small" onClick={() => window.open(`/informe/certificado/${r._id}`, "_blank")}>
-              <ArticleOutlinedIcon fontSize="small" sx={{ color: "secondary.main" }} />
-            </IconButton>
-          </Tooltip>
-          <Tooltip title="Código QR">
-            <IconButton size="small" onClick={() => setQrCert(r)}>
-              <QrCode2OutlinedIcon fontSize="small" sx={{ color: "secondary.main" }} />
-            </IconButton>
-          </Tooltip>
-          <Tooltip title="Etiqueta / imprimir">
-            <IconButton size="small" onClick={() => setEtiquetaCert(r)}>
-              <LabelOutlinedIcon fontSize="small" sx={{ color: "secondary.main" }} />
-            </IconButton>
-          </Tooltip>
-          {esAdmin && r.estado === "vigente" && (
-            <Tooltip title="Editar certificado (servicio, condiciones, comentarios)">
-              <IconButton size="small" onClick={() => setEditarCertId(r._id)}>
-                <EditOutlinedIcon fontSize="small" sx={{ color: "secondary.main" }} />
-              </IconButton>
-            </Tooltip>
-          )}
-          {esAdmin && r.estado !== "anulado" && (
-            <Tooltip title="Anular">
-              <IconButton size="small" onClick={() => setAnularCert(r)}>
-                <BlockOutlinedIcon fontSize="small" sx={{ color: "text.secondary" }} />
-              </IconButton>
-            </Tooltip>
-          )}
+          <MenuAcciones
+            acciones={[
+              { label: "Informe de calibración (PDF)", icon: <ArticleOutlinedIcon fontSize="small" />, onClick: () => verInforme(r) },
+              esAdmin && { label: "Cotizar recalibración", icon: <RequestQuoteOutlinedIcon fontSize="small" />, onClick: () => cotizarRecalibracion(r) },
+              { label: "Código QR", icon: <QrCode2OutlinedIcon fontSize="small" />, onClick: () => setQrCert(r) },
+              { label: "Etiqueta / imprimir", icon: <LabelOutlinedIcon fontSize="small" />, onClick: () => setEtiquetaCert(r) },
+              esAdmin && r.estado === "vigente" && { label: "Editar certificado", icon: <EditOutlinedIcon fontSize="small" />, onClick: () => setEditarCertId(r._id), separador: true },
+              esAdmin && r.estado !== "anulado" && { label: "Anular", icon: <BlockOutlinedIcon fontSize="small" />, color: "error", onClick: () => setAnularCert(r), separador: true },
+            ].filter(Boolean)}
+          />
         </Box>
       ),
     },
   ];
 
   const vencColumns = [
-    {
-      field: "folio",
-      headerName: "Certificado",
-      renderCell: (r) => (
-        <Box>
-          <Typography variant="body2" fontWeight={700}>{r.folio}</Typography>
-          <Typography variant="caption" color="text.secondary">
-            {r.equipoSnapshot?.idInterno} · {r.equipoSnapshot?.descripcion}
-          </Typography>
-        </Box>
-      ),
-    },
-    { field: "cliente", headerName: "Cliente", renderCell: (r) => r.clienteSnapshot?.nombre || r.cliente?.nombre || "—" },
-    { field: "vigencia", headerName: "Vigencia", renderCell: (r) => formatDate(r.vigencia) },
+    { field: "folio", headerName: "Certificado", minWidth: 220, renderCell: celdaCertificado },
+    { field: "cliente", headerName: "Cliente", minWidth: 150, renderCell: (r) => r.clienteSnapshot?.nombre || r.cliente?.nombre || "—" },
+    { field: "vigencia", headerName: "Vigencia", nowrap: true, renderCell: (r) => formatDate(r.vigencia) },
     {
       field: "estado",
       headerName: "Estado",
+      nowrap: true,
       renderCell: (r) => {
         const s = ESTADO_CHIP[r.estadoEfectivo] || { label: r.estadoEfectivo, color: "default" };
         return <Chip size="small" label={s.label} color={s.color} />;
@@ -206,15 +184,11 @@ export default function CertificadosPage() {
       field: "acciones",
       headerName: "Acciones",
       align: "center",
+      nowrap: true,
       renderCell: (r) => (
-        <Box sx={{ display: "flex", gap: 0.25, justifyContent: "center" }}>
-          <Tooltip title="Informe de calibración (PDF)">
-            <IconButton size="small" onClick={() => window.open(`/informe/certificado/${r._id}`, "_blank")}>
-              <ArticleOutlinedIcon fontSize="small" sx={{ color: "secondary.main" }} />
-            </IconButton>
-          </Tooltip>
+        <Box sx={{ display: "flex", gap: 0.5, alignItems: "center", justifyContent: "center" }}>
           <Tooltip title={r.cliente?.contacto?.telefono ? "Enviar recordatorio por WhatsApp (con el certificado en PDF)" : "El cliente no tiene teléfono capturado"}>
-            <span>
+            <span data-no-row-click>
               <IconButton
                 size="small"
                 disabled={!r.cliente?.contacto?.telefono || enviandoWspId === r._id}
@@ -224,13 +198,13 @@ export default function CertificadosPage() {
               </IconButton>
             </span>
           </Tooltip>
-          {esAdmin && (
-            <Tooltip title="Editar certificado (servicio, condiciones, comentarios)">
-              <IconButton size="small" onClick={() => setEditarCertId(r._id)}>
-                <EditOutlinedIcon fontSize="small" sx={{ color: "secondary.main" }} />
-              </IconButton>
-            </Tooltip>
-          )}
+          <MenuAcciones
+            acciones={[
+              { label: "Informe de calibración (PDF)", icon: <ArticleOutlinedIcon fontSize="small" />, onClick: () => verInforme(r) },
+              esAdmin && { label: "Cotizar recalibración", icon: <RequestQuoteOutlinedIcon fontSize="small" />, onClick: () => cotizarRecalibracion(r) },
+              esAdmin && { label: "Editar certificado", icon: <EditOutlinedIcon fontSize="small" />, onClick: () => setEditarCertId(r._id) },
+            ].filter(Boolean)}
+          />
         </Box>
       ),
     },
@@ -322,6 +296,7 @@ export default function CertificadosPage() {
             onPageChange={setPage}
             onRowsPerPageChange={(n) => { setRowsPerPage(n); setPage(0); }}
             emptyText="Sin certificados"
+            onRowClick={verInforme}
           />
         </>
       ) : (
@@ -362,6 +337,7 @@ export default function CertificadosPage() {
             onPageChange={() => {}}
             onRowsPerPageChange={() => {}}
             emptyText="Sin certificados por vencer"
+            onRowClick={verInforme}
           />
         </>
       )}
@@ -417,7 +393,7 @@ function EmitirDialog({ open, onClose, onDone }) {
     const asig = asignaciones.find((a) => a._id === f.sel);
     if (!asig?.fechaCalibracion) return;
     const v = new Date(asig.fechaCalibracion);
-    v.setFullYear(v.getFullYear() + 1);
+    v.setMonth(v.getMonth() + (asig.equipo?.intervaloCalibracionMeses || 12));
     setF((s) => ({ ...s, vigencia: v.toISOString().slice(0, 10) }));
   }, [f.sel]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -483,7 +459,7 @@ function EmitirDialog({ open, onClose, onDone }) {
           <Grid size={12}>
             <TextField
               type="date" fullWidth size="small" label="Vigencia"
-              helperText="Sugerida a 1 año de la calibración — puedes cambiarla"
+              helperText={`Sugerida a ${asignacionSel?.equipo?.intervaloCalibracionMeses || 12} meses de la calibración${asignacionSel?.equipo?.intervaloCalibracionMeses ? " (intervalo de este equipo)" : ""} — puedes cambiarla`}
               value={f.vigencia} onChange={(e) => { setVigenciaTocada(true); set("vigencia")(e); }}
               slotProps={{ inputLabel: { shrink: true } }}
             />
@@ -496,8 +472,11 @@ function EmitirDialog({ open, onClose, onDone }) {
             </TextField>
           </Grid>
           <Grid size={{ xs: 6 }}>
-            <TextField select fullWidth size="small" label="Autorizó (aseguramiento de calidad)" value={f.autorizadoPor} onChange={set("autorizadoPor")}>
-              <MenuItem value="">— Sin especificar —</MenuItem>
+            <TextField
+              select fullWidth size="small" label="Autorizó (aseguramiento de calidad)" value={f.autorizadoPor} onChange={set("autorizadoPor")}
+              helperText="Vacío = quien aprobó en Calidad"
+            >
+              <MenuItem value="">— Quien aprobó en Calidad —</MenuItem>
               {usuarios.map((u) => <MenuItem key={u._id} value={u._id}>{u.nombre}</MenuItem>)}
             </TextField>
           </Grid>

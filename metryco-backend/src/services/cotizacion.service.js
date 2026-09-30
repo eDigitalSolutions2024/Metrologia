@@ -5,6 +5,8 @@ const Cotizacion = require("../models/Cotizacion");
 const Cliente = require("../models/Cliente");
 const Counter = require("../models/Counter");
 const Reporte = require("../models/Reporte");
+const ComprobanteFiscal = require("../models/ComprobanteFiscal");
+const cotizacionFacturacion = require("./cotizacionFacturacion");
 const AppError = require("../utils/AppError");
 const configuracionService = require("./configuracion.service");
 const { destinoAdjuntosCotizacion } = require("../middleware/upload");
@@ -90,6 +92,21 @@ async function listar({ search = "", status = "todos", mes = "", anio = "", clie
     { $unwind: "$clienteInfo" },
     { $lookup: { from: "usuarios", localField: "creadoPor", foreignField: "_id", as: "vendedorInfo" } },
     { $unwind: { path: "$vendedorInfo", preserveNullAndEmptyArrays: true } },
+    // CFDI de ingreso vigente (no cancelado) que nació de esta cotización, el más reciente.
+    {
+      $lookup: {
+        from: ComprobanteFiscal.collection.name,
+        let: { cotizacionId: "$_id" },
+        pipeline: [
+          { $match: { $expr: { $and: [{ $eq: ["$cotizacion", "$$cotizacionId"] }, { $eq: ["$tipoComprobante", "I"] }, { $ne: ["$estado", "cancelada"] }] } } },
+          { $sort: { createdAt: -1 } },
+          { $limit: 1 },
+          { $project: { folioInterno: 1, estado: 1, metodoPago: 1, total: 1, saldoPendiente: 1 } },
+        ],
+        as: "cfdiInfo",
+      },
+    },
+    { $addFields: { cfdi: { $arrayElemAt: ["$cfdiInfo", 0] } } },
   ];
 
   if (search) {
@@ -113,6 +130,12 @@ async function listar({ search = "", status = "todos", mes = "", anio = "", clie
     Cotizacion.aggregate([...pipeline, { $count: "total" }]),
   ]);
 
+  const avances = await cotizacionFacturacion.avanceVarios(items);
+  for (const it of items) {
+    const av = avances.get(String(it._id));
+    it.facturacion = { parcial: av.parcial, completa: av.completa, partidasFacturadas: av.partidasFacturadas, partidasTotal: av.partidasTotal };
+  }
+
   return { items, total: totalResult[0]?.total ?? 0 };
 }
 
@@ -128,6 +151,13 @@ async function obtener(id) {
   // cotización, para poder saltar de una a otro igual que en el PHP legacy.
   const reporte = await Reporte.findOne({ cotizacion: id }).select("folio status").lean();
   cotizacion.reporte = reporte || null;
+
+  cotizacion.facturacion = (await cotizacionFacturacion.avanceVarios([cotizacion])).get(String(cotizacion._id));
+
+  cotizacion.cfdi = await ComprobanteFiscal.findOne({ cotizacion: id, tipoComprobante: "I", estado: { $ne: "cancelada" } })
+    .sort({ createdAt: -1 })
+    .select("folioInterno estado metodoPago total saldoPendiente")
+    .lean();
 
   return cotizacion;
 }

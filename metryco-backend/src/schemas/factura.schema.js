@@ -12,4 +12,10 @@ const crearFacturaSchema = z.object({
   comentarios: z.string().trim().optional(),
 });
 
-module.exports = { crearFacturaSchema };
+const registrarAbonoSchema = z.object({
+  monto: z.coerce.number().positive("El abono debe ser mayor a 0"),
+  fecha: z.preprocess((v) => (v === "" || v == null ? undefined : v), z.coerce.date().optional()),
+  nota: z.string().trim().optional(),
+});
+
+module.exports = { crearFacturaSchema, registrarAbonoSchema };

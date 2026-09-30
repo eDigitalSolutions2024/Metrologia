@@ -12,6 +12,11 @@ export async function obtenerCliente(id) {
   return data.data;
 }
 
+export async function resumenCliente(id) {
+  const { data } = await api.get(`${ENDPOINTS.CLIENTES}/${id}/resumen`);
+  return data.data;
+}
+
 export async function crearCliente(payload) {
   const { data } = await api.post(ENDPOINTS.CLIENTES, payload);
   return data.data;

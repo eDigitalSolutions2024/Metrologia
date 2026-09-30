@@ -4,11 +4,13 @@ import {
   Box, Typography, TextField, Chip, Checkbox, Button, IconButton, Tooltip, Avatar,
   MenuItem, Select, FormControl, InputLabel, Paper, Alert, Link as MuiLink,
   Dialog, DialogTitle, DialogContent, DialogActions,
+  Table, TableHead, TableBody, TableRow, TableCell,
 } from "@mui/material";
 import Autocomplete from "@mui/material/Autocomplete";
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
 import AddIcon from "@mui/icons-material/Add";
 import PictureAsPdfOutlinedIcon from "@mui/icons-material/PictureAsPdfOutlined";
+import ReceiptLongOutlinedIcon from "@mui/icons-material/ReceiptLongOutlined";
 import RefreshOutlinedIcon from "@mui/icons-material/RefreshOutlined";
 import CheckRoundedIcon from "@mui/icons-material/CheckRounded";
 import BiotechOutlinedIcon from "@mui/icons-material/BiotechOutlined";
@@ -25,7 +27,7 @@ import PageHeader from "../../shared/components/PageHeader";
 import { formatDate } from "../../shared/utils/formatDate";
 import FactCheckOutlinedIcon from "@mui/icons-material/FactCheckOutlined";
 import {
-  obtenerReporte, actualizarReporte, agregarComentarioReporte,
+  obtenerReporte, actualizarReporte, agregarComentarioReporte, asignarEquiposDeCotizacion,
   crearAsignacion, actualizarAsignacion, cambiarEstadoAsignacion, eliminarAsignacion,
 } from "../../services/reportes";
 import { listarEquipos } from "../../services/equipos";
@@ -34,6 +36,7 @@ import { listarPatrones } from "../../services/patrones";
 import { listarPerformance } from "../../services/performance";
 import { listarContactos, crearContacto } from "../../services/contactos";
 import { listarCotizaciones } from "../../services/cotizaciones";
+import AvisoDeuda from "../../shared/components/AvisoDeuda";
 import { listarCertificadosPorReporte, emitirCertificado, cambiarEstadoCertificado } from "../../services/certificados";
 import { aprobarCalculosPorAsignacion } from "../../services/incertidumbre";
 import { direccionCliente } from "./imprimir/shared";
@@ -126,6 +129,8 @@ export default function ReporteDetallePage() {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [asignandoCot, setAsignandoCot] = useState(false);
+  const [avisoAsignacion, setAvisoAsignacion] = useState(null);
   const [factura, setFactura] = useState("");
   const [comentario, setComentario] = useState("");
   const [rechazoTarget, setRechazoTarget] = useState(null);
@@ -191,6 +196,25 @@ export default function ReporteDetallePage() {
       cargar();
     } catch {
       setError("No se pudo agregar el comentario.");
+    }
+  };
+
+  const asignarDeCotizacion = async () => {
+    setAsignandoCot(true); setAvisoAsignacion(null);
+    try {
+      const r = await asignarEquiposDeCotizacion(id);
+      const yaAsignados = r.omitidas.filter((o) => /ya está asignado/.test(o.motivo)).length;
+      const sinEquipo = r.omitidas.filter((o) => !/ya está asignado/.test(o.motivo));
+      const partes = [];
+      if (r.creadas) partes.push(`Se asignaron ${r.creadas} equipo${r.creadas === 1 ? "" : "s"}: ${r.equipos.join(", ")}.`);
+      if (yaAsignados) partes.push(`${yaAsignados} ya estaba${yaAsignados === 1 ? "" : "n"} asignado${yaAsignados === 1 ? "" : "s"}.`);
+      if (sinEquipo.length) partes.push(`${sinEquipo.length} partida${sinEquipo.length === 1 ? "" : "s"} sin equipo registrado (${sinEquipo.map((o) => o.descripcion).join("; ")}).`);
+      setAvisoAsignacion({ severity: r.creadas ? "success" : "info", texto: partes.join(" ") || "No hay equipos de la cotización por asignar." });
+      cargar();
+    } catch (e) {
+      setError(e?.response?.data?.message || "No se pudieron asignar los equipos de la cotización.");
+    } finally {
+      setAsignandoCot(false);
     }
   };
 
@@ -298,11 +322,21 @@ export default function ReporteDetallePage() {
             <AppButton variant="outlined" startIcon={<RefreshOutlinedIcon />} onClick={cargar} sx={{ borderRadius: 2 }}>
               Actualizar
             </AppButton>
+            {["terminado", "entregado"].includes(reporte.status) && (
+              <AppButton
+                startIcon={<ReceiptLongOutlinedIcon />} sx={{ borderRadius: 2 }}
+                onClick={() => navigate(`/facturacion?${new URLSearchParams({ cliente: cliente._id || "", ...(reporte.cotizacion?._id ? { cotizacion: reporte.cotizacion._id } : {}) }).toString()}`)}
+              >
+                Facturar
+              </AppButton>
+            )}
           </>
         }
       />
 
       {error && <Alert severity="error" sx={{ mb: 2, borderRadius: 2 }} onClose={() => setError("")}>{error}</Alert>}
+
+      <AvisoDeuda clienteId={cliente._id} sx={{ mb: 2 }} />
 
       {/* Datos del cliente / reporte */}
       <Paper variant="outlined" sx={{ p: 2.5, borderRadius: 2, mb: 2.5 }}>
@@ -400,29 +434,28 @@ export default function ReporteDetallePage() {
             </Typography>
           </Typography>
           <Paper variant="outlined" sx={{ borderRadius: 1.5, mb: 2.5, overflow: "auto" }}>
-            <Box component="table" sx={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
-              <Box component="thead" sx={{ bgcolor: "background.default" }}>
-                <Box component="tr">
-                  {["Descripción", "Marca", "Modelo", "Cantidad", "Tiempo de entrega"].map((h) => (
-                    <Box
-                      component="th" key={h}
-                      sx={{ px: 2, py: 1.5, textAlign: "left", borderBottom: 1, borderColor: "divider", fontSize: 11, fontWeight: 700, color: "text.secondary" }}
-                    >{h}</Box>
-                  ))}
-                </Box>
-              </Box>
-              <Box component="tbody">
+            <Table size="small">
+              <TableHead>
+                <TableRow>
+                  <TableCell sx={{ px: 2.25, py: 1.5, minWidth: 200 }}>Descripción</TableCell>
+                  <TableCell sx={{ px: 2.25, py: 1.5 }}>Marca</TableCell>
+                  <TableCell sx={{ px: 2.25, py: 1.5 }}>Modelo</TableCell>
+                  <TableCell align="center" sx={{ px: 2.25, py: 1.5 }}>Cantidad</TableCell>
+                  <TableCell sx={{ px: 2.25, py: 1.5, whiteSpace: "nowrap" }}>Tiempo de entrega</TableCell>
+                </TableRow>
+              </TableHead>
+              <TableBody>
                 {reporte.cotizacion.items.map((it, i) => (
-                  <Box component="tr" key={i} sx={{ "& td": { px: 2, py: 1.25, borderBottom: 1, borderColor: "divider" } }}>
-                    <Box component="td">{it.descripcion || "—"}</Box>
-                    <Box component="td">{it.marca || "—"}</Box>
-                    <Box component="td">{it.modelo || "—"}</Box>
-                    <Box component="td">{it.cantidad ?? "—"}</Box>
-                    <Box component="td">{it.tiempoEntrega || "—"}</Box>
-                  </Box>
+                  <TableRow key={i} sx={{ "&:last-child td": { border: 0 }, "& td": { fontSize: 13.5, px: 2.25, py: 1.25 } }}>
+                    <TableCell>{it.descripcion || "—"}</TableCell>
+                    <TableCell>{it.marca || "—"}</TableCell>
+                    <TableCell>{it.modelo || "—"}</TableCell>
+                    <TableCell align="center">{it.cantidad ?? "—"}</TableCell>
+                    <TableCell sx={{ whiteSpace: "nowrap" }}>{it.tiempoEntrega || "—"}</TableCell>
+                  </TableRow>
                 ))}
-              </Box>
-            </Box>
+              </TableBody>
+            </Table>
           </Paper>
         </>
       )}
@@ -430,58 +463,79 @@ export default function ReporteDetallePage() {
       {/* Recolección de equipos */}
       <Typography variant="subtitle2" fontWeight={700} sx={{ mb: 1 }}>Recolección de equipos</Typography>
       <Paper variant="outlined" sx={{ borderRadius: 1.5, mb: 2.5, overflow: "auto" }}>
-        <Box component="table" sx={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
-          <Box component="thead" sx={{ bgcolor: "background.default" }}>
-            <Box component="tr">
-              {["Marca", "Modelo", "Descripción", "En Sitio", "En Laboratorio", "Ubicación", "Recolectado", "Info. Recolección"].map((h) => (
-                <Box
-                  component="th" key={h}
-                  sx={{ px: 2, py: 1.5, textAlign: "left", borderBottom: 1, borderColor: "divider", fontSize: 11, fontWeight: 700, color: "text.secondary" }}
-                >{h}</Box>
-              ))}
-            </Box>
-          </Box>
-          <Box component="tbody">
+        <Table size="small">
+          <TableHead>
+            <TableRow>
+              <TableCell sx={{ px: 2.25, py: 1.5, minWidth: 200 }}>Equipo</TableCell>
+              <TableCell align="center" sx={{ px: 2.25, py: 1.5, whiteSpace: "nowrap" }}>En Sitio</TableCell>
+              <TableCell align="center" sx={{ px: 2.25, py: 1.5, whiteSpace: "nowrap" }}>En Laboratorio</TableCell>
+              <TableCell sx={{ px: 2.25, py: 1.5, minWidth: 190 }}>Ubicación</TableCell>
+              <TableCell align="center" sx={{ px: 2.25, py: 1.5, whiteSpace: "nowrap" }}>Recolectado</TableCell>
+              <TableCell sx={{ px: 2.25, py: 1.5, minWidth: 190 }}>Info. Recolección</TableCell>
+            </TableRow>
+          </TableHead>
+          <TableBody>
             {asignaciones.map((a) => (
-              <Box component="tr" key={a._id} sx={{ "& td": { px: 2, py: 1.25, borderBottom: 1, borderColor: "divider" } }}>
-                <Box component="td">{a.equipo?.marca || "—"}</Box>
-                <Box component="td">{a.equipo?.modelo || "—"}</Box>
-                <Box component="td">{a.equipo?.descripcion || "—"}</Box>
-                <Box component="td" sx={{ textAlign: "center" }}>
+              <TableRow key={a._id} sx={{ "&:last-child td": { border: 0 }, "& td": { fontSize: 13.5, px: 2.25, py: 1 } }}>
+                <TableCell>
+                  <Typography variant="body2" fontWeight={700}>{a.equipo?.descripcion || "—"}</Typography>
+                  <Typography variant="caption" color="text.secondary" sx={{ display: "block" }}>
+                    {[a.equipo?.marca, a.equipo?.modelo].filter(Boolean).join(" / ") || "—"}
+                  </Typography>
+                </TableCell>
+                <TableCell align="center">
                   <Checkbox size="small" checked={!!a.recoleccion?.enSitio} disabled={!puedeOperarAsignacion}
                     onChange={(e) => guardarRecoleccion(a._id, "enSitio", e.target.checked)} />
-                </Box>
-                <Box component="td" sx={{ textAlign: "center" }}>
+                </TableCell>
+                <TableCell align="center">
                   <Checkbox size="small" checked={!!a.recoleccion?.enLaboratorio} disabled={!puedeOperarAsignacion}
                     onChange={(e) => guardarRecoleccion(a._id, "enLaboratorio", e.target.checked)} />
-                </Box>
-                <Box component="td">
-                  <TextField size="small" variant="standard" placeholder="Info. ubicación" disabled={!puedeOperarAsignacion}
+                </TableCell>
+                <TableCell>
+                  <TextField size="small" fullWidth placeholder="Info. ubicación" disabled={!puedeOperarAsignacion}
                     defaultValue={a.recoleccion?.ubicacionInfo || ""}
                     onBlur={(e) => guardarRecoleccion(a._id, "ubicacionInfo", e.target.value)} />
-                </Box>
-                <Box component="td" sx={{ textAlign: "center" }}>
+                </TableCell>
+                <TableCell align="center">
                   <Checkbox size="small" checked={!!a.recoleccion?.recolectado} disabled={!puedeOperarAsignacion}
                     onChange={(e) => guardarRecoleccion(a._id, "recolectado", e.target.checked)} />
-                </Box>
-                <Box component="td">
-                  <TextField size="small" variant="standard" placeholder="Info. recolección" disabled={!puedeOperarAsignacion}
+                </TableCell>
+                <TableCell>
+                  <TextField size="small" fullWidth placeholder="Info. recolección" disabled={!puedeOperarAsignacion}
                     defaultValue={a.recoleccion?.infoRecoleccion || ""}
                     onBlur={(e) => guardarRecoleccion(a._id, "infoRecoleccion", e.target.value)} />
-                </Box>
-              </Box>
+                </TableCell>
+              </TableRow>
             ))}
             {asignaciones.length === 0 && (
-              <Box component="tr"><Box component="td" colSpan={8} sx={{ p: 2, textAlign: "center", color: "text.secondary" }}>Sin equipos asignados todavía.</Box></Box>
+              <TableRow>
+                <TableCell colSpan={6} align="center" sx={{ py: 3, color: "text.secondary", border: 0 }}>Sin equipos asignados todavía.</TableCell>
+              </TableRow>
             )}
-          </Box>
-        </Box>
+          </TableBody>
+        </Table>
       </Paper>
 
       {/* Selecciona el equipo a calibrar */}
       {puedeAsignar && (
         <>
-          <Typography variant="subtitle2" fontWeight={700} sx={{ mb: 1 }}>Selecciona el equipo a calibrar</Typography>
+          <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 1, flexWrap: "wrap", mb: 1 }}>
+            <Typography variant="subtitle2" fontWeight={700}>Selecciona el equipo a calibrar</Typography>
+            {reporte.cotizacion && (
+              <Tooltip title="Asigna los equipos de las partidas de la cotización que ya están registrados del cliente">
+                <span>
+                  <AppButton type="button" size="small" variant="outlined" loading={asignandoCot} onClick={asignarDeCotizacion} sx={{ borderRadius: 2 }}>
+                    Asignar equipos de la cotización
+                  </AppButton>
+                </span>
+              </Tooltip>
+            )}
+          </Box>
+          {avisoAsignacion && (
+            <Alert severity={avisoAsignacion.severity} sx={{ mb: 1.5, borderRadius: 2 }} onClose={() => setAvisoAsignacion(null)}>
+              {avisoAsignacion.texto}
+            </Alert>
+          )}
           <AsignarForm clienteId={cliente._id} reporteId={id} equiposYaAsignados={asignaciones.map((a) => a.equipo?._id)} onDone={cargar} />
         </>
       )}

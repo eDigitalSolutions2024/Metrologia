@@ -32,4 +32,8 @@ const eliminar = asyncHandler(async (req, res) => {
   res.json({ success: true, data: cliente });
 });
 
-module.exports = { listar, obtener, crear, actualizar, eliminar };
+const resumen = asyncHandler(async (req, res) => {
+  res.json({ success: true, data: await clienteService.resumen(req.params.id) });
+});
+
+module.exports = { listar, obtener, resumen, crear, actualizar, eliminar };

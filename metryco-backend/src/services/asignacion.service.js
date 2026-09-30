@@ -35,7 +35,7 @@ async function listar({ reporteId = "", estadoCertificado = "", estadoCalibracio
 
   const [items, total] = await Promise.all([
     Asignacion.find(match)
-      .populate("equipo", "idInterno marca modelo serie categoria descripcion")
+      .populate("equipo", "idInterno marca modelo serie categoria descripcion intervaloCalibracionMeses")
       .populate({ path: "reporte", select: "folio cliente status", populate: { path: "cliente", select: "nombre" } })
       .populate("tecnicoAsignado", "nombre usuario")
       .populate("tecnicoEjecutor", "nombre usuario")
@@ -61,7 +61,7 @@ async function listarParaCalidad({ clienteId = "" } = {}) {
   };
 
   const items = await Asignacion.find(match)
-    .populate("equipo", "idInterno marca modelo serie categoria descripcion")
+    .populate("equipo", "idInterno marca modelo serie categoria descripcion intervaloCalibracionMeses")
     .populate({
       path: "reporte",
       select: "folio cliente",
@@ -131,6 +131,17 @@ async function crear(datos, reqUser) {
   const out = a.toObject();
   out.advertencias = await avisosPatrones(datos.patrones);
   return out;
+}
+
+/** Procedimiento/servicio de la calibración anterior del MISMO equipo — para no volver a teclearlo. */
+async function servicioPrevio(id) {
+  const a = await Asignacion.findById(id).select("equipo");
+  if (!a) throw new AppError("Asignación no encontrada", 404);
+  const previa = await Asignacion.findOne({ equipo: a.equipo, _id: { $ne: a._id }, "servicio.procedimiento": { $exists: true, $ne: "" } })
+    .sort({ createdAt: -1 })
+    .populate("reporte", "folio")
+    .select("servicio reporte");
+  return previa ? { servicio: previa.servicio, desde: previa.reporte?.folio || null } : null;
 }
 
 async function actualizar(id, datos, reqUser) {
@@ -363,5 +374,4 @@ async function archivoGraficaStream(id) {
 
 module.exports = {
   listar, listarParaCalidad, obtener, crear, actualizar, cambiarEstado, eliminar,
-  subirGrafica, archivoGraficaStream,
-};
+  subirGrafica, archivoGraficaStream, servicioPrevio };

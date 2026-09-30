@@ -36,12 +36,12 @@ export default function RazonesSocialesPage() {
   useEffect(cargar, []);
 
   const columns = [
-    { field: "nombre", headerName: "Nombre" },
-    { field: "rfc", headerName: "RFC", renderCell: (r) => r.rfc || "—" },
-    { field: "domicilio", headerName: "Domicilio", renderCell: (r) => r.domicilio || "—" },
-    { field: "activo", headerName: "Estado", renderCell: (r) => <Chip size="small" label={r.activo ? "Activa" : "Inactiva"} color={r.activo ? "success" : "default"} /> },
+    { field: "nombre", headerName: "Nombre", minWidth: 200, renderCell: (r) => <Typography variant="body2" fontWeight={600}>{r.nombre}</Typography> },
+    { field: "rfc", headerName: "RFC", nowrap: true, renderCell: (r) => r.rfc || "—" },
+    { field: "domicilio", headerName: "Domicilio", minWidth: 220, hideBelow: "md", renderCell: (r) => r.domicilio || "—" },
+    { field: "activo", headerName: "Estado", nowrap: true, renderCell: (r) => <Chip size="small" label={r.activo ? "Activa" : "Inactiva"} color={r.activo ? "success" : "default"} /> },
     {
-      field: "acciones", headerName: "Acciones", align: "center",
+      field: "acciones", headerName: "Acciones", align: "center", nowrap: true,
       renderCell: (r) => (
         <>
           <Tooltip title="Editar">
@@ -73,7 +73,7 @@ export default function RazonesSocialesPage() {
       />
       {error && <Alert severity="error" sx={{ mb: 2, borderRadius: 2 }} onClose={() => setError("")}>{error}</Alert>}
 
-      <AppTable columns={columns} rows={items} totalCount={items.length} loading={loading} />
+      <AppTable columns={columns} rows={items} totalCount={items.length} loading={loading} onRowClick={setEditando} />
 
       <FormDialog
         datos={editando}

@@ -290,7 +290,7 @@ export default function CfdiDetalleDialog({ cfdi, onClose, onCambiado, onElimina
           </Box>
         )}
 
-        <Table size="small" sx={{ mb: 2 }}>
+        <Table size="small" sx={{ mb: 2, "& .MuiTableCell-root": { py: 1.25, fontSize: 13.5 }, "& td:not(:first-of-type), & th:not(:first-of-type)": { whiteSpace: "nowrap" } }}>
           <TableHead>
             <TableRow>
               <TableCell>Descripción</TableCell>

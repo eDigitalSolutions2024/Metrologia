@@ -31,6 +31,7 @@ const baseEquipo = {
   rango: z.string().trim().optional(),
   rangoUso: z.string().trim().optional(),
   rangoCalibracion: z.string().trim().optional(),
+  intervaloCalibracionMeses: z.preprocess((v) => (v === "" || v === null ? undefined : v), z.coerce.number().int().min(1).max(60).optional()),
   localizacion: z.string().trim().optional(),
   comentarios: z.string().trim().optional(),
   costo: z.coerce.number().min(0).optional(),

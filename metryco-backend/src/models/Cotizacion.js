@@ -10,6 +10,9 @@ const itemSchema = new Schema(
     // CFDI ya traiga las claves y no haya que teclearlas de nuevo.
     claveProdServ: { type: String, trim: true }, // c_ClaveProdServ, ej. 80101504
     claveUnidad: { type: String, trim: true }, // c_ClaveUnidad, ej. E48
+    // Equipo registrado del cliente al que corresponde la partida — con esto, al abrir el reporte de
+    // esta cotización, el equipo se asigna solo (ver reporte.service.asignarEquiposDeCotizacion).
+    equipo: { type: Schema.Types.ObjectId, ref: "Equipo" },
     cantidad: { type: Number, required: true, min: 0 },
     precioUnitario: { type: Number, required: true, min: 0 },
   },

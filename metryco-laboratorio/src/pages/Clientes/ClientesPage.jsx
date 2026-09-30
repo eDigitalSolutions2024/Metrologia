@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
-  Box, Typography, TextField, InputAdornment, IconButton,
+  Box, Typography, TextField, InputAdornment, IconButton, Drawer,
   Chip, Tooltip, MenuItem, Select, FormControl, InputLabel, Alert,
 } from "@mui/material";
 import SearchIcon from "@mui/icons-material/Search";
@@ -21,9 +21,12 @@ import { listarClientes, actualizarCliente, eliminarCliente } from "../../servic
 import { useDebounce } from "../../shared/hooks/useDebounce";
 import { SECTORES, SECTOR_MAP } from "../../shared/constants/sectores";
 import { usePolling } from "../../shared/hooks/usePolling";
+import { FichaContenido } from "./ClienteFichaPage";
 import BusinessOutlinedIcon from "@mui/icons-material/BusinessOutlined";
 import PersonOutlineOutlinedIcon from "@mui/icons-material/PersonOutlineOutlined";
 import MailOutlineOutlinedIcon from "@mui/icons-material/MailOutlineOutlined";
+import CloseIcon from "@mui/icons-material/Close";
+import OpenInNewOutlinedIcon from "@mui/icons-material/OpenInNewOutlined";
 import VerifiedOutlinedIcon from "@mui/icons-material/VerifiedOutlined";
 import ReportProblemOutlinedIcon from "@mui/icons-material/ReportProblemOutlined";
 
@@ -54,6 +57,7 @@ export default function ClientesPage() {
   const [rowsPerPage, setRowsPerPage] = useState(10);
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [toggleTarget, setToggleTarget] = useState(null);
+  const [fichaId, setFichaId] = useState(null);
 
   const [rows, setRows] = useState([]);
   const [totalCount, setTotalCount] = useState(0);
@@ -142,7 +146,7 @@ export default function ClientesPage() {
       ),
     },
     {
-      field: "email", headerName: "Correo", minWidth: 180,
+      field: "email", headerName: "Correo", minWidth: 180, hideBelow: "lg",
       renderCell: (row) => (
         <Tooltip title={row.contacto?.emailCotizaciones || ""}>
           <Box sx={{ minWidth: 0, maxWidth: 210 }}>
@@ -152,7 +156,7 @@ export default function ClientesPage() {
       ),
     },
     {
-      field: "fiscal", headerName: "Fiscal",
+      field: "fiscal", headerName: "Fiscal", nowrap: true,
       renderCell: (row) => {
         const faltan = faltantesFiscales(row);
         return faltan.length === 0
@@ -171,6 +175,7 @@ export default function ClientesPage() {
     {
       field: "sector",
       headerName: "Sector",
+      nowrap: true, hideBelow: "xl",
       renderCell: (row) => {
         const s = SECTOR_MAP[row.sector] ?? { label: row.sector || "—", color: "default" };
         return <Chip label={s.label} color={s.color} size="small" variant="outlined" />;
@@ -179,6 +184,7 @@ export default function ClientesPage() {
     {
       field: "status",
       headerName: "Estado",
+      nowrap: true,
       renderCell: (row) => (
         <Chip
           label={row.status === "activo" ? "Activo" : "Inactivo"}
@@ -193,7 +199,7 @@ export default function ClientesPage() {
       align: "center",
       width: 120,
       renderCell: (row) => (
-        <Box sx={{ display: "flex", gap: 0.5, justifyContent: "center" }}>
+        <Box onClick={(e) => e.stopPropagation()} sx={{ display: "flex", gap: 0.5, justifyContent: "center" }}>
           <Tooltip title="Editar">
             <IconButton size="small" onClick={() => navigate(`/clientes/${row.id}/editar`)}>
               <EditOutlinedIcon fontSize="small" sx={{ color: "secondary.main" }} />
@@ -268,7 +274,39 @@ export default function ClientesPage() {
         rowsPerPage={rowsPerPage}
         onPageChange={setPage}
         onRowsPerPageChange={(n) => { setRowsPerPage(n); setPage(0); }}
+        onRowClick={(row) => setFichaId(row.id)}
       />
+
+      <Drawer
+        anchor="right" open={!!fichaId} onClose={() => setFichaId(null)}
+        slotProps={{ paper: { sx: { width: { xs: "100%", sm: 560 }, p: 2.5 } } }}
+      >
+        {fichaId && (
+          <FichaContenido
+            id={fichaId} compacto
+            encabezado={(cliente) => (
+              <Box sx={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 1, mb: 2 }}>
+                <Box sx={{ minWidth: 0 }}>
+                  <Typography variant="overline" color="text.secondary">Ficha del cliente</Typography>
+                  <Typography variant="h6" fontWeight={800} sx={{ lineHeight: 1.2 }}>{cliente.nombre}</Typography>
+                  <Typography variant="caption" color="text.secondary">
+                    {[cliente.rfc, cliente.domicilioFiscal?.ciudad].filter(Boolean).join(" · ") || "Sin RFC"}
+                  </Typography>
+                </Box>
+                <Box sx={{ display: "flex", gap: 0.5, flexShrink: 0 }}>
+                  <Tooltip title="Abrir en página completa">
+                    <IconButton size="small" onClick={() => navigate(`/clientes/${fichaId}`)}><OpenInNewOutlinedIcon fontSize="small" /></IconButton>
+                  </Tooltip>
+                  <Tooltip title="Editar">
+                    <IconButton size="small" onClick={() => navigate(`/clientes/${fichaId}/editar`)}><EditOutlinedIcon fontSize="small" /></IconButton>
+                  </Tooltip>
+                  <IconButton size="small" onClick={() => setFichaId(null)}><CloseIcon fontSize="small" /></IconButton>
+                </Box>
+              </Box>
+            )}
+          />
+        )}
+      </Drawer>
 
       <ConfirmDialog
         open={!!toggleTarget}

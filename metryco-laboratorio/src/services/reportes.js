@@ -85,3 +85,13 @@ export async function fetchGraficaAsignacionBlob(id) {
   const { data } = await api.get(`${ENDPOINTS.ASIGNACIONES}/${id}/grafica`, { responseType: "blob" });
   return data;
 }
+
+export async function asignarEquiposDeCotizacion(id) {
+  const { data } = await api.post(`${ENDPOINTS.REPORTES}/${id}/asignar-desde-cotizacion`);
+  return data.data;
+}
+
+export async function obtenerServicioPrevio(asignacionId) {
+  const { data } = await api.get(`${ENDPOINTS.ASIGNACIONES}/${asignacionId}/servicio-previo`);
+  return data.data;
+}

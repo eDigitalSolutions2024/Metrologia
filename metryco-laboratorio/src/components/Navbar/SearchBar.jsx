@@ -115,7 +115,7 @@ export default function SearchBar() {
     { label: "Equipos", real: true, items: equipos, render: (e) => ({ key: e._id, primary: e.descripcion, secondary: e.idInterno, extra: e.cliente?.nombre, onClick: () => ir(`/equipos/${e._id}/editar`) }) },
     { label: "Reportes", real: true, items: reportes, render: (r) => ({ key: r._id, primary: r.folio, secondary: r.cliente?.nombre, extra: r.status, onClick: () => ir(`/reportes/${r._id}`) }) },
     { label: "Calidad", real: true, items: calidad, render: (a) => ({ key: a._id, primary: a.reporte?.folio, secondary: a.equipo?.idInterno, extra: a.tecnicoAsignado?.nombre, onClick: () => ir(a.reporte?._id ? `/reportes/${a.reporte._id}` : "/calidad") }) },
-    { label: "Cobranza", real: true, items: cobranza, render: (f) => ({ key: f._id, primary: f.folio, secondary: f.cliente?.nombre, extra: f.statusPago === 1 ? "Pagado" : "Pendiente", onClick: () => ir("/cobranza") }) },
+    { label: "Cobranza", real: true, items: cobranza, render: (f) => ({ key: f._id, primary: f.folio, secondary: f.cliente?.nombre, extra: f.statusPago === 1 ? "Pagado" : f.cobrado > 0 ? "Pago parcial" : "Pendiente", onClick: () => ir("/cobranza") }) },
   ];
 
   const hayResultados = grupos.some((g) => g.items.length > 0);

@@ -335,6 +335,24 @@ export default function ClienteForm() {
               </FormControl>
             </Grid>
             <Grid size={{ xs: 12, sm: 6, md: 4 }}>
+              <FormControl fullWidth size="small">
+                <InputLabel shrink>Días de crédito</InputLabel>
+                <Controller
+                  name="diasCredito"
+                  control={control}
+                  render={({ field }) => (
+                    <Select label="Días de crédito" notched displayEmpty {...field} value={field.value ?? ""} sx={{ borderRadius: 2 }}>
+                      <MenuItem value="">Sin definir</MenuItem>
+                      <MenuItem value={0}>Contado (0 días)</MenuItem>
+                      <MenuItem value={15}>15 días</MenuItem>
+                      <MenuItem value={30}>30 días</MenuItem>
+                      <MenuItem value={60}>60 días</MenuItem>
+                    </Select>
+                  )}
+                />
+              </FormControl>
+            </Grid>
+            <Grid size={{ xs: 12, sm: 6, md: 4 }}>
               <AppInput label="Correo (Cotizaciones)" {...register("contacto.emailCotizaciones")} />
             </Grid>
             <Grid size={{ xs: 12, sm: 6, md: 4 }}>

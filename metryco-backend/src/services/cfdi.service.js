@@ -2,6 +2,8 @@ const mongoose = require("mongoose");
 const ComprobanteFiscal = require("../models/ComprobanteFiscal");
 const Cliente = require("../models/Cliente");
 const Factura = require("../models/Factura");
+const facturaService = require("./factura.service");
+const cotizacionFacturacion = require("./cotizacionFacturacion");
 const Cotizacion = require("../models/Cotizacion");
 const Reporte = require("../models/Reporte");
 const AppError = require("../utils/AppError");
@@ -177,6 +179,11 @@ async function crear(datos, usuarioId) {
       : null,
   ]);
 
+  // Facturación por partes: no se puede facturar más de lo pendiente de una partida.
+  if (datos.cotizacion && oid(datos.cotizacion)) {
+    await cotizacionFacturacion.validarPartidas(datos.cotizacion, datos.conceptos);
+  }
+
   const { conceptos, subtotal, totalImpuestosTrasladados, totalImpuestosRetenidos, descuento, total } =
     calcularTotales(datos.conceptos);
 
@@ -214,12 +221,10 @@ async function crear(datos, usuarioId) {
 
   const cfdi = await ComprobanteFiscal.create(datosComprobante);
 
-  // Mismo criterio que factura.service.crear (Cobranza): si el CFDI nace de
-  // una cotización aprobada, se marca "facturada" para que no se reutilice
-  // por error para otro comprobante — sin esto quedaba "aprobada" para
-  // siempre aunque ya se hubiera facturado.
+  // La cotización pasa a "facturada" solo cuando ya no queda nada por facturar
+  // de ninguna partida; si se facturó una parte, sigue "aprobada" con lo pendiente.
   if (datos.cotizacion && oid(datos.cotizacion)) {
-    await Cotizacion.updateOne({ _id: datos.cotizacion }, { status: "facturada" });
+    await cotizacionFacturacion.sincronizarEstado(datos.cotizacion);
   }
 
   return cfdi.populate("cliente", "nombre rfc");
@@ -242,10 +247,8 @@ async function eliminar(id) {
       409
     );
   }
-  if (cfdi.cotizacion) {
-    await Cotizacion.updateOne({ _id: cfdi.cotizacion, status: "facturada" }, { status: "aprobada" });
-  }
   await ComprobanteFiscal.deleteOne({ _id: cfdi._id });
+  if (cfdi.cotizacion) await cotizacionFacturacion.sincronizarEstado(cfdi.cotizacion);
 }
 
 async function actualizar(id, datos) {
@@ -263,6 +266,7 @@ async function actualizar(id, datos) {
     if (datos[campo] !== undefined) cfdi[campo] = datos[campo];
   }
   if (Array.isArray(datos.conceptos) && datos.conceptos.length) {
+    if (cfdi.cotizacion) await cotizacionFacturacion.validarPartidas(cfdi.cotizacion, datos.conceptos, { excluirCfdiId: cfdi._id });
     const { conceptos, subtotal, totalImpuestosTrasladados, totalImpuestosRetenidos, descuento, total } =
       calcularTotales(datos.conceptos);
     Object.assign(cfdi, { conceptos, subtotal, totalImpuestosTrasladados, totalImpuestosRetenidos, descuento, total });
@@ -412,7 +416,9 @@ async function sincronizarCuentaPorCobrar(cfdi, snapshot) {
       if (await Factura.exists({ comprobante: cfdi._id })) return;
       const cotizacion = snapshot.cotizacion ? await Cotizacion.findById(snapshot.cotizacion).select("ordenCompra") : null;
       const fechaCr = cfdi.fechaTimbrado || new Date();
-      const diasPago = snapshot.metodoPago === "PPD" ? 30 : 0;
+      // PUE vence al momento; PPD usa los días de crédito del cliente (30 si aún no los tiene definidos).
+      const cliente = await Cliente.findById(snapshot.cliente).select("diasCredito");
+      const diasPago = snapshot.metodoPago === "PPD" ? (cliente?.diasCredito > 0 ? cliente.diasCredito : 30) : 0;
       const folio = `${snapshot.serie ? `${snapshot.serie}-` : ""}${snapshot.folioInterno}`;
       const fechaPago = new Date(fechaCr);
       fechaPago.setDate(fechaPago.getDate() + diasPago);
@@ -420,23 +426,39 @@ async function sincronizarCuentaPorCobrar(cfdi, snapshot) {
         cliente: snapshot.cliente, cotizacion: snapshot.cotizacion || undefined, comprobante: cfdi._id,
         oc: cotizacion?.ordenCompra || "S/OC", folio, monto: snapshot.total,
         fechaCr, diasPago, fechaPago, comentarios: `CFDI ${cfdi.uuid}`, registradoPor: snapshot.registradoPor,
+        requiereComplemento: snapshot.metodoPago === "PPD",
       });
-      if (snapshot.cotizacion) await Reporte.updateOne({ cotizacion: snapshot.cotizacion }, { factura: folio });
-    } else if (snapshot.tipoComprobante === "P" && Number(snapshot.pago?.docRelacionado?.impSaldoInsoluto) === 0) {
-      await Factura.updateOne(
-        { comprobante: snapshot.pago.docRelacionado.comprobante },
-        { statusPago: 1, fechaPagada: snapshot.pago.fechaPago || new Date() }
-      );
+      if (snapshot.cotizacion) {
+        // Una cotización puede facturarse en varios CFDI: el reporte junta todos los folios.
+        const reporte = await Reporte.findOne({ cotizacion: snapshot.cotizacion }).select("factura");
+        if (reporte) {
+          const folios = String(reporte.factura || "").split(",").map((f) => f.trim()).filter(Boolean);
+          if (!folios.includes(folio)) { folios.push(folio); await Reporte.updateOne({ _id: reporte._id }, { factura: folios.join(", ") }); }
+        }
+      }
+    } else if (snapshot.tipoComprobante === "P" && snapshot.pago?.docRelacionado?.comprobante) {
+      // El Complemento de Pago es un abono de la cuenta de la factura que paga.
+      await facturaService.abonarDesdeComplemento(snapshot.pago.docRelacionado.comprobante, {
+        _id: cfdi._id, folioInterno: snapshot.folioInterno, pago: snapshot.pago,
+      });
     }
   } catch (err) {
     console.error("[cfdi] No se pudo sincronizar la cuenta por cobrar:", err.message);
   }
 }
 
-// Un CFDI cancelado ya no se cobra: se retira su cuenta por cobrar si sigue pendiente.
-async function retirarCuentaPorCobrar(comprobanteId) {
+// Un CFDI cancelado ya no se cobra: se retira su cuenta por cobrar si sigue
+// pendiente y sin abonos (si ya recibió dinero, se deja para revisarse a mano).
+// Un Complemento de Pago cancelado solo retira su abono de la cuenta.
+async function retirarCuentaPorCobrar(cfdi) {
   try {
-    await Factura.deleteOne({ comprobante: comprobanteId, statusPago: 0 });
+    // Un CFDI de ingreso cancelado libera sus partidas: la cotización vuelve a tener pendiente.
+    if (cfdi.tipoComprobante === "I" && cfdi.cotizacion) await cotizacionFacturacion.sincronizarEstado(cfdi.cotizacion);
+    if (cfdi.tipoComprobante === "P") {
+      await facturaService.retirarAbonoDeComplemento(cfdi._id);
+      return;
+    }
+    await Factura.deleteOne({ comprobante: cfdi._id, statusPago: 0, "abonos.0": { $exists: false } });
   } catch (err) {
     console.error("[cfdi] No se pudo retirar la cuenta por cobrar:", err.message);
   }
@@ -488,7 +510,7 @@ async function cancelar(id, { motivoCodigo, motivo, folioSustitucion }) {
     : (pacConfirmoDeInmediato ? "cancelada" : "cancelacion_en_proceso");
 
   await cfdi.save();
-  if (cfdi.estado === "cancelada") await retirarCuentaPorCobrar(cfdi._id);
+  if (cfdi.estado === "cancelada") await retirarCuentaPorCobrar(cfdi);
   return cfdi.populate("cliente", "nombre rfc");
 }
 
@@ -509,7 +531,7 @@ async function confirmarCancelacionEnProceso(id) {
   cfdi.estado = "cancelada";
   cfdi.cancelacion.fecha = new Date();
   await cfdi.save();
-  await retirarCuentaPorCobrar(cfdi._id);
+  await retirarCuentaPorCobrar(cfdi);
   return cfdi.populate("cliente", "nombre rfc");
 }
 
@@ -533,7 +555,7 @@ async function resolverSolicitudCancelacion(id, aceptar) {
   cfdi.cancelacion.estadoSolicitud = aceptar ? "aceptada" : "rechazada";
   cfdi.cancelacion.fechaResolucion = new Date();
   await cfdi.save();
-  if (aceptar) await retirarCuentaPorCobrar(cfdi._id);
+  if (aceptar) await retirarCuentaPorCobrar(cfdi);
   return cfdi.populate("cliente", "nombre rfc");
 }
 

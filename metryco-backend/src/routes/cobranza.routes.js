@@ -3,7 +3,7 @@ const auth = require("../middleware/auth");
 const requireRole = require("../middleware/requireRole");
 const validate = require("../middleware/validate");
 const auditar = require("../middleware/auditar");
-const { crearFacturaSchema } = require("../schemas/factura.schema");
+const { crearFacturaSchema, registrarAbonoSchema } = require("../schemas/factura.schema");
 const c = require("../controllers/factura.controller");
 
 const router = Router();
@@ -14,6 +14,8 @@ router.get("/", c.listar);
 
 router.post("/", requireRole("admin", "coordinador"), validate(crearFacturaSchema), c.crear);
 router.patch("/:id/pagar", requireRole("admin", "coordinador"), auditar("factura_pagada", "Factura"), c.aplicarPago);
+router.post("/:id/abonos", requireRole("admin", "coordinador"), validate(registrarAbonoSchema), auditar("factura_abono", "Factura"), c.registrarAbono);
+router.delete("/:id/abonos/:abonoId", requireRole("admin", "coordinador"), auditar("factura_abono_eliminado", "Factura"), c.eliminarAbono);
 router.patch("/:id/reabrir", requireRole("admin", "coordinador"), auditar("factura_reabierta", "Factura"), c.reabrir);
 router.delete("/:id", requireRole("admin", "coordinador"), auditar("factura_eliminada", "Factura"), c.eliminar);
 

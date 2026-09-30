@@ -29,6 +29,7 @@ router.patch("/:id/estado", validate(cambiarEstadoCertificadoSchema), c.cambiarE
 router.post("/:id/pdf", pdfCertificado, c.adjuntarPdf);
 router.post("/:id/regenerar-token", requireRole("admin", "coordinador"), c.regenerarToken);
 router.post("/:id/anular", requireRole("admin", "coordinador"), validate(anularCertificadoSchema), auditar("certificado_anulado", "Certificado"), c.anular);
+router.get("/:id/recotizacion", requireRole("admin", "coordinador", "ventas"), c.datosRecotizacion);
 router.post("/:id/whatsapp", requireRole("admin", "coordinador", "ventas"), auditar("certificado_recordatorio_whatsapp", "Certificado"), c.enviarRecordatorioWhatsApp);
 router.post("/whatsapp/ejecutar-lote", requireRole("admin"), auditar("certificado_recordatorios_whatsapp_lote", "Certificado"), c.ejecutarRecordatoriosWhatsApp);
 

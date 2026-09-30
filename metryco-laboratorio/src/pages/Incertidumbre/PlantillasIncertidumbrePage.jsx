@@ -73,17 +73,21 @@ export default function PlantillasIncertidumbrePage() {
   };
 
   const columns = [
-    { field: "nombre", headerName: "Nombre" },
-    { field: "magnitud", headerName: "Magnitud" },
-    { field: "tipoInstrumento", headerName: "Tipo de instrumento" },
+    { field: "nombre", headerName: "Nombre", minWidth: 200, renderCell: (row) => <Typography variant="body2" fontWeight={600}>{row.nombre}</Typography> },
+    { field: "magnitud", headerName: "Magnitud", minWidth: 120 },
+    { field: "tipoInstrumento", headerName: "Tipo de instrumento", minWidth: 160, hideBelow: "md" },
     {
       field: "contribuciones",
       headerName: "Contribuciones",
+      align: "center",
+      nowrap: true,
+      hideBelow: "sm",
       renderCell: (row) => <Chip label={row.contribuciones?.length || 0} size="small" />,
     },
     {
       field: "activo",
       headerName: "Estado",
+      nowrap: true,
       renderCell: (row) => (
         <Chip label={row.activo ? "Activa" : "Inactiva"} color={row.activo ? "success" : "default"} size="small" />
       ),
@@ -92,6 +96,7 @@ export default function PlantillasIncertidumbrePage() {
       field: "acciones",
       headerName: "Acciones",
       align: "center",
+      nowrap: true,
       renderCell: (row) => (
         <>
           <Tooltip title="Editar plantilla">
@@ -155,7 +160,7 @@ export default function PlantillasIncertidumbrePage() {
         />
       </Box>
 
-      <AppTable columns={columns} rows={filtrados} totalCount={filtrados.length} loading={loading} />
+      <AppTable columns={columns} rows={filtrados} totalCount={filtrados.length} loading={loading} onRowClick={(row) => navigate(`/incertidumbre/plantillas/${row._id}/editar`)} />
 
       <Dialog open={!!aEliminar} onClose={() => setAEliminar(null)}>
         <DialogTitle component="div">

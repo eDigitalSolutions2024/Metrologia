@@ -20,6 +20,7 @@ import CreditCardOutlinedIcon from "@mui/icons-material/CreditCardOutlined";
 import HelpOutlineOutlinedIcon from "@mui/icons-material/HelpOutlineOutlined";
 import ScheduleOutlinedIcon from "@mui/icons-material/ScheduleOutlined";
 import SearchIcon from "@mui/icons-material/Search";
+import MenuBookOutlinedIcon from "@mui/icons-material/MenuBookOutlined";
 import BusinessOutlinedIcon from "@mui/icons-material/BusinessOutlined";
 import BadgeOutlinedIcon from "@mui/icons-material/BadgeOutlined";
 import EventOutlinedIcon from "@mui/icons-material/EventOutlined";
@@ -35,7 +36,7 @@ import { useDebounce } from "../../shared/hooks/useDebounce";
 import { formatDateShort } from "../../shared/utils/formatDate";
 import { formatCurrency } from "../../shared/utils/currency";
 import { listarClientes } from "../../services/clientes";
-import { listarCfdi, descargarPdfCfdi, descargarXmlCfdi, eliminarCfdi } from "../../services/cfdi";
+import { listarCfdi, obtenerCfdi, descargarPdfCfdi, descargarXmlCfdi, eliminarCfdi } from "../../services/cfdi";
 import CrearCfdiDialog from "./CrearCfdiDialog";
 import CfdiDetalleDialog from "./CfdiDetalleDialog";
 import { ESTADO_CFDI_CHIP, FORMAS_PAGO_SAT } from "./estadosCfdi";
@@ -146,9 +147,10 @@ export default function FacturacionPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const [prefill, setPrefill] = useState(() => {
     const cotizacion = searchParams.get("cotizacion");
-    return cotizacion ? { cotizacion, cliente: searchParams.get("cliente") || "" } : null;
+    const cliente = searchParams.get("cliente");
+    return cotizacion || cliente ? { cotizacion: cotizacion || "", cliente: cliente || "" } : null;
   });
-  const [crearOpen, setCrearOpen] = useState(() => !!searchParams.get("cotizacion"));
+  const [crearOpen, setCrearOpen] = useState(() => !!(searchParams.get("cotizacion") || searchParams.get("cliente")));
   const [detalle, setDetalle] = useState(null);
   const [accionInicial, setAccionInicial] = useState(null);
   const [error, setError] = useState("");
@@ -170,6 +172,18 @@ export default function FacturacionPage() {
   useEffect(() => { cargar(); }, [cargar]);
   useEffect(() => { listarClientes({ pageSize: 300 }).then(({ items }) => setClientes(items)).catch(() => {}); }, []);
   usePolling(() => cargar(true));
+
+  // Enlace directo desde la ficha del cliente: /facturacion?cfdi=ID abre ese comprobante.
+  const cfdiIdUrl = searchParams.get("cfdi");
+  const accionUrl = searchParams.get("accion");
+  useEffect(() => {
+    if (!cfdiIdUrl) return;
+    obtenerCfdi(cfdiIdUrl)
+      .then((c) => { setAccionInicial(accionUrl === "pagar" ? "pagar" : null); setDetalle(c); })
+      .catch(() => setError("No se encontró el comprobante solicitado."))
+      .finally(() => setSearchParams({}, { replace: true }));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cfdiIdUrl]);
 
   // Saldo pendiente real de una factura PPD (pago en parcialidades/diferido)
   // ya timbrada — solo tiene sentido para tipoComprobante "I" con
@@ -208,9 +222,9 @@ export default function FacturacionPage() {
       ),
     },
     { field: "cliente", headerName: "Cliente", minWidth: 180, renderCell: (r) => <CeldaIcono icon={BusinessOutlinedIcon}>{r.receptor?.nombre || r.cliente?.nombre || "—"}</CeldaIcono> },
-    { field: "rfc", headerName: "RFC", width: 150, renderCell: (r) => <CeldaIcono icon={BadgeOutlinedIcon}>{r.receptor?.rfc || "—"}</CeldaIcono> },
-    { field: "fecha", headerName: "Fecha", width: 130, renderCell: (r) => <CeldaIcono icon={EventOutlinedIcon}>{formatDateShort(r.createdAt)}</CeldaIcono> },
-    { field: "total", headerName: "Total", width: 120, align: "right", renderCell: (r) => <Typography fontWeight={700} fontSize={13}>{formatCurrency(r.total)}</Typography> },
+    { field: "rfc", headerName: "RFC", width: 150, nowrap: true, hideBelow: "lg", renderCell: (r) => <CeldaIcono icon={BadgeOutlinedIcon}>{r.receptor?.rfc || "—"}</CeldaIcono> },
+    { field: "fecha", headerName: "Fecha", width: 130, nowrap: true, hideBelow: "md", renderCell: (r) => <CeldaIcono icon={EventOutlinedIcon}>{formatDateShort(r.createdAt)}</CeldaIcono> },
+    { field: "total", headerName: "Total", width: 120, align: "right", nowrap: true, renderCell: (r) => <Typography fontWeight={700} fontSize={13}>{formatCurrency(r.total)}</Typography> },
     {
       field: "pago", headerName: "Pago", width: 210,
       renderCell: (r) => {
@@ -259,7 +273,7 @@ export default function FacturacionPage() {
       },
     },
     {
-      field: "estado", headerName: "Estado", width: 140,
+      field: "estado", headerName: "Estado", width: 140, nowrap: true,
       renderCell: (r) => {
         const s = ESTADO_CFDI_CHIP[r.estado] || { label: r.estado, color: "default" };
         return <Chip size="small" label={s.label} color={s.color} />;
@@ -314,9 +328,17 @@ export default function FacturacionPage() {
         title="Facturación (CFDI)"
         subtitle={`${total} comprobantes · Etapa 2 — requiere PAC configurado para timbrar de verdad`}
         actions={
+          <>
+          <AppButton
+            variant="outlined" startIcon={<MenuBookOutlinedIcon />} sx={{ borderRadius: 2 }}
+            onClick={() => window.open("/Guia-Timbrado-Facturas-CFDI.pdf", "_blank")}
+          >
+            Guía de timbrado
+          </AppButton>
           <AppButton startIcon={<AddIcon />} onClick={() => { setPrefill(null); setCrearOpen(true); }} sx={{ borderRadius: 2 }}>
             Nuevo comprobante
           </AppButton>
+          </>
         }
       />
 
@@ -371,6 +393,7 @@ export default function FacturacionPage() {
         onPageChange={setPage}
         onRowsPerPageChange={(n) => { setRowsPerPage(n); setPage(0); }}
         emptyText="Sin comprobantes fiscales"
+        onRowClick={(row) => { setAccionInicial(null); setDetalle(row); }}
       />
 
       <CrearCfdiDialog

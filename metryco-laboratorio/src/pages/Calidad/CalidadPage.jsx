@@ -12,6 +12,7 @@ import DescriptionOutlinedIcon from "@mui/icons-material/DescriptionOutlined";
 
 import AppButton from "../../shared/components/AppButton";
 import AppTable from "../../shared/components/AppTable";
+import MenuAcciones from "../../shared/components/MenuAcciones";
 import PageHeader from "../../shared/components/PageHeader";
 import ScienceOutlinedIcon from "@mui/icons-material/ScienceOutlined";
 import { formatDate } from "../../shared/utils/formatDate";
@@ -140,28 +141,35 @@ function ConsultarTab() {
     }
   };
 
+  const verReporte = (a) => { if (a.reporte?._id) navigate(`/reportes/${a.reporte._id}`); };
+
   const columns = [
-    { field: "reporte", headerName: "Reporte", renderCell: (a) => a.reporte?.folio || "—" },
-    { field: "cliente", headerName: "Cliente", renderCell: (a) => a.reporte?.cliente?.nombre || "—" },
-    { field: "fechaAsignacion", headerName: "Fecha Asignación", renderCell: (a) => formatDate(a.createdAt) },
-    { field: "fechaCaptura", headerName: "Fecha Captura", renderCell: (a) => (a.fechaCalibracion ? formatDate(a.fechaCalibracion) : "—") },
-    { field: "tecnico", headerName: "Técnico", renderCell: (a) => a.tecnicoEjecutor?.nombre || a.tecnicoAsignado?.nombre || "—" },
-    { field: "idClienteInterno", headerName: "ID Cliente", renderCell: (a) => a.equipo?.idInterno || "—" },
     {
-      field: "portada",
-      headerName: "Portada",
-      align: "center",
+      field: "reporte", headerName: "Reporte", minWidth: 180,
       renderCell: (a) => (
-        <Tooltip title="Ver / descargar hoja del equipo (vista previa)">
-          <IconButton size="small" onClick={() => window.open(`/informe/asignacion/${a._id}/preview`, "_blank")}>
-            <DescriptionOutlinedIcon fontSize="small" sx={{ color: "secondary.main" }} />
-          </IconButton>
-        </Tooltip>
+        <Box>
+          <Typography variant="body2" fontWeight={700}>{a.reporte?.folio || "—"}</Typography>
+          <Typography variant="caption" color="text.secondary" sx={{ display: "block" }}>{a.reporte?.cliente?.nombre || "—"}</Typography>
+        </Box>
+      ),
+    },
+    { field: "idClienteInterno", headerName: "Equipo", nowrap: true, renderCell: (a) => a.equipo?.idInterno || "—" },
+    { field: "tecnico", headerName: "Técnico", minWidth: 120, hideBelow: "md", renderCell: (a) => a.tecnicoEjecutor?.nombre || a.tecnicoAsignado?.nombre || "—" },
+    {
+      field: "fechas", headerName: "Fechas", nowrap: true, hideBelow: "lg",
+      renderCell: (a) => (
+        <Box>
+          <Typography variant="body2">{formatDate(a.createdAt)}</Typography>
+          <Typography variant="caption" color="text.secondary" sx={{ display: "block" }}>
+            Captura: {a.fechaCalibracion ? formatDate(a.fechaCalibracion) : "—"}
+          </Typography>
+        </Box>
       ),
     },
     {
       field: "statusCalidad",
       headerName: "Estatus Calidad",
+      nowrap: true,
       renderCell: (a) =>
         a.estados?.certificado === "rechazado" ? (
           <Box sx={{ display: "flex", alignItems: "center", gap: 0.75 }}>
@@ -180,13 +188,9 @@ function ConsultarTab() {
       field: "accion",
       headerName: "Acción",
       align: "center",
+      nowrap: true,
       renderCell: (a) => (
-        <Box sx={{ display: "flex", gap: 0.5, justifyContent: "center" }}>
-          <Tooltip title="Ver reporte">
-            <IconButton size="small" onClick={() => navigate(`/reportes/${a.reporte?._id}`)}>
-              <VisibilityOutlinedIcon fontSize="small" sx={{ color: "secondary.main" }} />
-            </IconButton>
-          </Tooltip>
+        <Box sx={{ display: "flex", gap: 0.5, alignItems: "center", justifyContent: "center" }}>
           <Tooltip title="Autorizar">
             <IconButton size="small" onClick={() => autorizar(a)}>
               <CheckCircleOutlineIcon fontSize="small" sx={{ color: "success.main" }} />
@@ -197,6 +201,12 @@ function ConsultarTab() {
               <CancelOutlinedIcon fontSize="small" sx={{ color: "error.main" }} />
             </IconButton>
           </Tooltip>
+          <MenuAcciones
+            acciones={[
+              { label: "Ver reporte", icon: <VisibilityOutlinedIcon fontSize="small" />, onClick: () => verReporte(a) },
+              { label: "Portada del equipo (vista previa)", icon: <DescriptionOutlinedIcon fontSize="small" />, onClick: () => window.open(`/informe/asignacion/${a._id}/preview`, "_blank") },
+            ]}
+          />
         </Box>
       ),
     },
@@ -232,6 +242,7 @@ function ConsultarTab() {
         onPageChange={setPage}
         onRowsPerPageChange={(n) => { setRowsPerPage(n); setPage(0); }}
         emptyText="No hay certificados pendientes de aprobar"
+        onRowClick={verReporte}
       />
 
       <RechazarDialog open={!!rechazarTarget} onClose={() => setRechazarTarget(null)} onConfirm={confirmarRechazo} />

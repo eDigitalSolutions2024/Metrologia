@@ -61,6 +61,7 @@ export default function CrearCfdiDialog({ open, onClose, onCreado, prefill }) {
   const [clientes, setClientes] = useState([]);
   const [cotizacionesAprobadas, setCotizacionesAprobadas] = useState([]);
   const [cargandoCotizacion, setCargandoCotizacion] = useState(false);
+  const [avanceCot, setAvanceCot] = useState(null); // avance de facturación de la cotización cargada
   const [submitError, setSubmitError] = useState("");
 
   const {
@@ -71,9 +72,24 @@ export default function CrearCfdiDialog({ open, onClose, onCreado, prefill }) {
   const conceptos = watch("conceptos");
   const clienteId = watch("cliente");
   const cotizacionId = watch("cotizacion");
+  const clienteElegido = clientes.find((c) => c._id === clienteId);
+  const creditoCliente = clienteElegido?.diasCredito;
+  const sugeridoParaRef = useRef(null);
+
+  // Sugiere el método de pago según el crédito del cliente (con crédito: PPD y forma 99; contado: PUE).
+  // Solo una vez por cliente elegido, para no pisar lo que el usuario cambie después.
+  useEffect(() => {
+    if (!clienteId || creditoCliente === undefined || sugeridoParaRef.current === clienteId) return;
+    sugeridoParaRef.current = clienteId;
+    const ppd = creditoCliente > 0;
+    setValue("metodoPago", ppd ? "PPD" : "PUE");
+    setValue("formaPago", ppd ? "99" : "03");
+  }, [clienteId, creditoCliente, setValue]);
 
   useEffect(() => {
     if (!open) return;
+    sugeridoParaRef.current = null;
+    setAvanceCot(null);
     reset({ ...DEFAULT_VALUES, cliente: prefill?.cliente || "" });
     cotizacionPendienteRef.current = prefill?.cotizacion || null;
     setSubmitError("");
@@ -103,23 +119,40 @@ export default function CrearCfdiDialog({ open, onClose, onCreado, prefill }) {
 
   const cargarDesdeCotizacion = async (id) => {
     setValue("cotizacion", id);
+    setAvanceCot(null);
     if (!id) return;
     setCargandoCotizacion(true);
     try {
       const cot = await obtenerCotizacion(id);
+      // Solo lo que falta por facturar: una cotización se puede facturar por partes.
+      const partidas = cot.facturacion?.items || cot.items.map((it, idx) => ({ idx, cantidad: it.cantidad, pendiente: it.cantidad }));
+      const pendientes = partidas.filter((p) => p.pendiente > 0);
+      if (pendientes.length === 0) {
+        setSubmitError(`La cotización ${cot.folio} ya está facturada por completo.`);
+        setValue("cotizacion", "");
+        return;
+      }
+      setAvanceCot({
+        folio: cot.folio, total: partidas.length, pendientes: pendientes.length,
+        yaFacturadas: partidas.filter((p) => p.pendiente <= 0).length,
+      });
       // Cotizaciones solo maneja un % de IVA general, no distingue tasa 0% —
       // si trae IVA se asume 16% (lo más común), si no, exento.
       const tasaIva = Number(cot.ivaPorcentaje) > 0 ? "16" : "exento";
       replace(
-        cot.items.map((it) => ({
-          claveProdServ: it.claveProdServ || "", // viene de la cotización; las anteriores a esa captura quedan vacías
-          descripcion: it.descripcion,
-          cantidad: it.cantidad,
-          claveUnidad: it.claveUnidad || "",
-          unidad: "",
-          valorUnitario: it.precioUnitario,
-          tasaIva,
-        }))
+        pendientes.map((p) => {
+          const it = cot.items[p.idx];
+          return {
+            claveProdServ: it.claveProdServ || "", // viene de la cotización; las anteriores a esa captura quedan vacías
+            descripcion: it.descripcion,
+            cantidad: p.pendiente,
+            claveUnidad: it.claveUnidad || "",
+            unidad: "",
+            valorUnitario: it.precioUnitario,
+            tasaIva,
+            partidaCotizacion: p.idx,
+          };
+        })
       );
       if (!getValues("comentarios")) {
         setValue("comentarios", `Cotización ${cot.folio}${cot.ordenCompra ? ` · OC ${cot.ordenCompra}` : ""}`);
@@ -149,6 +182,7 @@ export default function CrearCfdiDialog({ open, onClose, onCreado, prefill }) {
         unidad: c.unidad,
         valorUnitario: Number(c.valorUnitario),
         objetoImpuesto: c.tasaIva === "exento" ? "01" : "02",
+        ...(data.cotizacion && c.partidaCotizacion !== undefined ? { partidaCotizacion: c.partidaCotizacion } : {}),
         impuestos: c.tasaIva === "exento"
           ? []
           : [{ tipo: "traslado", impuesto: "002", tipoFactor: "Tasa", tasaOCuota: c.tasaIva === "16" ? 0.16 : 0, base: 0, importe: 0 }],
@@ -238,6 +272,14 @@ export default function CrearCfdiDialog({ open, onClose, onCreado, prefill }) {
                       ))}
                     </Select>
                   </FormControl>
+                  {cotizacionId && avanceCot && (
+                    <Alert severity="info" sx={{ mt: 1.5, borderRadius: 2 }}>
+                      Esta factura cubre <b>{avanceCot.pendientes} de {avanceCot.total} partidas</b> de {avanceCot.folio}
+                      {avanceCot.yaFacturadas > 0 ? <> (las otras {avanceCot.yaFacturadas} ya se facturaron)</> : null}.
+                      Para facturar <b>solo una parte</b>, quita partidas o baja las cantidades: lo que no factures ahora
+                      queda pendiente en la cotización.
+                    </Alert>
+                  )}
                   {cotizacionId && (
                     <Alert
                       severity={conceptos.some((c) => !c.claveProdServ || !c.claveUnidad) ? "warning" : "success"}
@@ -251,6 +293,11 @@ export default function CrearCfdiDialog({ open, onClose, onCreado, prefill }) {
                 </Grid>
               )}
               <Grid size={{ xs: 6, md: 4 }}>
+                {creditoCliente !== undefined && (
+                  <Typography variant="caption" color="text.secondary" sx={{ display: "block", mb: 0.5 }}>
+                    Crédito del cliente: {creditoCliente > 0 ? `${creditoCliente} días` : "contado"}
+                  </Typography>
+                )}
                 <FormControl fullWidth size="small">
                   <InputLabel>Método de pago</InputLabel>
                   <Controller

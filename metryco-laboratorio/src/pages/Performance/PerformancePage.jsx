@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Box, TextField, InputAdornment, IconButton, Tooltip, Chip } from "@mui/material";
+import { Box, Typography, TextField, InputAdornment, IconButton, Tooltip, Chip } from "@mui/material";
 import SearchIcon from "@mui/icons-material/Search";
 import AddIcon from "@mui/icons-material/Add";
 import EditOutlinedIcon from "@mui/icons-material/EditOutlined";
@@ -31,17 +31,19 @@ export default function PerformancePage() {
   }, [buscar, page, rowsPerPage]);
 
   const columns = [
-    { field: "nombre", headerName: "Nombre" },
-    { field: "comentarios", headerName: "Comentarios" },
+    { field: "nombre", headerName: "Nombre", minWidth: 200, renderCell: (row) => <Typography variant="body2" fontWeight={600}>{row.nombre}</Typography> },
+    { field: "comentarios", headerName: "Comentarios", minWidth: 220, hideBelow: "md", renderCell: (row) => row.comentarios || "—" },
     {
       field: "puntos",
       headerName: "Puntos de Prueba",
+      nowrap: true,
       renderCell: (row) => <Chip label={`${row.puntos?.length ?? 0} puntos`} size="small" variant="outlined" />,
     },
     {
       field: "acciones",
       headerName: "Acciones",
       align: "center",
+      nowrap: true,
       renderCell: (row) => (
         <Tooltip title="Editar performance">
           <IconButton size="small" onClick={() => navigate(`/performance/${row._id}/editar`)}>
@@ -94,6 +96,7 @@ export default function PerformancePage() {
         onPageChange={setPage}
         onRowsPerPageChange={(n) => { setRowsPerPage(n); setPage(0); }}
         loading={loading}
+        onRowClick={(row) => navigate(`/performance/${row._id}/editar`)}
       />
     </Box>
   );

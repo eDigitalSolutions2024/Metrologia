@@ -7,6 +7,7 @@ const Certificado = require("../models/Certificado");
 const Asignacion = require("../models/Asignacion");
 const Equipo = require("../models/Equipo");
 const Reporte = require("../models/Reporte");
+const Cotizacion = require("../models/Cotizacion");
 const Patron = require("../models/Patron");
 const AppError = require("../utils/AppError");
 const escapeRegex = require("../utils/escapeRegex");
@@ -197,6 +198,60 @@ async function obtener(id) {
   return conLogo(conEstadoVigente(cert));
 }
 
+/**
+ * Datos para cotizar la recalibración de un equipo a partir de su certificado:
+ * cliente, contacto, la partida ya descrita y el precio que se le cobró la vez
+ * anterior (de la cotización del reporte de origen). Las partidas de una
+ * cotización son texto libre, así que el precio anterior se busca por el
+ * código interno del equipo, luego por marca/modelo; si la cotización solo
+ * tenía una partida, se usa esa.
+ */
+async function datosRecotizacion(id) {
+  if (!oid(id)) throw new AppError("Certificado inválido", 400);
+  const cert = await Certificado.findById(id)
+    .populate("equipo", "idInterno marca modelo descripcion")
+    .populate({ path: "reporte", select: "folio cotizacion", populate: { path: "cotizacion", select: "folio moneda ivaPorcentaje contacto items" } });
+  if (!cert) throw new AppError("Certificado no encontrado", 404);
+
+  const eq = cert.equipo || {};
+  const anterior = cert.reporte?.cotizacion || null;
+  const norm = (v) => String(v || "").trim().toLowerCase();
+
+  let partidaAnterior = null;
+  if (anterior?.items?.length) {
+    // 1) el código interno del equipo aparece en la descripción (así la escribe el sistema al
+    // sugerir equipos), 2) misma marca y modelo, 3) única partida de la cotización.
+    partidaAnterior = (eq.idInterno && anterior.items.find((i) => norm(i.descripcion).includes(norm(eq.idInterno))))
+      || anterior.items.find((i) => eq.marca && eq.modelo && norm(i.marca) === norm(eq.marca) && norm(i.modelo) === norm(eq.modelo))
+      || (anterior.items.length === 1 ? anterior.items[0] : null);
+  }
+
+  const nombreEquipo = [eq.marca, eq.modelo].filter(Boolean).join(" ");
+  const descripcion = nombreEquipo
+    ? `Recalibración de ${nombreEquipo}${eq.idInterno ? ` (${eq.idInterno})` : ""}`
+    : (partidaAnterior?.descripcion || `Recalibración del certificado ${cert.folio}`);
+
+  return {
+    cliente: String(cert.cliente),
+    contacto: anterior?.contacto ? String(anterior.contacto) : "",
+    moneda: anterior?.moneda || "MXN",
+    ivaPorcentaje: anterior?.ivaPorcentaje ?? 16,
+    observaciones: `Recalibración del certificado ${cert.folio}${anterior ? ` (cotización anterior ${anterior.folio})` : ""}.`,
+    cotizacionAnterior: anterior ? { _id: String(anterior._id), folio: anterior.folio } : null,
+    precioAnteriorEncontrado: !!partidaAnterior,
+    item: {
+      descripcion,
+      marca: eq.marca || "",
+      modelo: eq.modelo || "",
+      tiempoEntrega: partidaAnterior?.tiempoEntrega || "",
+      claveProdServ: partidaAnterior?.claveProdServ || "80101504",
+      claveUnidad: partidaAnterior?.claveUnidad || "E48",
+      cantidad: 1,
+      precioUnitario: partidaAnterior?.precioUnitario ?? 0,
+    },
+  };
+}
+
 /** Todos los certificados emitidos de un reporte — para el PDF combinado. */
 async function porReporte(reporteId) {
   if (!oid(reporteId)) throw new AppError("Reporte inválido", 400);
@@ -296,6 +351,17 @@ async function emitir(datos, reqUser) {
     const Usuario = require("../models/Usuario");
     const u = await Usuario.findById(datos.autorizadoPor).select("nombre");
     if (u) autorizadoPor = { id: u._id, nombre: u.nombre };
+  }
+  // Si no se eligió quién autorizó, se toma a quien aprobó el certificado en Calidad
+  // (su aprobación queda en el historial de la asignación) — no hay que volver a elegirlo.
+  if (!autorizadoPor && asignacionId) {
+    const aprobada = await Asignacion.findById(asignacionId).select("historial");
+    const evento = [...(aprobada?.historial || [])].reverse().find((h) => /^estado\.certificado:.*→ autorizado$/.test(h.accion || ""));
+    if (evento?.usuario?.id) {
+      const Usuario = require("../models/Usuario");
+      const u = await Usuario.findById(evento.usuario.id).select("nombre");
+      if (u) autorizadoPor = { id: u._id, nombre: u.nombre };
+    }
   }
 
   // Puntos: toma los CalculoIncertidumbre APROBADOS de la asignación.
@@ -659,5 +725,5 @@ async function archivoStream(id) {
 module.exports = {
   listar, obtener, exportar, emitir, actualizar, cambiarEstado, adjuntarPdf,
   anular, regenerarToken, qrPng, qrSvg, archivoStream, porVencer, listarPorVencer, porReporte,
-  urlPublica, rutaArchivo, previsualizar, enviarRecordatorioWhatsApp,
+  urlPublica, rutaArchivo, previsualizar, enviarRecordatorioWhatsApp, datosRecotizacion,
 };

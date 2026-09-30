@@ -15,6 +15,16 @@ export async function aplicarPagoFactura(id, fechaPagada) {
   return data.data;
 }
 
+export async function registrarAbonoFactura(id, payload) {
+  const { data } = await api.post(`${ENDPOINTS.COBRANZA}/${id}/abonos`, payload);
+  return data.data;
+}
+
+export async function eliminarAbonoFactura(id, abonoId) {
+  const { data } = await api.delete(`${ENDPOINTS.COBRANZA}/${id}/abonos/${abonoId}`);
+  return data.data;
+}
+
 export async function reabrirFactura(id) {
   const { data } = await api.patch(`${ENDPOINTS.COBRANZA}/${id}/reabrir`);
   return data.data;

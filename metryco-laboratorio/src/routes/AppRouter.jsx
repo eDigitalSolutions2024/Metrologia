@@ -28,6 +28,7 @@ import AuditoriaPage from "../pages/Administracion/AuditoriaPage";
 import WhatsAppPruebasPage from "../pages/Administracion/WhatsAppPruebasPage";
 import ClientesPage from "../pages/Clientes/ClientesPage";
 import ClienteForm from "../pages/Clientes/ClienteForm";
+import ClienteFichaPage from "../pages/Clientes/ClienteFichaPage";
 import CotizacionesPage from "../pages/Cotizaciones/CotizacionesPage";
 import ReportesPage from "../pages/Reportes/ReportesPage";
 import MisAsignacionesPage from "../pages/Reportes/MisAsignacionesPage";
@@ -146,6 +147,7 @@ export default function AppRouter() {
         <Route path="clientes" element={<ClientesPage />} />
         <Route path="clientes/nuevo" element={<ClienteForm />} />
         <Route path="clientes/:id/editar" element={<ClienteForm />} />
+        <Route path="clientes/:id" element={<ClienteFichaPage />} />
         <Route path="cotizaciones" element={<CotizacionesPage />} />
         <Route path="reportes" element={<ReportesPage />} />
         <Route path="reportes/mis-asignaciones" element={<MisAsignacionesPage />} />

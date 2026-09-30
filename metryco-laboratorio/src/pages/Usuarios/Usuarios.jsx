@@ -9,10 +9,6 @@ import {
   Tooltip,
   Avatar,
   Alert,
-  Menu,
-  MenuItem,
-  ListItemIcon,
-  ListItemText,
   Grid,
   Paper,
 } from "@mui/material";
@@ -23,13 +19,13 @@ import EditOutlinedIcon from "@mui/icons-material/EditOutlined";
 import BlockOutlinedIcon from "@mui/icons-material/BlockOutlined";
 import DeleteOutlineIcon from "@mui/icons-material/DeleteOutlineOutlined";
 import ChatBubbleOutlineIcon from "@mui/icons-material/ChatBubbleOutlineOutlined";
-import MoreVertIcon from "@mui/icons-material/MoreVert";
 import GroupsOutlinedIcon from "@mui/icons-material/GroupsOutlined";
 import CheckCircleOutlineIcon from "@mui/icons-material/CheckCircleOutlineOutlined";
 import BlockOutlined from "@mui/icons-material/BlockOutlined";
 import AdminPanelSettingsOutlinedIcon from "@mui/icons-material/AdminPanelSettingsOutlined";
 
 import AppButton from "../../shared/components/AppButton";
+import MenuAcciones from "../../shared/components/MenuAcciones";
 import AppTable from "../../shared/components/AppTable";
 import PageHeader from "../../shared/components/PageHeader";
 import StatCard from "../../shared/components/StatCard";
@@ -59,8 +55,6 @@ export default function Usuarios() {
   const [deactivateTarget, setDeactivateTarget] = useState(null);
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [observacionesTarget, setObservacionesTarget] = useState(null);
-  const [menuAnchor, setMenuAnchor] = useState(null);
-  const [menuRow, setMenuRow] = useState(null);
 
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(0);
@@ -137,15 +131,6 @@ export default function Usuarios() {
 
   const recargar = () => setReloadKey((k) => k + 1);
 
-  const abrirMenu = (e, row) => {
-    setMenuAnchor(e.currentTarget);
-    setMenuRow(row);
-  };
-  const cerrarMenu = () => {
-    setMenuAnchor(null);
-    setMenuRow(null);
-  };
-
   const handleDesactivar = async () => {
     const target = deactivateTarget;
     setDeactivateTarget(null);
@@ -178,6 +163,7 @@ export default function Usuarios() {
     {
       field: "nombre",
       headerName: "Usuario",
+      minWidth: 200,
       renderCell: (row) => (
         <Box sx={{ display: "flex", alignItems: "center", gap: 1.5 }}>
           <Avatar
@@ -201,10 +187,11 @@ export default function Usuarios() {
         </Box>
       ),
     },
-    { field: "email", headerName: "Correo" },
+    { field: "email", headerName: "Correo", hideBelow: "md", renderCell: (row) => row.email || "—" },
     {
       field: "rol",
       headerName: "Rol",
+      nowrap: true,
       renderCell: (row) => {
         const r = ROL_MAP[row.rol] ?? { label: row.rol, color: "default" };
         return <Chip label={r.label} color={r.color} size="small" />;
@@ -213,6 +200,7 @@ export default function Usuarios() {
     {
       field: "status",
       headerName: "Estado",
+      nowrap: true,
       renderCell: (row) => (
         <Chip
           label={row.status === "activo" ? "Activo" : "Inactivo"}
@@ -225,23 +213,23 @@ export default function Usuarios() {
       field: "acciones",
       headerName: "Acciones",
       align: "center",
+      nowrap: true,
       renderCell: (row) => (
-        <Box sx={{ display: "flex", gap: 1, justifyContent: "center" }}>
+        <Box sx={{ display: "flex", gap: 1, justifyContent: "center", alignItems: "center" }}>
           <Tooltip title="Editar">
             <IconButton size="small" onClick={() => setEditTarget(row)}>
               <EditOutlinedIcon fontSize="small" sx={{ color: "secondary.main" }} />
             </IconButton>
           </Tooltip>
-          <Tooltip title="Observaciones">
-            <IconButton size="small" onClick={() => setObservacionesTarget(row)}>
-              <ChatBubbleOutlineIcon fontSize="small" sx={{ color: "secondary.main" }} />
-            </IconButton>
-          </Tooltip>
-          <Tooltip title="Más opciones">
-            <IconButton size="small" onClick={(e) => abrirMenu(e, row)}>
-              <MoreVertIcon fontSize="small" />
-            </IconButton>
-          </Tooltip>
+          <MenuAcciones
+            acciones={[
+              { label: "Observaciones", icon: <ChatBubbleOutlineIcon fontSize="small" />, onClick: () => setObservacionesTarget(row) },
+              row.status === "inactivo"
+                ? { label: "Activar", icon: <CheckCircleOutlineIcon fontSize="small" />, color: "success", onClick: () => handleReactivar(row), separador: true }
+                : { label: "Desactivar", icon: <BlockOutlinedIcon fontSize="small" />, color: "error", onClick: () => setDeactivateTarget(row), separador: true },
+              { label: "Eliminar permanentemente", icon: <DeleteOutlineIcon fontSize="small" />, color: "error", onClick: () => setDeleteTarget(row) },
+            ]}
+          />
         </Box>
       ),
     },
@@ -293,6 +281,7 @@ export default function Usuarios() {
         columns={columns}
         rows={rows}
         loading={loading}
+        onRowClick={setEditTarget}
         totalCount={totalCount}
         page={page}
         rowsPerPage={rowsPerPage}
@@ -335,50 +324,6 @@ export default function Usuarios() {
         onClose={() => setObservacionesTarget(null)}
         onSaved={recargar}
       />
-
-      <Menu
-        anchorEl={menuAnchor}
-        open={!!menuAnchor}
-        onClose={cerrarMenu}
-        slotProps={{ paper: { sx: { borderRadius: 2, minWidth: 200 } } }}
-      >
-        {menuRow?.status === "inactivo" ? (
-          <MenuItem
-            onClick={() => {
-              handleReactivar(menuRow);
-              cerrarMenu();
-            }}
-          >
-            <ListItemIcon>
-              <CheckCircleOutlineIcon fontSize="small" sx={{ color: "success.main" }} />
-            </ListItemIcon>
-            <ListItemText>Activar</ListItemText>
-          </MenuItem>
-        ) : (
-          <MenuItem
-            onClick={() => {
-              setDeactivateTarget(menuRow);
-              cerrarMenu();
-            }}
-          >
-            <ListItemIcon>
-              <BlockOutlinedIcon fontSize="small" sx={{ color: "error.main" }} />
-            </ListItemIcon>
-            <ListItemText>Desactivar</ListItemText>
-          </MenuItem>
-        )}
-        <MenuItem
-          onClick={() => {
-            setDeleteTarget(menuRow);
-            cerrarMenu();
-          }}
-        >
-          <ListItemIcon>
-            <DeleteOutlineIcon fontSize="small" sx={{ color: "error.dark" }} />
-          </ListItemIcon>
-          <ListItemText>Eliminar permanentemente</ListItemText>
-        </MenuItem>
-      </Menu>
     </Box>
   );
 }

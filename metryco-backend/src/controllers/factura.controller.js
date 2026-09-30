@@ -11,7 +11,7 @@ const crear = asyncHandler(async (req, res) => {
 });
 
 const aplicarPago = asyncHandler(async (req, res) => {
-  res.json({ success: true, data: await service.aplicarPago(req.params.id, req.body.fechaPagada) });
+  res.json({ success: true, data: await service.aplicarPago(req.params.id, req.body.fechaPagada, req.user?.id) });
 });
 
 const reabrir = asyncHandler(async (req, res) => {
@@ -22,4 +22,12 @@ const eliminar = asyncHandler(async (req, res) => {
   res.json({ success: true, data: await service.eliminar(req.params.id) });
 });
 
-module.exports = { listar, crear, aplicarPago, reabrir, eliminar };
+const registrarAbono = asyncHandler(async (req, res) => {
+  res.status(201).json({ success: true, data: await service.registrarAbono(req.params.id, req.body, req.user?.id) });
+});
+
+const eliminarAbono = asyncHandler(async (req, res) => {
+  res.json({ success: true, data: await service.eliminarAbono(req.params.id, req.params.abonoId) });
+});
+
+module.exports = { listar, crear, aplicarPago, reabrir, eliminar, registrarAbono, eliminarAbono };

@@ -19,6 +19,10 @@ const porVencer = asyncHandler(async (req, res) => {
   res.json({ success: true, data: await service.listarPorVencer({ clienteId, estado, dias: Number(dias) }) });
 });
 
+const datosRecotizacion = asyncHandler(async (req, res) => {
+  res.json({ success: true, data: await service.datosRecotizacion(req.params.id) });
+});
+
 const enviarRecordatorioWhatsApp = asyncHandler(async (req, res) => {
   const resultado = await service.enviarRecordatorioWhatsApp(req.params.id, { telefonoPrueba: req.body?.telefonoPrueba });
   res.json({ success: true, data: resultado });
@@ -83,5 +87,5 @@ const descargarPdf = asyncHandler(async (req, res) => {
 module.exports = {
   listar, obtener, exportar, emitir, actualizar, cambiarEstado, adjuntarPdf,
   anular, regenerarToken, qrPng, qrSvg, descargarPdf, porReporte, porVencer, previsualizar,
-  enviarRecordatorioWhatsApp, ejecutarRecordatoriosWhatsApp,
+  enviarRecordatorioWhatsApp, ejecutarRecordatoriosWhatsApp, datosRecotizacion,
 };

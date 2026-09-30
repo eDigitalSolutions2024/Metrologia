@@ -43,6 +43,7 @@ const baseCliente = {
   rfc: z.string().trim().min(1, "El RFC es obligatorio"),
   regimenFiscal: z.string().trim().optional(),
   usoCFDI: vacio(z.enum(USO_CFDI, { error: "Uso de CFDI inválido" })),
+  diasCredito: vacio(z.coerce.number().refine((v) => [0, 15, 30, 60].includes(v), { error: "Días de crédito inválidos (0, 15, 30 o 60)" })),
   domicilioFiscal: domicilioSchema,
   contacto: contactoSchema,
   facturacion: facturacionSchema,

@@ -356,6 +356,7 @@ Para empezar de cero con la base de datos: borra la base `metryco` desde MongoDB
 
 ## 11. Documentación adicional y seguridad
 
+- [`PDFs/Guia-Timbrado-Facturas-CFDI.pdf`](PDFs/Guia-Timbrado-Facturas-CFDI.pdf): **guía para el personal** sobre qué debe estar listo y cómo capturar los datos para que el timbrado funcione y llegue al SAT (también se abre desde Facturación → *Guía de timbrado*).
 - [`docs/FACTURACION.md`](docs/FACTURACION.md): arquitectura, reglas del SAT, proveedores de timbrado y cómo conectar un PAC real.
 - [`PDFs/`](PDFs/): guías "Cómo funciona…" por módulo y resúmenes de cambios.
 - [`docs/modelo-datos.html`](docs/modelo-datos.html): modelo de datos.

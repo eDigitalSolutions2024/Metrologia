@@ -10,6 +10,7 @@ router.use(auth);
 router.get("/", c.listar);
 // Cola de Calidad: exclusiva de admin/coordinador, igual que aprobar/rechazar.
 router.get("/calidad", requireRole("admin", "coordinador"), c.calidad);
+router.get("/:id/servicio-previo", c.servicioPrevio);
 router.get("/:id", c.obtener);
 // Quien decide qué equipo se calibra y con quién: administración/coordinación/ventas.
 router.post("/", requireRole("admin", "coordinador", "ventas"), c.crear);

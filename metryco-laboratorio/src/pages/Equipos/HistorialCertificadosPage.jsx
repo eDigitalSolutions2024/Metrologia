@@ -132,9 +132,11 @@ export default function HistorialCertificadosPage() {
   const cuenta = (estado) => items.filter((c) => (c.estadoEfectivo || c.estado) === estado).length;
 
 
+  const verCertificado = (c) => window.open(`/informe/certificado/${c._id}`, "_blank");
+
   const columns = [
     {
-      field: "folio", headerName: "Certificado",
+      field: "folio", headerName: "Certificado", minWidth: 220,
       renderCell: (c) => {
         const Icono = iconoCategoria(c.equipoSnapshot?.categoria);
         const color = colorCategoria(c.equipoSnapshot?.categoria);
@@ -144,8 +146,8 @@ export default function HistorialCertificadosPage() {
               <Icono fontSize="small" />
             </Avatar>
             <Box sx={{ minWidth: 0 }}>
-              <Typography variant="body2" fontWeight={700} noWrap>{c.folio}</Typography>
-              <Typography variant="caption" color="text.secondary" noWrap sx={{ display: "block" }}>
+              <Typography variant="body2" fontWeight={700}>{c.folio}</Typography>
+              <Typography variant="caption" color="text.secondary" sx={{ display: "block" }}>
                 {c.equipoSnapshot?.idInterno || "—"} · {c.equipoSnapshot?.descripcion || "—"}
               </Typography>
             </Box>
@@ -153,12 +155,21 @@ export default function HistorialCertificadosPage() {
         );
       },
     },
-    { field: "cliente", headerName: "Cliente", renderCell: (c) => c.cliente?.nombre || c.clienteSnapshot?.nombre || "—" },
-    { field: "marcaModelo", headerName: "Marca / Modelo", renderCell: (c) => [c.equipoSnapshot?.marca, c.equipoSnapshot?.modelo].filter(Boolean).join(" / ") || "—" },
-    { field: "serie", headerName: "Serie", renderCell: (c) => c.equipoSnapshot?.serie || "—" },
-    { field: "fecha", headerName: "Fecha Calibración", renderCell: (c) => formatDate(c.fechaCalibracion) },
+    { field: "cliente", headerName: "Cliente", minWidth: 150, renderCell: (c) => c.cliente?.nombre || c.clienteSnapshot?.nombre || "—" },
     {
-      field: "estado", headerName: "Estado",
+      field: "marcaModelo", headerName: "Marca / Modelo", minWidth: 150, hideBelow: "md",
+      renderCell: (c) => (
+        <Box>
+          <Typography variant="body2">{[c.equipoSnapshot?.marca, c.equipoSnapshot?.modelo].filter(Boolean).join(" / ") || "—"}</Typography>
+          <Typography variant="caption" color="text.secondary" sx={{ display: "block" }}>
+            {c.equipoSnapshot?.serie ? `Serie: ${c.equipoSnapshot.serie}` : "Sin serie"}
+          </Typography>
+        </Box>
+      ),
+    },
+    { field: "fecha", headerName: "Calibración", nowrap: true, renderCell: (c) => formatDate(c.fechaCalibracion) },
+    {
+      field: "estado", headerName: "Estado", nowrap: true,
       renderCell: (c) => {
         const e = ESTADO_MAP[c.estadoEfectivo || c.estado] || ESTADO_MAP.borrador;
         return <Chip size="small" label={e.label} color={e.color} />;
@@ -168,10 +179,11 @@ export default function HistorialCertificadosPage() {
       field: "acciones",
       headerName: "Acciones",
       align: "center",
+      nowrap: true,
       renderCell: (c) => (
         <Box sx={{ display: "flex", alignItems: "center", justifyContent: "center", flexWrap: "nowrap" }}>
           <Tooltip title={c.reporte ? "Editar en el reporte de origen" : "Sin reporte ligado"}>
-            <span>
+            <span data-no-row-click>
               <IconButton
                 size="small"
                 disabled={!c.reporte}
@@ -182,7 +194,7 @@ export default function HistorialCertificadosPage() {
             </span>
           </Tooltip>
           <Tooltip title="Ver / descargar certificado (Portada)">
-            <IconButton size="small" onClick={() => window.open(`/informe/certificado/${c._id}`, "_blank")}>
+            <IconButton size="small" onClick={() => verCertificado(c)}>
               <DescriptionOutlinedIcon fontSize="small" sx={{ color: "primary.main" }} />
             </IconButton>
           </Tooltip>
@@ -278,6 +290,7 @@ export default function HistorialCertificadosPage() {
         onPageChange={setPage}
         onRowsPerPageChange={(n) => { setRowsPerPage(n); setPage(0); }}
         emptyText="Sin certificados para este filtro"
+        onRowClick={verCertificado}
       />
 
       <VencimientoAutomaticoDialog open={vencimientoOpen} onClose={() => setVencimientoOpen(false)} />

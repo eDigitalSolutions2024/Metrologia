@@ -47,30 +47,51 @@ export default function MisAsignacionesPage() {
   useEffect(() => { cargar(); }, [cargar]);
   usePolling(() => cargar(true));
 
+  const abrir = (r) => { if (r.reporte?._id) navigate(`/reportes/${r.reporte._id}`); };
+
   const columns = [
-    { field: "reporte", headerName: "Reporte", renderCell: (r) => r.reporte?.folio || "—" },
-    { field: "cliente", headerName: "Cliente", renderCell: (r) => r.reporte?.cliente?.nombre || "—" },
-    { field: "equipo", headerName: "Equipo", renderCell: (r) => `${r.equipo?.idInterno || "—"} — ${r.equipo?.descripcion || ""}` },
-    { field: "marca", headerName: "Marca/Modelo", renderCell: (r) => `${r.equipo?.marca || "—"} ${r.equipo?.modelo || ""}` },
     {
-      field: "calibracion", headerName: "Calibración",
+      field: "reporte", headerName: "Reporte", minWidth: 170,
+      renderCell: (r) => (
+        <Box>
+          <Typography variant="body2" fontWeight={700}>{r.reporte?.folio || "—"}</Typography>
+          <Typography variant="caption" color="text.secondary" sx={{ display: "block" }}>{r.reporte?.cliente?.nombre || "—"}</Typography>
+        </Box>
+      ),
+    },
+    {
+      field: "equipo", headerName: "Equipo", minWidth: 180,
+      renderCell: (r) => (
+        <Box>
+          <Typography variant="body2" fontWeight={600}>{r.equipo?.idInterno || "—"}</Typography>
+          <Typography variant="caption" color="text.secondary" sx={{ display: "block" }}>{r.equipo?.descripcion || ""}</Typography>
+        </Box>
+      ),
+    },
+    {
+      field: "marca", headerName: "Marca / Modelo", minWidth: 140, hideBelow: "md",
+      renderCell: (r) => [r.equipo?.marca, r.equipo?.modelo].filter(Boolean).join(" ") || "—",
+    },
+    {
+      field: "calibracion", headerName: "Calibración", nowrap: true,
       renderCell: (r) => (
         <Chip size="small" label={EST_CALIBRACION[r.estados?.calibracion] || r.estados?.calibracion}
           color={EST_CALIBRACION_COLOR[r.estados?.calibracion] || "default"} />
       ),
     },
     {
-      field: "certificado", headerName: "Certificado",
+      field: "certificado", headerName: "Certificado", nowrap: true,
       renderCell: (r) => (
         <Chip size="small" label={r.estados?.certificado?.replace("_", " ") || "—"}
-          color={EST_CERTIFICADO_COLOR[r.estados?.certificado] || "default"} />
+          color={EST_CERTIFICADO_COLOR[r.estados?.certificado] || "default"}
+          sx={{ textTransform: "capitalize" }} />
       ),
     },
     {
-      field: "acciones", headerName: "Acciones", align: "center",
+      field: "acciones", headerName: "Acciones", align: "center", nowrap: true,
       renderCell: (r) => (
         <Tooltip title="Abrir reporte">
-          <IconButton size="small" onClick={() => navigate(`/reportes/${r.reporte?._id}`)}>
+          <IconButton size="small" onClick={() => abrir(r)}>
             <VisibilityOutlinedIcon fontSize="small" sx={{ color: "secondary.main" }} />
           </IconButton>
         </Tooltip>
@@ -100,6 +121,7 @@ export default function MisAsignacionesPage() {
         columns={columns} rows={rows} loading={loading}
         totalCount={total} page={page} rowsPerPage={rowsPerPage} onPageChange={setPage}
         onRowsPerPageChange={(n) => { setRowsPerPage(n); setPage(0); }}
+        onRowClick={abrir}
         emptyText={filtro === "pendientes" ? "No tienes asignaciones pendientes." : "Todavía no tienes asignaciones."}
       />
 

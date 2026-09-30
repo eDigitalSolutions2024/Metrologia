@@ -74,6 +74,7 @@ export default function General() {
     {
       field: "nombre",
       headerName: "Usuario",
+      minWidth: 200,
       renderCell: (row) => (
         <Box sx={{ display: "flex", alignItems: "center", gap: 1.5 }}>
           <Avatar sx={{ width: 32, height: 32, fontSize: 13, bgcolor: "secondary.main" }}>
@@ -90,10 +91,11 @@ export default function General() {
         </Box>
       ),
     },
-    { field: "email", headerName: "Correo" },
+    { field: "email", headerName: "Correo", hideBelow: "md", renderCell: (row) => row.email || "—" },
     {
       field: "rol",
       headerName: "Rol",
+      nowrap: true,
       renderCell: (row) => {
         const r = ROL_MAP[row.rol] ?? { label: row.rol, color: "default" };
         return <Chip label={r.label} color={r.color} size="small" />;
@@ -102,6 +104,8 @@ export default function General() {
     {
       field: "sucursal",
       headerName: "Sucursal",
+      nowrap: true,
+      hideBelow: "sm",
       renderCell: (row) => SUCURSAL_LABELS[row.sucursal] || row.sucursal || "—",
     },
   ];

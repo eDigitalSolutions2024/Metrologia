@@ -2,6 +2,8 @@ const mongoose = require("mongoose");
 const Reporte = require("../models/Reporte");
 const Asignacion = require("../models/Asignacion");
 const Cliente = require("../models/Cliente");
+const Cotizacion = require("../models/Cotizacion");
+const Equipo = require("../models/Equipo");
 const AppError = require("../utils/AppError");
 const escapeRegex = require("../utils/escapeRegex");
 const { crearEvento } = require("../utils/historial");
@@ -108,21 +110,78 @@ async function crear(datos, reqUser) {
   const clienteDoc = await Cliente.findById(cliente).select("nombre nombreComercial");
   if (!clienteDoc) throw new AppError("Cliente no encontrado", 404);
 
+  // Si nace de una cotización, hereda su OC y su contacto cuando no se
+  // capturaron aparte — la OC ya se sabe, no debe teclearse dos veces.
+  let { ordenCompra, contacto } = datos;
+  if (datos.cotizacion && mongoose.isValidObjectId(datos.cotizacion)) {
+    const cot = await Cotizacion.findById(datos.cotizacion).select("ordenCompra contacto");
+    if (cot) {
+      ordenCompra = ordenCompra || cot.ordenCompra;
+      contacto = contacto || cot.contacto;
+    }
+  }
+
   const folio = await siguienteFolioReporte(clienteDoc);
   const evento = await crearEvento(reqUser, "reporte_creado", { folio });
 
-  return Reporte.create({
+  const reporte = await Reporte.create({
     folio,
     cliente,
-    contacto: datos.contacto || undefined,
+    contacto: contacto || undefined,
     cotizacion: datos.cotizacion || undefined,
-    ordenCompra: datos.ordenCompra,
+    ordenCompra,
     factura: datos.factura,
     observaciones: datos.observaciones,
     fechaCompromiso: datos.fechaCompromiso,
     creadoPor: reqUser?.id,
     historial: [evento],
   });
+
+  // Si nace de una cotización, sus equipos ya registrados se asignan solos.
+  if (reporte.cotizacion) {
+    try { await asignarEquiposDeCotizacion(reporte._id, reqUser); } catch (err) { console.error("[reporte] No se pudieron asignar los equipos de la cotización:", err.message); }
+  }
+  return reporte;
+}
+
+/**
+ * Crea las asignaciones de un reporte a partir de las partidas de su cotización:
+ * cada partida ligada a un equipo registrado del cliente (o, en cotizaciones
+ * anteriores a ese vínculo, cuyo texto trae el código interno del equipo entre
+ * paréntesis) se asigna sin capturar nada. El técnico y los patrones se eligen después.
+ * Omite lo que no puede asignar y dice por qué, sin fallar el resto.
+ */
+async function asignarEquiposDeCotizacion(reporteId, reqUser) {
+  const asignacionService = require("./asignacion.service"); // lazy: evita dependencia circular al cargar
+  const reporte = await Reporte.findById(reporteId).select("cliente cotizacion");
+  if (!reporte) throw new AppError("Reporte no encontrado", 404);
+  if (!reporte.cotizacion) return { creadas: 0, omitidas: [], sinCotizacion: true };
+
+  const cot = await Cotizacion.findById(reporte.cotizacion).select("items");
+  const equiposCliente = await Equipo.find({ cliente: reporte.cliente, status: "activo" }).select("idInterno");
+  const porId = new Map(equiposCliente.map((e) => [String(e._id), e]));
+  const norm = (v) => String(v || "").toLowerCase();
+
+  const creadas = [];
+  const omitidas = [];
+  const vistos = new Set();
+  for (const item of cot?.items || []) {
+    let equipo = item.equipo ? porId.get(String(item.equipo)) : null;
+    if (!equipo) equipo = equiposCliente.find((e) => e.idInterno && norm(item.descripcion).includes(norm(`(${e.idInterno})`)));
+    if (!equipo) {
+      omitidas.push({ descripcion: item.descripcion, motivo: item.equipo ? "el equipo ya no está activo o no es de este cliente" : "no está ligada a un equipo registrado" });
+      continue;
+    }
+    if (vistos.has(String(equipo._id))) continue;
+    vistos.add(String(equipo._id));
+    try {
+      await asignacionService.crear({ reporte: reporte._id, equipo: equipo._id }, reqUser);
+      creadas.push(equipo.idInterno);
+    } catch (err) {
+      omitidas.push({ descripcion: item.descripcion, motivo: err.message });
+    }
+  }
+  return { creadas: creadas.length, equipos: creadas, omitidas };
 }
 
 async function actualizar(id, datos, reqUser) {
@@ -222,4 +281,4 @@ async function eliminar(id) {
   return reporte;
 }
 
-module.exports = { listar, obtener, crear, actualizar, eliminar, paraImprimir, agregarComentario };
+module.exports = { listar, obtener, crear, actualizar, eliminar, paraImprimir, agregarComentario, asignarEquiposDeCotizacion };

@@ -3,18 +3,18 @@ import { useNavigate } from "react-router-dom";
 import {
   Box, TextField, InputAdornment, IconButton, Typography, Avatar,
   Tooltip, MenuItem, Select, FormControl, InputLabel, Button,
-  Chip, Menu, ListItemIcon, ListItemText, Alert, FormControlLabel, Checkbox,
+  Chip, Alert, FormControlLabel, Checkbox,
 } from "@mui/material";
 import SearchIcon from "@mui/icons-material/Search";
 import AddIcon from "@mui/icons-material/Add";
 import EditOutlinedIcon from "@mui/icons-material/EditOutlined";
 import QrCode2OutlinedIcon from "@mui/icons-material/QrCode2Outlined";
-import MoreVertIcon from "@mui/icons-material/MoreVert";
 import CheckCircleOutlineIcon from "@mui/icons-material/CheckCircleOutlineOutlined";
 import BlockOutlinedIcon from "@mui/icons-material/BlockOutlined";
 
 import AppButton from "../../shared/components/AppButton";
 import AppTable from "../../shared/components/AppTable";
+import MenuAcciones from "../../shared/components/MenuAcciones";
 import PageHeader from "../../shared/components/PageHeader";
 import EtiquetaEquipoDialog from "../../shared/components/EtiquetaEquipoDialog";
 import ConfirmDialog from "../../shared/components/ConfirmDialog";
@@ -40,8 +40,6 @@ export default function EquiposPage() {
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
   const [etiquetaEquipo, setEtiquetaEquipo] = useState(null);
-  const [menuAnchor, setMenuAnchor] = useState(null);
-  const [menuRow, setMenuRow] = useState(null);
   const [bajaTarget, setBajaTarget] = useState(null);
   const [error, setError] = useState("");
 
@@ -60,9 +58,6 @@ export default function EquiposPage() {
   };
   useEffect(() => { cargar(); }, [buscar, clienteFiltro, incluirInactivos, page, rowsPerPage]); // eslint-disable-line react-hooks/exhaustive-deps
   usePolling(() => cargar(true));
-
-  const abrirMenu = (e, row) => { setMenuAnchor(e.currentTarget); setMenuRow(row); };
-  const cerrarMenu = () => { setMenuAnchor(null); setMenuRow(null); };
 
   const activar = async (row) => {
     setError("");
@@ -85,9 +80,11 @@ export default function EquiposPage() {
     }
   };
 
+  const editar = (row) => navigate(`/equipos/${row._id}/editar`);
+
   const columns = [
     {
-      field: "idInterno", headerName: "Equipo",
+      field: "idInterno", headerName: "Equipo", minWidth: 200,
       renderCell: (row) => {
         const Icono = iconoCategoria(row.categoria);
         const color = colorCategoria(row.categoria);
@@ -97,25 +94,32 @@ export default function EquiposPage() {
               <Icono fontSize="small" />
             </Avatar>
             <Box sx={{ minWidth: 0 }}>
-              <Typography variant="body2" fontWeight={700} noWrap>{row.idInterno}</Typography>
-              <Typography variant="caption" color="text.secondary" noWrap sx={{ display: "block" }}>{row.descripcion || "—"}</Typography>
+              <Typography variant="body2" fontWeight={700}>{row.idInterno}</Typography>
+              <Typography variant="caption" color="text.secondary" sx={{ display: "block" }}>{row.descripcion || "—"}</Typography>
             </Box>
           </Box>
         );
       },
     },
-    { field: "cliente", headerName: "Cliente", renderCell: (row) => row.cliente?.nombre || "—" },
-    { field: "marcaModelo", headerName: "Marca / Modelo", renderCell: (row) => [row.marca, row.modelo].filter(Boolean).join(" / ") || "—" },
-    { field: "serie", headerName: "Serie" },
+    { field: "cliente", headerName: "Cliente", minWidth: 150, renderCell: (row) => row.cliente?.nombre || "—" },
     {
-      field: "categoria", headerName: "Categoría",
+      field: "marcaModelo", headerName: "Marca / Modelo", minWidth: 150, hideBelow: "md",
+      renderCell: (row) => (
+        <Box>
+          <Typography variant="body2">{[row.marca, row.modelo].filter(Boolean).join(" / ") || "—"}</Typography>
+          <Typography variant="caption" color="text.secondary" sx={{ display: "block" }}>{row.serie ? `Serie: ${row.serie}` : "Sin serie"}</Typography>
+        </Box>
+      ),
+    },
+    {
+      field: "categoria", headerName: "Categoría", nowrap: true, hideBelow: "lg",
       renderCell: (row) => row.categoria
         ? <Chip size="small" variant="outlined" label={row.categoria} sx={{ borderColor: colorCategoria(row.categoria), color: colorCategoria(row.categoria) }} />
         : "—",
     },
-    { field: "rango", headerName: "Rango" },
+    { field: "rango", headerName: "Rango", nowrap: true, hideBelow: "xl" },
     {
-      field: "status", headerName: "Estado",
+      field: "status", headerName: "Estado", nowrap: true,
       renderCell: (row) => (
         <Chip size="small" label={row.status === "activo" ? "Activo" : "Inactivo"} color={row.status === "activo" ? "success" : "default"} />
       ),
@@ -124,23 +128,22 @@ export default function EquiposPage() {
       field: "acciones",
       headerName: "Acciones",
       align: "center",
+      nowrap: true,
       renderCell: (row) => (
-        <Box sx={{ display: "flex", alignItems: "center", justifyContent: "center", flexWrap: "nowrap" }}>
-          <Tooltip title="Editar equipo">
-            <IconButton size="small" onClick={() => navigate(`/equipos/${row._id}/editar`)}>
-              <EditOutlinedIcon fontSize="small" sx={{ color: "secondary.main" }} />
-            </IconButton>
-          </Tooltip>
+        <Box sx={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 0.5, flexWrap: "nowrap" }}>
           <Tooltip title="Etiqueta / imprimir">
             <IconButton size="small" onClick={() => setEtiquetaEquipo(row)}>
               <QrCode2OutlinedIcon fontSize="small" sx={{ color: "primary.main" }} />
             </IconButton>
           </Tooltip>
-          <Tooltip title="Más opciones">
-            <IconButton size="small" onClick={(e) => abrirMenu(e, row)}>
-              <MoreVertIcon fontSize="small" />
-            </IconButton>
-          </Tooltip>
+          <MenuAcciones
+            acciones={[
+              { label: "Editar equipo", icon: <EditOutlinedIcon fontSize="small" />, onClick: () => editar(row) },
+              row.status === "inactivo"
+                ? { label: "Activar", icon: <CheckCircleOutlineIcon fontSize="small" />, color: "success", onClick: () => activar(row), separador: true }
+                : { label: "Dar de baja", icon: <BlockOutlinedIcon fontSize="small" />, color: "error", onClick: () => setBajaTarget(row), separador: true },
+            ]}
+          />
         </Box>
       ),
     },
@@ -207,6 +210,7 @@ export default function EquiposPage() {
         onPageChange={setPage}
         onRowsPerPageChange={(n) => { setRowsPerPage(n); setPage(0); }}
         loading={loading}
+        onRowClick={editar}
       />
 
       <EtiquetaEquipoDialog
@@ -225,29 +229,6 @@ export default function EquiposPage() {
         onConfirm={confirmarBaja}
         onCancel={() => setBajaTarget(null)}
       />
-
-      <Menu
-        anchorEl={menuAnchor}
-        open={!!menuAnchor}
-        onClose={cerrarMenu}
-        slotProps={{ paper: { sx: { borderRadius: 2, minWidth: 200 } } }}
-      >
-        {menuRow?.status === "inactivo" ? (
-          <MenuItem onClick={() => { activar(menuRow); cerrarMenu(); }}>
-            <ListItemIcon>
-              <CheckCircleOutlineIcon fontSize="small" sx={{ color: "success.main" }} />
-            </ListItemIcon>
-            <ListItemText>Activar</ListItemText>
-          </MenuItem>
-        ) : (
-          <MenuItem onClick={() => { setBajaTarget(menuRow); cerrarMenu(); }}>
-            <ListItemIcon>
-              <BlockOutlinedIcon fontSize="small" sx={{ color: "error.main" }} />
-            </ListItemIcon>
-            <ListItemText>Dar de baja</ListItemText>
-          </MenuItem>
-        )}
-      </Menu>
     </Box>
   );
 }

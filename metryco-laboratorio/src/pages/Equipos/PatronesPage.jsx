@@ -2,20 +2,20 @@ import { useCallback, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   Box, Typography, TextField, InputAdornment, IconButton, Tooltip, Chip, Avatar,
-  MenuItem, Select, FormControl, InputLabel, Menu, ListItemIcon, ListItemText, Alert,
+  MenuItem, Select, FormControl, InputLabel, Alert,
 } from "@mui/material";
 import SearchIcon from "@mui/icons-material/Search";
 import AddIcon from "@mui/icons-material/Add";
 import EditOutlinedIcon from "@mui/icons-material/EditOutlined";
 import FileDownloadOutlinedIcon from "@mui/icons-material/FileDownloadOutlined";
 import QrCode2OutlinedIcon from "@mui/icons-material/QrCode2Outlined";
-import MoreVertIcon from "@mui/icons-material/MoreVert";
 import CheckCircleOutlineIcon from "@mui/icons-material/CheckCircleOutlineOutlined";
 import BlockOutlinedIcon from "@mui/icons-material/BlockOutlined";
 import DeleteOutlineIcon from "@mui/icons-material/DeleteOutlined";
 
 import AppButton from "../../shared/components/AppButton";
 import AppTable from "../../shared/components/AppTable";
+import MenuAcciones from "../../shared/components/MenuAcciones";
 import PageHeader from "../../shared/components/PageHeader";
 import StatCard from "../../shared/components/StatCard";
 import EtiquetaEquipoDialog from "../../shared/components/EtiquetaEquipoDialog";
@@ -58,8 +58,6 @@ export default function PatronesPage() {
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(10);
   const [etiquetaPatron, setEtiquetaPatron] = useState(null);
-  const [menuAnchor, setMenuAnchor] = useState(null);
-  const [menuRow, setMenuRow] = useState(null);
   const [bajaTarget, setBajaTarget] = useState(null);
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [error, setError] = useState("");
@@ -75,9 +73,6 @@ export default function PatronesPage() {
   usePolling(() => cargar(true));
 
   const cuenta = (v) => rows.filter((r) => r.vigencia === v).length;
-
-  const abrirMenu = (e, row) => { setMenuAnchor(e.currentTarget); setMenuRow(row); };
-  const cerrarMenu = () => { setMenuAnchor(null); setMenuRow(null); };
 
   const activar = async (row) => {
     setError("");
@@ -113,9 +108,11 @@ export default function PatronesPage() {
     }
   };
 
+  const editar = (r) => navigate(`/equipos/patrones/${r._id}/editar`);
+
   const columns = [
     {
-      field: "codigo", headerName: "Patrón",
+      field: "codigo", headerName: "Patrón", minWidth: 200,
       renderCell: (r) => {
         const Icono = iconoCategoria(r.categoria);
         const color = colorCategoria(r.categoria);
@@ -124,23 +121,23 @@ export default function PatronesPage() {
             <Avatar sx={{ width: 32, height: 32, bgcolor: `${color}1a`, color }}>
               <Icono fontSize="small" />
             </Avatar>
-            <Box>
+            <Box sx={{ minWidth: 0 }}>
               <Typography variant="body2" fontWeight={700}>{r.codigo}</Typography>
-              <Typography variant="caption" color="text.secondary">{r.nombre}</Typography>
+              <Typography variant="caption" color="text.secondary" sx={{ display: "block" }}>{r.nombre}</Typography>
             </Box>
           </Box>
         );
       },
     },
     {
-      field: "categoria", headerName: "Categoría",
+      field: "categoria", headerName: "Categoría", nowrap: true, hideBelow: "lg",
       renderCell: (r) => r.categoria
         ? <Chip size="small" variant="outlined" label={r.categoria} sx={{ borderColor: colorCategoria(r.categoria), color: colorCategoria(r.categoria) }} />
         : "—",
     },
-    { field: "trazabilidad", headerName: "Trazabilidad", renderCell: (r) => r.trazabilidad || "—" },
+    { field: "trazabilidad", headerName: "Trazabilidad", minWidth: 140, hideBelow: "xl", renderCell: (r) => r.trazabilidad || "—" },
     {
-      field: "incertidumbre", headerName: "U (cert.)",
+      field: "incertidumbre", headerName: "U (cert.)", nowrap: true, hideBelow: "lg",
       renderCell: (r) =>
         r.incertidumbre?.modo === "tabla"
           ? <Chip size="small" variant="outlined" label={`tabla · ${r.incertidumbre.puntos?.length || 0} pts`} />
@@ -148,43 +145,46 @@ export default function PatronesPage() {
           ? <span>{r.incertidumbre.valor} {r.incertidumbre.unidad || r.unidad} <Typography component="span" variant="caption" color="text.secondary">k={r.incertidumbre.k}</Typography></span>
           : "—",
     },
-    { field: "venc", headerName: "Vence", renderCell: (r) => formatDate(r.calibracion?.vencimiento) },
     {
-      field: "vigencia", headerName: "Vigencia",
+      field: "vigencia", headerName: "Vigencia", nowrap: true,
       renderCell: (r) => {
         const v = VIG[r.vigencia] || VIG.sin_fecha;
-        return <Chip size="small" label={v.label} color={v.color} />;
+        return (
+          <Box>
+            <Chip size="small" label={v.label} color={v.color} />
+            <Typography variant="caption" color="text.secondary" sx={{ display: "block", mt: 0.25 }}>
+              Vence: {formatDate(r.calibracion?.vencimiento)}
+            </Typography>
+          </Box>
+        );
       },
     },
     {
-      field: "estado", headerName: "Estado",
+      field: "estado", headerName: "Estado", nowrap: true,
       renderCell: (r) => {
         const e = ESTADO_MAP[r.estado] || ESTADO_MAP.activo;
         return <Chip size="small" label={e.label} color={e.color} variant={r.estado === "baja" ? "outlined" : "filled"} />;
       },
     },
     {
-      field: "acciones", headerName: "Acciones", align: "center",
+      field: "acciones", headerName: "Acciones", align: "center", nowrap: true,
       renderCell: (r) => (
-        <Box sx={{ display: "flex", alignItems: "center", justifyContent: "center", flexWrap: "nowrap" }}>
-          {puedeEditar && (
-            <Tooltip title="Editar patrón">
-              <IconButton size="small" onClick={() => navigate(`/equipos/patrones/${r._id}/editar`)}>
-                <EditOutlinedIcon fontSize="small" sx={{ color: "secondary.main" }} />
-              </IconButton>
-            </Tooltip>
-          )}
+        <Box sx={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 0.5, flexWrap: "nowrap" }}>
           <Tooltip title="Etiqueta / imprimir">
             <IconButton size="small" onClick={() => setEtiquetaPatron(r)}>
               <QrCode2OutlinedIcon fontSize="small" sx={{ color: "primary.main" }} />
             </IconButton>
           </Tooltip>
           {puedeEditar && (
-            <Tooltip title="Más opciones">
-              <IconButton size="small" onClick={(e) => abrirMenu(e, r)}>
-                <MoreVertIcon fontSize="small" />
-              </IconButton>
-            </Tooltip>
+            <MenuAcciones
+              acciones={[
+                { label: "Editar patrón", icon: <EditOutlinedIcon fontSize="small" />, onClick: () => editar(r) },
+                r.estado === "baja"
+                  ? { label: "Activar", icon: <CheckCircleOutlineIcon fontSize="small" />, color: "success", onClick: () => activar(r), separador: true }
+                  : { label: "Dar de baja", icon: <BlockOutlinedIcon fontSize="small" />, color: "error", onClick: () => setBajaTarget(r), separador: true },
+                { label: "Eliminar permanentemente", icon: <DeleteOutlineIcon fontSize="small" />, color: "error", onClick: () => setDeleteTarget(r) },
+              ]}
+            />
           )}
         </Box>
       ),
@@ -263,6 +263,7 @@ export default function PatronesPage() {
         rowsPerPage={rowsPerPage}
         onPageChange={setPage}
         emptyText="Sin patrones registrados"
+        onRowClick={puedeEditar ? editar : undefined}
         onRowsPerPageChange={(n) => { setRowsPerPage(n); setPage(0); }}
       />
 
@@ -282,35 +283,6 @@ export default function PatronesPage() {
         onConfirm={confirmarBaja}
         onCancel={() => setBajaTarget(null)}
       />
-
-      <Menu
-        anchorEl={menuAnchor}
-        open={!!menuAnchor}
-        onClose={cerrarMenu}
-        slotProps={{ paper: { sx: { borderRadius: 2, minWidth: 200 } } }}
-      >
-        {menuRow?.estado === "baja" ? (
-          <MenuItem onClick={() => { activar(menuRow); cerrarMenu(); }}>
-            <ListItemIcon>
-              <CheckCircleOutlineIcon fontSize="small" sx={{ color: "success.main" }} />
-            </ListItemIcon>
-            <ListItemText>Activar</ListItemText>
-          </MenuItem>
-        ) : (
-          <MenuItem onClick={() => { setBajaTarget(menuRow); cerrarMenu(); }}>
-            <ListItemIcon>
-              <BlockOutlinedIcon fontSize="small" sx={{ color: "error.main" }} />
-            </ListItemIcon>
-            <ListItemText>Dar de baja</ListItemText>
-          </MenuItem>
-        )}
-        <MenuItem onClick={() => { setDeleteTarget(menuRow); cerrarMenu(); }}>
-          <ListItemIcon>
-            <DeleteOutlineIcon fontSize="small" sx={{ color: "error.dark" }} />
-          </ListItemIcon>
-          <ListItemText>Eliminar permanentemente</ListItemText>
-        </MenuItem>
-      </Menu>
 
       <PasswordConfirmDialog
         open={!!deleteTarget}

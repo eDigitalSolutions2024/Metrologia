@@ -106,3 +106,8 @@ export async function verificarPublico(token) {
 }
 export const publicoQrUrl = (token) => `${API_BASE_URL}${ENDPOINTS.PUBLICO}/certificado/${token}/qr.png`;
 export const publicoPdfUrl = (token) => `${API_BASE_URL}${ENDPOINTS.PUBLICO}/certificado/${token}/pdf`;
+
+export async function obtenerDatosRecotizacion(id) {
+  const { data } = await api.get(`${ENDPOINTS.CERTIFICADOS}/${id}/recotizacion`);
+  return data.data;
+}

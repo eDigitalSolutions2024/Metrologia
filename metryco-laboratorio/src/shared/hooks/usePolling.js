@@ -14,7 +14,7 @@ import { useEffect, useRef } from "react";
  */
 export function usePolling(fn, ms = 20000, activo = true) {
   const fnRef = useRef(fn);
-  fnRef.current = fn;
+  useEffect(() => { fnRef.current = fn; });
 
   useEffect(() => {
     if (!activo) return undefined;

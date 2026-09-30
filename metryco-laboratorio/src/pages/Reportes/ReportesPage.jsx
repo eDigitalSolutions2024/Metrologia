@@ -1,5 +1,6 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useNavigate, useSearchParams } from "react-router-dom";
+import AvisoDeuda from "../../shared/components/AvisoDeuda";
 import {
   Box, Typography, TextField, InputAdornment, Chip, Tooltip, IconButton,
   MenuItem, Select, FormControl, InputLabel, Grid,
@@ -8,14 +9,12 @@ import {
 import { useTheme } from "@mui/material/styles";
 import SearchIcon from "@mui/icons-material/Search";
 import AddIcon from "@mui/icons-material/Add";
-import VisibilityOutlinedIcon from "@mui/icons-material/VisibilityOutlined";
 import FileDownloadOutlinedIcon from "@mui/icons-material/FileDownloadOutlined";
 import PictureAsPdfOutlinedIcon from "@mui/icons-material/PictureAsPdfOutlined";
 import DescriptionOutlinedIcon from "@mui/icons-material/DescriptionOutlined";
 import HourglassTopOutlinedIcon from "@mui/icons-material/HourglassTopOutlined";
 import TaskAltOutlinedIcon from "@mui/icons-material/TaskAltOutlined";
 import LocalShippingOutlinedIcon from "@mui/icons-material/LocalShippingOutlined";
-import OpenInNewOutlinedIcon from "@mui/icons-material/OpenInNewOutlined";
 import RequestQuoteOutlinedIcon from "@mui/icons-material/RequestQuoteOutlined";
 
 import AppButton from "../../shared/components/AppButton";
@@ -59,7 +58,12 @@ export default function ReportesPage() {
   const [anio, setAnio] = useState("");
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(10);
-  const [nuevoOpen, setNuevoOpen] = useState(false);
+  const [searchParams, setSearchParams] = useSearchParams();
+  // Enlace desde Cotizaciones ("Crear reporte"): /reportes?nuevo=1&cliente=..&cotizacion=..
+  const [prefillReporte, setPrefillReporte] = useState(() => (
+    searchParams.get("nuevo") ? { cliente: searchParams.get("cliente") || "", cotizacion: searchParams.get("cotizacion") || "" } : null
+  ));
+  const [nuevoOpen, setNuevoOpen] = useState(() => !!searchParams.get("nuevo"));
 
   const cargar = useCallback((silencioso = false) => {
     if (!silencioso) setLoading(true);
@@ -83,32 +87,24 @@ export default function ReportesPage() {
 
   const columns = [
     {
-      field: "folio", headerName: "Reporte",
+      field: "folio", headerName: "Reporte", nowrap: true,
       renderCell: (r) => (
-        <Tooltip title="Abrir reporte">
-          <Chip
-            size="small" clickable label={r.folio} icon={<OpenInNewOutlinedIcon sx={{ fontSize: 14 }} />}
-            onClick={() => navigate(`/reportes/${r._id}`)}
-            sx={{
-              fontWeight: 700, color: "secondary.main", borderColor: "secondary.main", borderRadius: "6px",
-              "& .MuiChip-icon": { color: "secondary.main" }, "& .MuiChip-label": { px: 1 },
-            }}
-            variant="outlined"
-          />
-        </Tooltip>
+        <Box>
+          <Typography variant="body2" fontWeight={700}>{r.folio}</Typography>
+          <Typography variant="caption" color="text.secondary" sx={{ display: "block" }}>{formatDate(r.fechaRecepcion)}</Typography>
+        </Box>
       ),
     },
-    { field: "cliente", headerName: "Cliente", renderCell: (r) => r.cliente?.nombre || "—" },
-    { field: "fechaRecepcion", headerName: "Fecha", renderCell: (r) => formatDate(r.fechaRecepcion) },
+    { field: "cliente", headerName: "Cliente", minWidth: 160, renderCell: (r) => r.cliente?.nombre || "—" },
     {
-      field: "status", headerName: "Estatus",
+      field: "status", headerName: "Estatus", nowrap: true,
       renderCell: (r) => {
         const s = STATUS[r.status] || { label: r.status, color: "default" };
         return <Chip size="small" label={s.label} color={s.color} />;
       },
     },
     {
-      field: "cotizacion", headerName: "Cotización", align: "center",
+      field: "cotizacion", headerName: "Cotización", nowrap: true, hideBelow: "lg",
       renderCell: (r) =>
         r.cotizacion?._id ? (
           <Tooltip title="Abrir cotización ligada">
@@ -124,9 +120,9 @@ export default function ReportesPage() {
           </Tooltip>
         ) : "—",
     },
-    { field: "ordenCompra", headerName: "OC / Factura", renderCell: (r) => r.ordenCompra || r.factura || "—" },
+    { field: "ordenCompra", headerName: "OC / Factura", nowrap: true, hideBelow: "xl", renderCell: (r) => r.ordenCompra || r.factura || "—" },
     {
-      field: "equipos", headerName: "Equipos", align: "center",
+      field: "equipos", headerName: "Equipos", align: "center", nowrap: true, hideBelow: "md",
       renderCell: (r) => (
         <Tooltip title="En proceso / total de asignaciones">
           <span>{(r.cantidadEnProceso ?? 0)} / {(r.numEquipos ?? 0)}</span>
@@ -134,20 +130,13 @@ export default function ReportesPage() {
       ),
     },
     {
-      field: "acciones", headerName: "Acciones", align: "center",
+      field: "acciones", headerName: "Acciones", align: "center", nowrap: true,
       renderCell: (r) => (
-        <Box sx={{ display: "flex", justifyContent: "center" }}>
-          <Tooltip title="Ver reporte">
-            <IconButton size="small" onClick={() => navigate(`/reportes/${r._id}`)}>
-              <VisibilityOutlinedIcon fontSize="small" sx={{ color: "secondary.main" }} />
-            </IconButton>
-          </Tooltip>
-          <Tooltip title="Descargar Reporte de Servicio (PDF)">
-            <IconButton size="small" onClick={() => window.open(`/informe/reporte/${r._id}`, "_blank")}>
-              <PictureAsPdfOutlinedIcon fontSize="small" sx={{ color: "error.main" }} />
-            </IconButton>
-          </Tooltip>
-        </Box>
+        <Tooltip title="Descargar Reporte de Servicio (PDF)">
+          <IconButton size="small" onClick={() => window.open(`/informe/reporte/${r._id}`, "_blank")}>
+            <PictureAsPdfOutlinedIcon fontSize="small" sx={{ color: "error.main" }} />
+          </IconButton>
+        </Tooltip>
       ),
     },
   ];
@@ -216,14 +205,20 @@ export default function ReportesPage() {
         onPageChange={setPage}
         onRowsPerPageChange={(n) => { setRowsPerPage(n); setPage(0); }}
         emptyText="Sin reportes todavía"
+        onRowClick={(r) => navigate(`/reportes/${r._id}`)}
       />
 
-      <NuevoReporteDialog open={nuevoOpen} onClose={() => setNuevoOpen(false)} onDone={(r) => { setNuevoOpen(false); cargar(); if (r?._id) navigate(`/reportes/${r._id}`); }} />
+      <NuevoReporteDialog
+        open={nuevoOpen} prefill={prefillReporte}
+        onClose={() => { setNuevoOpen(false); setPrefillReporte(null); setSearchParams({}, { replace: true }); }}
+        onDone={(r) => { setNuevoOpen(false); setPrefillReporte(null); setSearchParams({}, { replace: true }); cargar(); if (r?._id) navigate(`/reportes/${r._id}`); }}
+      />
     </Box>
   );
 }
 
-function NuevoReporteDialog({ open, onClose, onDone }) {
+function NuevoReporteDialog({ open, onClose, onDone, prefill }) {
+  const cotizacionPendienteRef = useRef(null);
   const [clientes, setClientes] = useState([]);
   const [cliente, setCliente] = useState("");
   const [contactos, setContactos] = useState([]);
@@ -236,21 +231,43 @@ function NuevoReporteDialog({ open, onClose, onDone }) {
   const [saving, setSaving] = useState(false);
   const [nuevoContacto, setNuevoContacto] = useState(null); // { nombre, telefono, correo } | null
 
+  // Al elegir una cotización se traen sola su OC y su contacto (no se teclean de nuevo).
+  const elegirCotizacion = (c, forzar = false) => {
+    setCotizacion(c?._id || "");
+    if (!c) return;
+    if (forzar || !oc) setOc(c.ordenCompra || "");
+    const contactoId = c.contacto?._id || c.contacto;
+    if (contactoId && (forzar || !contacto)) setContacto(contactoId);
+  };
+
   useEffect(() => {
     if (!open) return;
-    setCliente(""); setOc(""); setObs(""); setError(""); setNuevoContacto(null);
+    setCliente(prefill?.cliente || ""); setOc(""); setObs(""); setError(""); setNuevoContacto(null);
+    cotizacionPendienteRef.current = prefill?.cotizacion || null;
     setContactos([]); setContacto(""); setCotizaciones([]); setCotizacion("");
     listarClientes({ pageSize: 200 }).then(({ items }) => setClientes(items)).catch(() => {});
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
 
   useEffect(() => {
-    setContacto(""); setCotizacion(""); setNuevoContacto(null);
+    const pendiente = cotizacionPendienteRef.current;
+    if (!pendiente) { setContacto(""); setCotizacion(""); }
+    setNuevoContacto(null);
     if (!cliente) { setContactos([]); setCotizaciones([]); return; }
     listarContactos(cliente).then(setContactos).catch(() => setContactos([]));
     listarCotizaciones({ clienteId: cliente, pageSize: 100 })
-      .then(({ items }) => setCotizaciones(items))
+      .then(({ items }) => {
+        setCotizaciones(items);
+        if (pendiente) {
+          cotizacionPendienteRef.current = null;
+          const c = items.find((x) => x._id === pendiente);
+          if (c) elegirCotizacion(c, true);
+        }
+      })
       .catch(() => setCotizaciones([]));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [cliente]);
+
 
   const agregarContacto = async () => {
     if (!nuevoContacto?.nombre?.trim()) { setError("Escribe el nombre del contacto."); return; }
@@ -290,6 +307,7 @@ function NuevoReporteDialog({ open, onClose, onDone }) {
           <TextField select fullWidth size="small" label="Cliente" value={cliente} onChange={(e) => setCliente(e.target.value)}>
             {clientes.map((c) => <MenuItem key={c._id} value={c._id}>{c.nombre}</MenuItem>)}
           </TextField>
+          <AvisoDeuda clienteId={cliente} />
           <Box>
             <TextField
               select fullWidth size="small" label="Contacto (opcional)" value={contacto}
@@ -320,7 +338,7 @@ function NuevoReporteDialog({ open, onClose, onDone }) {
           </Box>
           <TextField
             select fullWidth size="small" label="Cotización (opcional)" value={cotizacion}
-            onChange={(e) => setCotizacion(e.target.value)} disabled={!cliente}
+            onChange={(e) => elegirCotizacion(cotizaciones.find((c) => c._id === e.target.value))} disabled={!cliente}
             helperText={cliente && cotizaciones.length === 0 ? "Este cliente no tiene cotizaciones registradas" : ""}
           >
             <MenuItem value="">— Sin especificar —</MenuItem>

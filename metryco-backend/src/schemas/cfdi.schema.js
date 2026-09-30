@@ -19,6 +19,7 @@ const conceptoSchema = z.object({
   valorUnitario: z.coerce.number().min(0, "El valor unitario no puede ser negativo"),
   descuento: z.coerce.number().min(0).optional(),
   objetoImpuesto: z.enum(["01", "02", "03"]).optional(),
+  partidaCotizacion: z.number().int().min(0).optional(),
   impuestos: z.array(impuestoSchema).optional(),
 });
 

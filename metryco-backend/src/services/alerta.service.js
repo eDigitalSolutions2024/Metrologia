@@ -1,5 +1,7 @@
 const Cotizacion = require("../models/Cotizacion");
 const Factura = require("../models/Factura");
+const ComprobanteFiscal = require("../models/ComprobanteFiscal");
+const { saldoDe } = require("../utils/saldoFactura");
 const patronService = require("./patron.service");
 const certificadoService = require("./certificado.service");
 const asignacionService = require("./asignacion.service");
@@ -7,6 +9,7 @@ const asignacionService = require("./asignacion.service");
 const DIAS_SIN_SEGUIMIENTO = 3; // pendiente sin moverse en X días
 const DIAS_RECIENTE = 7; // ventana para "recién rechazada/aprobada"
 const DIAS_POR_VENCER = 30;
+const DIAS_FACTURA_POR_VENCER = 7; // cuentas por cobrar que vencen en la próxima semana
 
 function fmt(fecha) {
   return fecha ? new Date(fecha).toLocaleDateString("es-MX") : "";
@@ -119,7 +122,45 @@ async function obtener(reqUser) {
     grupos.push(grupo(
       "facturas_atrasadas", "Facturas atrasadas por cobrar", "factura", "error", "/cobranza",
       facturasAtrasadas,
-      (f) => ({ id: f._id, texto: `${f.folio} — ${f.cliente?.nombre || "Cliente"}`, detalle: `${diasDesde(f.fechaPago)} días de atraso` })
+      (f) => ({ id: f._id, texto: `${f.folio} — ${f.cliente?.nombre || "Cliente"}`, detalle: `${diasDesde(f.fechaPago)} días de atraso · debe ${saldoDe(f).toLocaleString("es-MX", { style: "currency", currency: "MXN" })}` })
+    ));
+
+    const enSemana = new Date(Date.now() + DIAS_FACTURA_POR_VENCER * 86400000);
+    const facturasPorVencer = await Factura.find({ statusPago: 0, fechaPago: { $gte: new Date(), $lte: enSemana } })
+      .populate("cliente", "nombre")
+      .sort({ fechaPago: 1 })
+      .lean();
+    grupos.push(grupo(
+      "facturas_por_vencer", "Facturas por vencer (7 días)", "factura", "warning", "/cobranza",
+      facturasPorVencer,
+      (f) => ({ id: f._id, texto: `${f.folio} — ${f.cliente?.nombre || "Cliente"}`, detalle: `vence en ${diasHasta(f.fechaPago)} días · debe ${saldoDe(f).toLocaleString("es-MX", { style: "currency", currency: "MXN" })}` })
+    ));
+
+    // Facturación electrónica: lo que necesita atención humana (no se resuelve solo).
+    const cfdiConError = await ComprobanteFiscal.find({ estado: "error_timbrado" })
+      .populate("cliente", "nombre").sort({ updatedAt: -1 }).lean();
+    grupos.push(grupo(
+      "cfdi_error", "CFDI con error de timbrado", "cfdi", "error", "/facturacion",
+      cfdiConError,
+      (f) => ({
+        id: f._id, ruta: `/facturacion?cfdi=${f._id}`,
+        texto: `${f.folioInterno} — ${f.cliente?.nombre || "Cliente"}`,
+        detalle: (f.errorTimbrado?.mensaje || "Falló el timbrado").slice(0, 90),
+      })
+    ));
+
+    const cfdiCancelando = await ComprobanteFiscal.find({ estado: { $in: ["cancelacion_en_proceso", "cancelacion_pendiente"] } })
+      .populate("cliente", "nombre").sort({ updatedAt: 1 }).lean();
+    grupos.push(grupo(
+      "cfdi_cancelaciones", "CFDI con cancelación por confirmar", "cfdi", "warning", "/facturacion",
+      cfdiCancelando,
+      (f) => ({
+        id: f._id, ruta: `/facturacion?cfdi=${f._id}`,
+        texto: `${f.folioInterno} — ${f.cliente?.nombre || "Cliente"}`,
+        detalle: f.estado === "cancelacion_en_proceso"
+          ? "el PAC la tiene en cola: confirma en el SAT y aquí"
+          : `espera la respuesta del receptor${f.cancelacion?.fechaLimiteRespuesta ? ` (hasta ${fmt(f.cancelacion.fechaLimiteRespuesta)})` : ""}`,
+      })
     ));
 
     const calidad = await asignacionService.listarParaCalidad({});

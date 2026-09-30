@@ -9,7 +9,7 @@ import DeleteOutlineIcon from "@mui/icons-material/DeleteOutlined";
 import AppButton from "../../shared/components/AppButton";
 import { listarMagnitudes, listarModelos, listarCalculos, crearCalculo, reemplazarCalculosPorAsignacion } from "../../services/incertidumbre";
 import { obtenerPerformance } from "../../services/performance";
-import { cambiarEstadoAsignacion, actualizarAsignacion } from "../../services/reportes";
+import { cambiarEstadoAsignacion, actualizarAsignacion, obtenerServicioPrevio } from "../../services/reportes";
 import { obtenerLaboratorio } from "../../services/configuracion";
 
 const RAZONES_SERVICIO = ["Calibración", "Revisión", "Reparación", "Verificación"];
@@ -58,6 +58,7 @@ export default function CapturarCalibracionDialog({ open, asignacion, onClose, o
   const [razon, setRazon] = useState("Calibración");
   const [tipoServicio, setTipoServicio] = useState("");
   const [procedimiento, setProcedimiento] = useState("");
+  const [procedimientoPrevio, setProcedimientoPrevio] = useState(null); // de dónde se copió, si se copió
   const [temperatura, setTemperatura] = useState("");
   const [humedad, setHumedad] = useState("");
   const [comentarios, setComentarios] = useState("");
@@ -93,6 +94,13 @@ export default function CapturarCalibracionDialog({ open, asignacion, onClose, o
     // asignación, se precargan; si no, defaults razonables.
     setRazon(asignacion.servicio?.razon || "Calibración");
     setProcedimiento(asignacion.servicio?.procedimiento || "");
+    setProcedimientoPrevio(null);
+    if (!asignacion.servicio?.procedimiento) {
+      // Mismo equipo, calibración anterior: el procedimiento casi siempre es el mismo.
+      obtenerServicioPrevio(asignacion._id)
+        .then((p) => { if (p?.servicio?.procedimiento) { setProcedimiento(p.servicio.procedimiento); setProcedimientoPrevio(p.desde || "la calibración anterior"); } })
+        .catch(() => {});
+    }
     setTemperatura(asignacion.condiciones?.temperatura ?? "");
     setHumedad(asignacion.condiciones?.humedad ?? "");
     setComentarios(asignacion.comentarios || "");
@@ -308,7 +316,10 @@ export default function CapturarCalibracionDialog({ open, asignacion, onClose, o
             <TextField select size="small" label="Tipo de servicio" value={tipoServicio} onChange={(e) => setTipoServicio(e.target.value)}>
               {TIPOS_SERVICIO.map((t) => <MenuItem key={t} value={t}>{t}</MenuItem>)}
             </TextField>
-            <TextField size="small" label="Procedimiento" placeholder="PRO-CAL-023" value={procedimiento} onChange={(e) => setProcedimiento(e.target.value)} />
+            <TextField
+              size="small" label="Procedimiento" placeholder="PRO-CAL-023" value={procedimiento} onChange={(e) => setProcedimiento(e.target.value)}
+              helperText={procedimientoPrevio ? `Copiado de ${procedimientoPrevio} (mismo equipo) — puedes cambiarlo` : undefined}
+            />
             <TextField size="small" type="number" label="Temperatura (°C)" value={temperatura} onChange={(e) => setTemperatura(e.target.value)} />
             <TextField size="small" type="number" label="Humedad (% HR)" value={humedad} onChange={(e) => setHumedad(e.target.value)} />
           </Box>

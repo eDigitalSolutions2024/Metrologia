@@ -13,6 +13,7 @@ router.use(auth, requireRole("admin", "coordinador", "ventas"));
 
 router.get("/", clienteController.listar);
 router.get("/:id", clienteController.obtener);
+router.get("/:id/resumen", clienteController.resumen);
 router.post("/", validate(crearClienteSchema), clienteController.crear);
 router.put("/:id", validate(actualizarClienteSchema), clienteController.actualizar);
 router.delete("/:id", requireRole("admin", "coordinador"), clienteController.eliminar);

@@ -66,6 +66,9 @@ const conceptoSchema = new Schema(
     importe: { type: Number, required: true, min: 0 },
     descuento: { type: Number, default: 0, min: 0 },
     objetoImpuesto: { type: String, enum: OBJETOS_IMPUESTO, default: "02" },
+    // Índice (0, 1, 2…) de la partida de la cotización de la que viene este concepto — permite facturar
+    // una cotización por partes y saber qué falta (ver cotizacionFacturacion.js).
+    partidaCotizacion: { type: Number, min: 0 },
     impuestos: [impuestoSchema],
   },
   { _id: false }

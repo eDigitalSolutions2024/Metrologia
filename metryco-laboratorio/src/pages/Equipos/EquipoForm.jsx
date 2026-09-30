@@ -78,6 +78,7 @@ export default function EquipoForm() {
           costo: e.costo, moneda: e.moneda, comentarios: e.comentarios,
           localizacion: e.localizacion, unidades: e.unidades, divMinima: e.divisionMinima,
           rango: e.rango, rangoUso: e.rangoUso, rangoCalibracion: e.rangoCalibracion,
+          intervaloCalibracionMeses: e.intervaloCalibracionMeses ?? "",
           patrones: (e.patronesSugeridos || []).map((p) => p._id ?? p),
         });
       })
@@ -98,6 +99,7 @@ export default function EquipoForm() {
       rango: data.rango,
       rangoUso: data.rangoUso || data.rango,
       rangoCalibracion: data.rangoCalibracion || data.rango,
+      intervaloCalibracionMeses: data.intervaloCalibracionMeses ? Number(data.intervaloCalibracionMeses) : undefined,
       patronesSugeridos: data.patrones,
     };
     // El técnico no ve Costo/Moneda — no se manda el campo, así no se corre
@@ -252,6 +254,13 @@ export default function EquipoForm() {
             </Grid>
             <Grid size={{ xs: 12, md: 6 }}>
               <AppInput label="Rango de Calibración" helperText="Si se deja vacío, se usa el mismo Rango" {...register("rangoCalibracion")} />
+            </Grid>
+            <Grid size={{ xs: 12, md: 6 }}>
+              <AppInput
+                label="Intervalo de calibración (meses)" type="number" inputProps={{ min: 1, max: 60 }}
+                helperText="Con esto el certificado propone su vigencia. Vacío = 12 meses"
+                {...register("intervaloCalibracionMeses")}
+              />
             </Grid>
           </Grid>
         </AppCard>

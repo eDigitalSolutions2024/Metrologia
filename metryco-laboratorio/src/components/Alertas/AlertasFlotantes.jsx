@@ -15,6 +15,7 @@ import StraightenOutlinedIcon from "@mui/icons-material/StraightenOutlined";
 import ScienceOutlinedIcon from "@mui/icons-material/ScienceOutlined";
 import FactCheckOutlinedIcon from "@mui/icons-material/FactCheckOutlined";
 import PaymentsOutlinedIcon from "@mui/icons-material/PaymentsOutlined";
+import ReceiptLongOutlinedIcon from "@mui/icons-material/ReceiptLongOutlined";
 import AdminPanelSettingsOutlinedIcon from "@mui/icons-material/AdminPanelSettingsOutlined";
 import SupervisorAccountOutlinedIcon from "@mui/icons-material/SupervisorAccountOutlined";
 import StorefrontOutlinedIcon from "@mui/icons-material/StorefrontOutlined";
@@ -36,6 +37,7 @@ const ICONOS = {
   calidad: ScienceOutlinedIcon,
   asignacion: FactCheckOutlinedIcon,
   factura: PaymentsOutlinedIcon,
+  cfdi: ReceiptLongOutlinedIcon,
 };
 
 // Mismo criterio de color por rol que ya usa Administración → Roles del Menú

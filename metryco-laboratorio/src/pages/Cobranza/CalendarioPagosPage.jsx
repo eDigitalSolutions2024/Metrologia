@@ -137,7 +137,7 @@ export default function CalendarioPagosPage() {
                   <Chip label={r.statusPago === 1 ? "Pagado" : "Pendiente"} color={r.statusPago === 1 ? "success" : "warning"} size="small" />
                 </Box>
                 <Typography variant="caption" color="text.secondary" sx={{ display: "block" }}>
-                  Factura: {r.folio} · Monto: {formatCurrency(r.monto)} · C/R: {formatDate(r.fechaCr)}
+                  Factura: {r.folio} · Monto: {formatCurrency(r.monto)}{r.statusPago === 0 && r.cobrado > 0 ? ` · Saldo: ${formatCurrency(r.saldo)}` : ""} · C/R: {formatDate(r.fechaCr)}
                 </Typography>
                 {r.comentarios && <Typography variant="caption">{r.comentarios}</Typography>}
               </Box>

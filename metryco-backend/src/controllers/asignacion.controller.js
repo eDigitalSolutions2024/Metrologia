@@ -14,6 +14,10 @@ const calidad = asyncHandler(async (req, res) => {
   res.json({ success: true, data: await service.listarParaCalidad({ clienteId }) });
 });
 
+const servicioPrevio = asyncHandler(async (req, res) => {
+  res.json({ success: true, data: await service.servicioPrevio(req.params.id) });
+});
+
 const obtener = asyncHandler(async (req, res) => {
   res.json({ success: true, data: await service.obtener(req.params.id) });
 });
@@ -44,4 +48,4 @@ const descargarGrafica = asyncHandler(async (req, res) => {
   res.download(ruta, nombre);
 });
 
-module.exports = { listar, calidad, obtener, crear, actualizar, cambiarEstado, eliminar, subirGrafica, descargarGrafica };
+module.exports = { listar, calidad, obtener, crear, actualizar, cambiarEstado, eliminar, subirGrafica, descargarGrafica, servicioPrevio };
