@@ -32,6 +32,11 @@ export async function desactivarUsuario(id) {
   return data.data;
 }
 
+export async function reactivarUsuario(id) {
+  const { data } = await api.patch(`${ENDPOINTS.USUARIOS}/${id}/reactivar`);
+  return data.data;
+}
+
 export async function eliminarUsuario(id) {
   const { data } = await api.delete(`${ENDPOINTS.USUARIOS}/${id}/permanente`);
   return data.data;
@@ -44,5 +49,20 @@ export async function agregarObservacion(id, texto) {
 
 export async function eliminarObservacion(id, observacionId) {
   const { data } = await api.delete(`${ENDPOINTS.USUARIOS}/${id}/observaciones/${observacionId}`);
+  return data.data;
+}
+
+// Firma digital del usuario (aparece en los certificados que revisa/autoriza).
+export async function subirFirmaUsuario(id, archivo) {
+  const form = new FormData();
+  form.append("archivo", archivo);
+  const { data } = await api.post(`${ENDPOINTS.USUARIOS}/${id}/firma`, form, {
+    headers: { "Content-Type": "multipart/form-data" },
+  });
+  return data.data;
+}
+
+export async function eliminarFirmaUsuario(id) {
+  const { data } = await api.delete(`${ENDPOINTS.USUARIOS}/${id}/firma`);
   return data.data;
 }

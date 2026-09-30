@@ -1,6 +1,11 @@
 const asyncHandler = require("../utils/asyncHandler");
 const cotizacionService = require("../services/cotizacion.service");
 
+const siguienteOrdenCompra = asyncHandler(async (req, res) => {
+  const ordenCompra = await cotizacionService.siguienteOrdenCompra(req.query.cliente);
+  res.json({ success: true, data: { ordenCompra } });
+});
+
 const listar = asyncHandler(async (req, res) => {
   const { search = "", status = "todos", mes = "", anio = "", clienteId = "", page = 0, pageSize = 10 } = req.query;
   const { items, total } = await cotizacionService.listar({
@@ -35,4 +40,24 @@ const eliminar = asyncHandler(async (req, res) => {
   res.json({ success: true });
 });
 
-module.exports = { listar, obtener, crear, actualizar, eliminar };
+const paraImprimir = asyncHandler(async (req, res) => {
+  res.json({ success: true, data: await cotizacionService.paraImprimir(req.params.id) });
+});
+
+const subirAdjunto = asyncHandler(async (req, res) => {
+  res.json({ success: true, data: await cotizacionService.subirAdjunto(req.params.id, req.file, req.user?.id) });
+});
+
+const descargarAdjunto = asyncHandler(async (req, res) => {
+  const { ruta, nombre } = await cotizacionService.archivoAdjuntoStream(req.params.id, req.params.adjuntoId);
+  res.download(ruta, nombre);
+});
+
+const eliminarAdjunto = asyncHandler(async (req, res) => {
+  res.json({ success: true, data: await cotizacionService.eliminarAdjunto(req.params.id, req.params.adjuntoId) });
+});
+
+module.exports = {
+  listar, obtener, crear, actualizar, eliminar, paraImprimir,
+  subirAdjunto, descargarAdjunto, eliminarAdjunto, siguienteOrdenCompra,
+};

@@ -12,6 +12,8 @@ const usuarioSchema = new Schema(
     rol: { type: String, enum: ROLES, required: true },
     sucursal: { type: String, enum: SUCURSALES },
     firmaUrl: { type: String },
+    fotoUrl: { type: String },
+    avatarColor: { type: String }, // preset de color para el avatar cuando no hay foto subida
     status: { type: String, enum: ["activo", "inactivo"], default: "activo" },
     observaciones: [
       {

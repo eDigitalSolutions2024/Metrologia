@@ -1,154 +1,180 @@
 /*
 ========================================================
+METROLOGÍA ERP · configuración del menú lateral
 
-METRYCO ERP
+El Sidebar lee este archivo. Estructura: grupos con
+un rótulo de sección y sus ítems (con o sin hijos).
 
-Archivo:
-menuConfig.js
+`roles`: qué roles ven ese ítem/hijo POR DEFECTO. Basado en los niveles
+0/1/2 del sistema PHP original (index.php): 0=admin ve todo,
+1=técnico (Reportes-consultar, Equipo, Calibraciones), 2=ventas
+(Clientes, Cotización, Reportes-consultar, Equipo básico,
+Cobranza-solo-consultar). "coordinador" no existe en el legacy
+(solo nivel 0 veía Calidad) — se definió como "admin menos
+Administración" (decisión 2026-08-28). Omitir `roles` = visible
+para todos los roles autenticados.
 
-Descripción:
-
-Aquí vive toda la configuración del menú lateral.
-
-El Sidebar leerá este archivo para construir
-automáticamente el menú.
-
+Desde 2026-08-29 estos valores son solo el DEFAULT: un admin puede
+sobreescribirlos en vivo desde Administración → Roles del Menú (se
+guardan en Mongo, ver services/configuracion.js). La sección
+"Administración" queda excluida de esa pantalla a propósito — siempre
+es admin-only, para que nadie pueda bloquearse a sí mismo el acceso.
 ========================================================
 */
+import SpaceDashboardOutlinedIcon from "@mui/icons-material/SpaceDashboardOutlined";
+import ReceiptLongOutlinedIcon from "@mui/icons-material/ReceiptLongOutlined";
+import FactCheckOutlinedIcon from "@mui/icons-material/FactCheckOutlined";
+import ScienceOutlinedIcon from "@mui/icons-material/ScienceOutlined";
+import PrecisionManufacturingOutlinedIcon from "@mui/icons-material/PrecisionManufacturingOutlined";
+import SpeedOutlinedIcon from "@mui/icons-material/SpeedOutlined";
+import CalendarMonthOutlinedIcon from "@mui/icons-material/CalendarMonthOutlined";
+import GroupsOutlinedIcon from "@mui/icons-material/GroupsOutlined";
+import RequestQuoteOutlinedIcon from "@mui/icons-material/RequestQuoteOutlined";
+import PaymentsOutlinedIcon from "@mui/icons-material/PaymentsOutlined";
+import AdminPanelSettingsOutlinedIcon from "@mui/icons-material/AdminPanelSettingsOutlined";
 
-import DashboardIcon from "@mui/icons-material/Dashboard";
-import AdminPanelSettingsIcon from "@mui/icons-material/AdminPanelSettings";
-import GroupsIcon from "@mui/icons-material/Groups";
-import DescriptionIcon from "@mui/icons-material/Description";
-import FactCheckIcon from "@mui/icons-material/FactCheck";
-import ScienceIcon from "@mui/icons-material/Science";
-import PrecisionManufacturingIcon from "@mui/icons-material/PrecisionManufacturing";
-import CalendarMonthIcon from "@mui/icons-material/CalendarMonth";
-import PaymentsIcon from "@mui/icons-material/Payments";
+export const ROLES = ["admin", "coordinador", "ventas", "tecnico"];
+export const ROL_LABELS = { admin: "Admin", coordinador: "Coordinador", ventas: "Ventas", tecnico: "Técnico" };
+
+const ADMIN_COORD = ["admin", "coordinador"];
+const ADMIN_COORD_VENTAS = ["admin", "coordinador", "ventas"];
+const ADMIN_COORD_TECNICO = ["admin", "coordinador", "tecnico"];
+const TODOS = ["admin", "coordinador", "ventas", "tecnico"];
 
 const menu = [
-
-    {
-        title: "Dashboard",
-        icon: DashboardIcon,
-        path: "/"
-    },
-
-    {
-        title: "Administración",
-        icon: AdminPanelSettingsIcon,
-        children: [
-            {
-                title: "Usuarios",
-                path: "/usuarios"
-            },
-            {
-                title: "General",
-                path: "/general"
-            }
-        ]
-    },
-
-    {
-        title: "Clientes",
-        icon: GroupsIcon,
-        children: [
-            {
-                title: "Nuevo Cliente",
-                path: "/clientes/nuevo"
-            },
-            {
-                title: "Consultar Clientes",
-                path: "/clientes"
-            }
-        ]
-    },
-
-    {
-        title: "Cotizaciones",
-        icon: DescriptionIcon,
-        path: "/cotizaciones"
-    },
-
-    {
+  {
+    section: "Principal",
+    items: [{ title: "Dashboard", icon: SpaceDashboardOutlinedIcon, path: "/", roles: TODOS }],
+  },
+  {
+    section: "Operación",
+    items: [
+      {
         title: "Reportes",
-        icon: FactCheckIcon,
+        icon: FactCheckOutlinedIcon,
+        roles: TODOS,
         children: [
-            {
-                title: "Consultar",
-                path: "/reportes"
-            },
-            {
-                title: "Exportar",
-                path: "/reportes/exportar"
-            }
-        ]
-    },
-
-    {
+          { title: "Consultar", path: "/reportes", roles: TODOS },
+          { title: "Mis Asignaciones", path: "/reportes/mis-asignaciones", roles: ADMIN_COORD_TECNICO },
+          { title: "Certificados", path: "/reportes/certificados", roles: ADMIN_COORD },
+          { title: "Exportar", path: "/reportes/exportar", roles: ADMIN_COORD_VENTAS },
+        ],
+      },
+      {
         title: "Calidad",
-        icon: ScienceIcon,
-        children: [
-            {
-                title: "Consultar",
-                path: "/calidad"
-            }
-        ]
-    },
-
-    {
+        icon: ScienceOutlinedIcon,
+        roles: ADMIN_COORD,
+        children: [{ title: "Consultar", path: "/calidad", roles: ADMIN_COORD }],
+      },
+      {
         title: "Equipos",
-        icon: PrecisionManufacturingIcon,
+        icon: PrecisionManufacturingOutlinedIcon,
+        roles: TODOS,
         children: [
-            {
-                title: "Alta de Equipo",
-                path: "/equipos/nuevo"
-            },
-            {
-                title: "Consultar Equipos",
-                path: "/equipos"
-            },
-            {
-                title: "Historial Certificados",
-                path: "/equipos/historial-certificados"
-            },
-            {
-                title: "Alta de Patrón",
-                path: "/equipos/patrones/nuevo"
-            },
-            {
-                title: "Consultar Patrones",
-                path: "/equipos/patrones"
-            }
-        ]
-    },
-
-    {
+          { title: "Alta de Equipo", path: "/equipos/nuevo", roles: TODOS },
+          { title: "Consultar Equipos", path: "/equipos", roles: TODOS },
+          { title: "Historial Certificados", path: "/equipos/historial-certificados", roles: ADMIN_COORD_TECNICO },
+          { title: "Alta de Patrón", path: "/equipos/patrones/nuevo", roles: ADMIN_COORD },
+          { title: "Consultar Patrones", path: "/equipos/patrones", roles: ADMIN_COORD_TECNICO },
+        ],
+      },
+      {
+        // La calibración en sí (capturar lecturas, tolerancia e incertidumbre)
+        // ya se hace desde "Iniciar calibración" en el detalle del Reporte.
+        // Aquí solo viven los catálogos que alimentan ese flujo y la pantalla
+        // avanzada de incertidumbre para ajustes finos / cálculos sueltos.
+        title: "Calibración",
+        icon: SpeedOutlinedIcon,
+        roles: ADMIN_COORD_TECNICO,
+        children: [
+          { title: "Plantillas de Tolerancia", path: "/performance", roles: ADMIN_COORD_TECNICO },
+          { title: "Plantillas de Incertidumbre", path: "/incertidumbre/plantillas", roles: ADMIN_COORD },
+          { title: "Análisis de Incertidumbre", path: "/incertidumbre", roles: ADMIN_COORD_TECNICO },
+        ],
+      },
+      {
         title: "Actividades",
-        icon: CalendarMonthIcon,
+        icon: CalendarMonthOutlinedIcon,
+        roles: ADMIN_COORD,
+        children: [{ title: "Calendario", path: "/actividades", roles: ADMIN_COORD }],
+      },
+    ],
+  },
+  {
+    section: "Comercial",
+    items: [
+      {
+        title: "Clientes",
+        icon: GroupsOutlinedIcon,
+        roles: ADMIN_COORD_VENTAS,
         children: [
-            {
-                title: "Calendario",
-                path: "/actividades"
-            }
-        ]
-    },
-
-    {
+          { title: "Nuevo Cliente", path: "/clientes/nuevo", roles: ADMIN_COORD_VENTAS },
+          { title: "Consultar Clientes", path: "/clientes", roles: ADMIN_COORD_VENTAS },
+        ],
+      },
+      { title: "Cotizaciones", icon: RequestQuoteOutlinedIcon, path: "/cotizaciones", roles: ADMIN_COORD_VENTAS },
+      {
         title: "Cuentas por Cobrar",
-        icon: PaymentsIcon,
+        icon: PaymentsOutlinedIcon,
+        roles: ADMIN_COORD_VENTAS,
         children: [
-            {
-                title: "Administrar Pagos",
-                path: "/cobranza"
-            },
-            {
-                title: "Consultar Calendario",
-                path: "/cobranza/calendario"
-            }
-        ]
-    }
-
+          { title: "Administrar Pagos", path: "/cobranza", roles: ADMIN_COORD },
+          { title: "Consultar Calendario", path: "/cobranza/calendario", roles: ADMIN_COORD_VENTAS },
+        ],
+      },
+      // Distinto de "Cuentas por Cobrar": ahí se controla el cobro, aquí se
+      // genera el comprobante fiscal (CFDI) formal. Requiere un PAC
+      // configurado para timbrar de verdad (ver services/pac/pac.config.js).
+      { title: "Facturación (CFDI)", icon: ReceiptLongOutlinedIcon, path: "/facturacion", roles: ADMIN_COORD },
+    ],
+  },
+  {
+    // "Administración" NO participa en la personalización de roles — siempre
+    // admin-only, fijo en código, para que nunca se pueda bloquear el acceso
+    // a la pantalla que controla los permisos de todo lo demás.
+    section: "Sistema",
+    items: [
+      {
+        title: "Administración",
+        icon: AdminPanelSettingsOutlinedIcon,
+        roles: ["admin"],
+        children: [
+          { title: "Usuarios", path: "/usuarios", roles: ["admin"] },
+          { title: "General", path: "/general", roles: ["admin"] },
+          { title: "Roles del Menú", path: "/administracion/roles-menu", roles: ["admin"] },
+          { title: "Datos del Laboratorio", path: "/administracion/laboratorio", roles: ["admin"] },
+          { title: "Razones Sociales", path: "/administracion/razones-sociales", roles: ["admin"] },
+          { title: "Colores", path: "/administracion/colores", roles: ["admin"] },
+          { title: "Auditoría", path: "/administracion/auditoria", roles: ["admin"] },
+          { title: "WhatsApp (pruebas)", path: "/administracion/whatsapp-pruebas", roles: ["admin"] },
+        ],
+      },
+    ],
+  },
 ];
+
+/** Key estable por ítem: su ruta si la tiene, si no su título. */
+export function menuKey(item) {
+  return item.path || item.title;
+}
+
+/**
+ * Lista plana de todos los ítems personalizables (todo menos "Administración",
+ * que se excluye a propósito) — la usa la pantalla de edición de permisos.
+ * Cada fila trae {key, seccion, grupo, titulo, icon, rolesPorDefecto}.
+ */
+export function itemsPersonalizables() {
+  const filas = [];
+  for (const grupo of menu) {
+    if (grupo.section === "Sistema") continue;
+    for (const item of grupo.items) {
+      filas.push({ key: menuKey(item), seccion: grupo.section, grupo: null, titulo: item.title, icon: item.icon, rolesPorDefecto: item.roles || ROLES });
+      for (const hijo of item.children || []) {
+        filas.push({ key: menuKey(hijo), seccion: grupo.section, grupo: item.title, titulo: hijo.title, icon: null, rolesPorDefecto: hijo.roles || ROLES });
+      }
+    }
+  }
+  return filas;
+}
 
 export default menu;

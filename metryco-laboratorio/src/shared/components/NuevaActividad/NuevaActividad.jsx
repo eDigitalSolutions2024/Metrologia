@@ -12,6 +12,7 @@ import AppDatePicker from "../AppDatePicker";
 import AppTimePicker from "../AppTimePicker";
 import { crearActividad } from "../../../services/actividades";
 import { obtenerDirectorio } from "../../../services/usuarios";
+import { listarReportes } from "../../../services/reportes";
 
 function SeccionTitulo({ children }) {
   return (
@@ -28,7 +29,7 @@ const defaultValues = {
   fechaActividad: "",
   fechaLimite: "",
   tecnico: "",
-  reporteServicio: "",
+  reporte: "",
   horaInicio: "",
   horaFin: "",
   actividad: "",
@@ -39,6 +40,7 @@ export default function NuevaActividad({ open, onClose, onCreated, fechaSugerida
   const theme = useTheme();
   const [submitError, setSubmitError] = useState("");
   const [tecnicos, setTecnicos] = useState([]);
+  const [reportes, setReportes] = useState([]);
   const {
     register,
     handleSubmit,
@@ -56,6 +58,9 @@ export default function NuevaActividad({ open, onClose, onCreated, fechaSugerida
     obtenerDirectorio()
       .then((lista) => setTecnicos(lista.filter((u) => u.rol === "tecnico")))
       .catch(() => setTecnicos([]));
+    listarReportes({ pageSize: 200 })
+      .then(({ items }) => setReportes(items.filter((r) => ["recepcion", "en_proceso"].includes(r.status))))
+      .catch(() => setReportes([]));
     reset({ ...defaultValues, fechaActividad: fechaSugerida || "", fechaLimite: fechaSugerida || "" });
     setSubmitError("");
   }, [open, fechaSugerida, reset]);
@@ -92,7 +97,7 @@ export default function NuevaActividad({ open, onClose, onCreated, fechaSugerida
             <EventAvailableOutlinedIcon />
           </Box>
           <Box>
-            <Typography variant="h6" fontWeight={700} lineHeight={1.2}>Nueva Actividad</Typography>
+            <Typography variant="h6" fontWeight={700} sx={{ lineHeight: 1.2 }}>Nueva Actividad</Typography>
             <Typography variant="body2" color="text.secondary">Programa una actividad en el calendario</Typography>
           </Box>
         </Box>
@@ -148,13 +153,22 @@ export default function NuevaActividad({ open, onClose, onCreated, fechaSugerida
               </FormControl>
             </Grid>
             <Grid size={{ xs: 12, sm: 6 }}>
-              <AppInput
-                label="Reporte de servicio (folio)"
-                placeholder="Ej. RPT-2026-041"
-                helperText="Folio del reporte de servicio relacionado, si aplica"
-                error={errors.reporteServicio}
-                {...register("reporteServicio")}
-              />
+              <FormControl fullWidth size="small">
+                <InputLabel>Reporte de servicio</InputLabel>
+                <Select
+                  label="Reporte de servicio"
+                  defaultValue=""
+                  {...register("reporte")}
+                  sx={{ borderRadius: 2 }}
+                >
+                  <MenuItem value="">Sin reporte relacionado</MenuItem>
+                  {reportes.map((r) => (
+                    <MenuItem key={r._id} value={r._id}>
+                      {r.folio} — {r.cliente?.nombre || "Sin cliente"}
+                    </MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
             </Grid>
           </Grid>
 
@@ -216,7 +230,7 @@ export default function NuevaActividad({ open, onClose, onCreated, fechaSugerida
         </DialogContent>
 
         <DialogActions sx={{ px: 3, pb: 3, pt: 1 }}>
-          <AppButton variant="outlined" onClick={cerrar} sx={{ borderRadius: 2 }}>Cancelar</AppButton>
+          <AppButton type="button" variant="outlined" onClick={cerrar} sx={{ borderRadius: 2 }}>Cancelar</AppButton>
           <AppButton type="submit" loading={isSubmitting} sx={{ borderRadius: 2 }}>Guardar Actividad</AppButton>
         </DialogActions>
       </Box>

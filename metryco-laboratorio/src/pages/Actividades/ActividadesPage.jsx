@@ -1,13 +1,19 @@
 import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import {
-  Box, Typography, Paper, Grid, Button, Tooltip,
+  Box, Typography, Paper, Grid, Button, Tooltip, Chip, Avatar, Link,
 } from "@mui/material";
 import ChevronLeftIcon from "@mui/icons-material/ChevronLeft";
 import ChevronRightIcon from "@mui/icons-material/ChevronRight";
 import AddIcon from "@mui/icons-material/Add";
+import EventAvailableOutlinedIcon from "@mui/icons-material/EventAvailableOutlined";
 import AppButton from "../../shared/components/AppButton";
+import AppCard from "../../shared/components/AppCard";
+import PageHeader from "../../shared/components/PageHeader";
+import CalendarMonthOutlinedIcon from "@mui/icons-material/CalendarMonthOutlined";
 import NuevaActividad from "../../shared/components/NuevaActividad/NuevaActividad";
 import { listarActividades } from "../../services/actividades";
+import { formatDate } from "../../shared/utils/formatDate";
 
 const MESES = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
   "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"];
@@ -18,6 +24,8 @@ const STATUS_COLOR = {
   en_proceso: "#2563EB",
   completada: "#22C55E",
 };
+const STATUS_LABEL = { pendiente: "Pendiente", en_proceso: "En proceso", completada: "Completada" };
+const STATUS_CHIP_COLOR = { pendiente: "warning", en_proceso: "info", completada: "success" };
 
 function getDaysInMonth(year, month) {
   return new Date(year, month + 1, 0).getDate();
@@ -32,12 +40,14 @@ function toFecha(year, month, day) {
 }
 
 export default function ActividadesPage() {
+  const navigate = useNavigate();
   const now = new Date();
   const [year, setYear] = useState(now.getFullYear());
   const [month, setMonth] = useState(now.getMonth());
   const [actividades, setActividades] = useState([]);
   const [modalOpen, setModalOpen] = useState(false);
   const [fechaSugerida, setFechaSugerida] = useState("");
+  const [actividadSeleccionada, setActividadSeleccionada] = useState(null);
 
   const daysInMonth = getDaysInMonth(year, month);
   const firstDay = getFirstDay(year, month);
@@ -66,6 +76,10 @@ export default function ActividadesPage() {
     setModalOpen(true);
   };
 
+  const pendientes = actividades
+    .filter((a) => a.status !== "completada")
+    .sort((a, b) => new Date(a.fechaActividad) - new Date(b.fechaActividad));
+
   const eventosPorDia = actividades.reduce((acc, act) => {
     const fecha = (act.fechaActividad || "").slice(0, 10);
     (acc[fecha] ??= []).push(act);
@@ -78,14 +92,17 @@ export default function ActividadesPage() {
 
   return (
     <Box>
-      <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 3 }}>
-        <Typography variant="h5" fontWeight={700}>Calendario de Actividades</Typography>
-        <AppButton startIcon={<AddIcon />} sx={{ borderRadius: 2 }} onClick={() => abrirNueva()}>
-          Nueva Actividad
-        </AppButton>
-      </Box>
+      <PageHeader
+        icon={<CalendarMonthOutlinedIcon />}
+        title="Calendario de Actividades"
+        actions={
+          <AppButton startIcon={<AddIcon />} sx={{ borderRadius: 2 }} onClick={() => abrirNueva()}>
+            Nueva Actividad
+          </AppButton>
+        }
+      />
 
-      <Paper elevation={0} sx={{ border: 1, borderColor: "divider", borderRadius: 4, overflow: "hidden" }}>
+      <Paper elevation={0} sx={{ border: 1, borderColor: "divider", borderRadius: 2, overflow: "hidden", mb: 2.5 }}>
         <Box sx={{ borderBottom: 1, display: "flex", alignItems: "center", justifyContent: "space-between", px: 3, py: 2, borderColor: "divider" }}>
           <Button onClick={prevMonth} size="small" sx={{ minWidth: 36 }}><ChevronLeftIcon /></Button>
           <Typography variant="h6" fontWeight={700}>
@@ -158,6 +175,77 @@ export default function ActividadesPage() {
           })}
         </Grid>
       </Paper>
+
+      <AppCard
+        dense
+        title="Actividades a realizar"
+        subtitle={`${pendientes.length} pendiente(s) / en proceso este mes`}
+        icon={<EventAvailableOutlinedIcon fontSize="small" />}
+        sx={{ mb: 2.5 }}
+      >
+        {pendientes.length === 0 ? (
+          <Typography variant="body2" color="text.secondary">Sin actividades pendientes este mes.</Typography>
+        ) : (
+          <Box sx={{ display: "flex", flexDirection: "column", gap: 1 }}>
+            {pendientes.map((act) => (
+              <Box
+                key={act._id}
+                onClick={() => setActividadSeleccionada((prev) => (prev?._id === act._id ? null : act))}
+                sx={{
+                  display: "flex", alignItems: "center", gap: 1.5, p: 1.25, borderRadius: 2,
+                  border: 1,
+                  borderColor: actividadSeleccionada?._id === act._id ? "secondary.main" : "divider",
+                  cursor: "pointer",
+                  "&:hover": { bgcolor: "action.hover" },
+                }}
+              >
+                <Avatar sx={{ width: 30, height: 30, fontSize: 12, bgcolor: "secondary.main" }}>
+                  {act.tecnico?.nombre?.charAt(0) || "?"}
+                </Avatar>
+                <Box sx={{ flex: 1, minWidth: 0 }}>
+                  <Typography variant="body2" fontWeight={600} noWrap>{act.actividad}</Typography>
+                  <Typography variant="caption" color="text.secondary">
+                    {act.tecnico?.nombre || "Sin técnico"} · {formatDate(act.fechaActividad)} · {act.horaInicio}–{act.horaFin}
+                    {act.reporte?.folio ? ` · ${act.reporte.folio}` : ""}
+                  </Typography>
+                </Box>
+                <Chip size="small" label={STATUS_LABEL[act.status] || act.status} color={STATUS_CHIP_COLOR[act.status] || "default"} />
+              </Box>
+            ))}
+          </Box>
+        )}
+
+        {actividadSeleccionada && (
+          <Box
+            sx={{
+              mt: 1.5, p: 1.5, borderRadius: 2, border: 1, borderColor: "divider",
+              bgcolor: "background.default",
+            }}
+          >
+            <Typography variant="subtitle2" fontWeight={700}>{actividadSeleccionada.actividad}</Typography>
+            <Typography variant="caption" color="text.secondary" sx={{ display: "block", mb: 1 }}>
+              {actividadSeleccionada.tecnico?.nombre || "Sin técnico"} · {formatDate(actividadSeleccionada.fechaActividad)} · {actividadSeleccionada.horaInicio}–{actividadSeleccionada.horaFin}
+            </Typography>
+            <Typography variant="body2" color="text.secondary">
+              {actividadSeleccionada.comentarios || "Sin comentarios adicionales."}
+            </Typography>
+            {actividadSeleccionada.reporte && (
+              <Typography variant="body2" sx={{ mt: 1 }}>
+                Reporte:{" "}
+                <Link
+                  component="button"
+                  type="button"
+                  onClick={() => navigate(`/reportes/${actividadSeleccionada.reporte._id}`)}
+                  sx={{ fontWeight: 600 }}
+                >
+                  {actividadSeleccionada.reporte.folio}
+                  {actividadSeleccionada.reporte.cliente?.nombre ? ` — ${actividadSeleccionada.reporte.cliente.nombre}` : ""}
+                </Link>
+              </Typography>
+            )}
+          </Box>
+        )}
+      </AppCard>
 
       <Box sx={{ display: "flex", gap: 2, mt: 2, flexWrap: "wrap" }}>
         {Object.entries(STATUS_COLOR).map(([status, color]) => (

@@ -1,0 +1,254 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>Metryco Laboratorio — Resumen de cambios (27 ago 2026)</title>
+<style>
+  :root{
+    --paper:#EEF2F4; --paper-raised:#FFFFFF; --paper-sunken:#E3E9EC;
+    --ink:#16232C; --ink-soft:#4B5D6B; --ink-faint:#7C8D98;
+    --line:#C7D2D9; --line-strong:#93A6B1;
+    --accent:#0E7C86; --accent-soft:#DCEEEF; --accent-ink:#0A5A62;
+    --ok:#2F7D4F; --ok-soft:#E4F3E9;
+    --warn:#A8671A; --warn-soft:#FBEEDC;
+    --crit:#A23B2C; --crit-soft:#FBE7E3;
+    --muted:#8B98A1;
+    --font-display:"Archivo Narrow","Roboto Condensed","Arial Narrow",sans-serif;
+    --font-body:"Segoe UI","Helvetica Neue",Arial,sans-serif;
+    --font-mono:"Cascadia Code","SF Mono",Consolas,"Liberation Mono",monospace;
+  }
+  @media (prefers-color-scheme: dark){
+    :root:not([data-theme="light"]){
+      --paper:#0B141C; --paper-raised:#101C26; --paper-sunken:#0E1922;
+      --ink:#DCE7EE; --ink-soft:#93A7B4; --ink-faint:#5E7683;
+      --line:#1E313D; --line-strong:#35505F;
+      --accent:#3FC2CD; --accent-soft:#123339; --accent-ink:#8FE0E7;
+      --ok:#4FBE7C; --ok-soft:#12291C;
+      --warn:#E0A548; --warn-soft:#2E2313;
+      --crit:#E2695A; --crit-soft:#301613;
+      --muted:#6C7C86;
+    }
+  }
+  :root[data-theme="dark"]{
+    --paper:#0B141C; --paper-raised:#101C26; --paper-sunken:#0E1922;
+    --ink:#DCE7EE; --ink-soft:#93A7B4; --ink-faint:#5E7683;
+    --line:#1E313D; --line-strong:#35505F;
+    --accent:#3FC2CD; --accent-soft:#123339; --accent-ink:#8FE0E7;
+    --ok:#4FBE7C; --ok-soft:#12291C;
+    --warn:#E0A548; --warn-soft:#2E2313;
+    --crit:#E2695A; --crit-soft:#301613;
+    --muted:#6C7C86;
+  }
+  *{box-sizing:border-box;}
+  body{ margin:0; background:var(--paper); color:var(--ink); font-family:var(--font-body); line-height:1.55; }
+  .sheet{ max-width:980px; margin:0 auto; padding:2.5rem 1.5rem 5rem; }
+  h1{ font-family:var(--font-display); font-weight:700; font-size:clamp(1.6rem,3.2vw,2.2rem); margin:0 0 .3rem; }
+  .sub{ color:var(--ink-soft); font-size:.98rem; margin-bottom:.5rem; }
+  .meta{ font-family:var(--font-mono); font-size:.78rem; color:var(--ink-faint); margin-bottom:2rem; }
+  h2{ font-size:1.25rem; margin:2.4rem 0 .8rem; padding-bottom:.4rem; border-bottom:2px solid var(--line-strong); }
+  h3{ font-size:1.02rem; color:var(--ink-soft); margin:1.4rem 0 .5rem; }
+  p{ margin:.6rem 0; }
+  code{ font-family:var(--font-mono); font-size:.86em; background:var(--paper-sunken); border:1px solid var(--line); border-radius:3px; padding:.05rem .3rem; }
+  table{ width:100%; border-collapse:collapse; margin:.8rem 0 1.2rem; font-size:.92rem; }
+  th,td{ text-align:left; padding:.55rem .7rem; border:1px solid var(--line); vertical-align:top; }
+  th{ background:var(--paper-sunken); font-weight:700; }
+  .callout{ border:1px solid var(--line-strong); border-left:4px solid var(--accent); background:var(--accent-soft); border-radius:4px; padding:.9rem 1.1rem; margin:1rem 0; }
+  .callout.warn{ border-left-color:var(--warn); background:var(--warn-soft); }
+  .callout.crit{ border-left-color:var(--crit); background:var(--crit-soft); }
+  .callout.ok{ border-left-color:var(--ok); background:var(--ok-soft); }
+  .tag{ display:inline-block; font-family:var(--font-mono); font-size:.68rem; font-weight:700; letter-spacing:.02em; padding:.15rem .45rem; border-radius:3px; margin-right:.4rem; vertical-align:middle; }
+  .tag.nuevo{ background:var(--ok-soft); color:var(--ok); border:1px solid var(--ok); }
+  .tag.mod{ background:var(--accent-soft); color:var(--accent-ink); border:1px solid var(--accent); }
+  .tag.elim{ background:var(--crit-soft); color:var(--crit); border:1px solid var(--crit); }
+  .tag.hallazgo{ background:var(--warn-soft); color:var(--warn); border:1px solid var(--warn); }
+  ul{ margin:.5rem 0; padding-left:1.3rem; }
+  li{ margin:.25rem 0; }
+  footer{ margin-top:3rem; padding-top:1rem; border-top:1px solid var(--line); color:var(--ink-faint); font-size:.85rem; }
+</style>
+</head>
+<body>
+<div class="sheet">
+
+<h1>Metryco Laboratorio — Resumen de cambios</h1>
+<div class="sub">Migración PHP → React/Vite + Node/Express + MongoDB — sesiones del 24 y 27 de agosto de 2026</div>
+<div class="meta">Continúa de: Resumen-Cambios-2026-08-21.pdf</div>
+
+<p>Este documento cubre lo que se hizo después del resumen del 21 de agosto: el hallazgo sobre Reportes del 24 de agosto,
+y una sesión larga el 27 de agosto que tocó seguridad del backend, completó el módulo Actividades de punta a punta,
+y reconstruyó Calidad, Equipos/Patrones, Cobranza y Performance <strong>comparando cada uno contra el código PHP real</strong>
+en <code>sistema.metrycolab.com/v2</code> — no contra suposiciones.</p>
+
+<div class="callout warn">
+<strong>Hilo conductor de esta sesión:</strong> varios módulos que ya existían en el frontend (mock) representaban
+conceptos distintos a los del sistema real. No fue un ajuste de detalles — fue re-descubrir qué es cada módulo
+leyendo el PHP original antes de tocar código, y luego reconstruir la UI para que coincida.
+</div>
+
+<h2>1. Sesión 24 de agosto — Hallazgo sobre Reportes</h2>
+<p><span class="tag hallazgo">HALLAZGO</span> Al revisar <code>php/reportes.php</code> y <code>php/reportes_genera.php</code> se confirmó que
+"Reportes" en el PHP legacy <strong>no es un listado simple</strong> — es el "Reporte de Servicio": cabecera (cliente, contacto,
+cotización, OC, factura, status) + Asignaciones (equipo + técnico + patrón(es) + performance, con 3 estados independientes:
+calibración, entrega, certificado) + 3 PDFs distintos + portada individual por asignación. Está fuertemente acoplado a
+Equipos, Patrones y Técnicos. Se decidió no rediseñarlo hasta ver el flujo real en producción — sigue así.</p>
+
+<h2>2. Seguridad del backend</h2>
+<p>Revisión de seguridad completa sobre <code>metryco-backend</code>, con hallazgos corregidos en dos rondas.</p>
+
+<h3>Ronda 1</h3>
+<table>
+<tr><th>Problema</th><th>Corrección</th></tr>
+<tr><td>Sin rate limiting en <code>/auth/login</code> ni <code>/auth/verificar-admin</code> — fuerza bruta ilimitada</td>
+<td><span class="tag nuevo">NUEVO</span> <code>middleware/rateLimiters.js</code> — 10 intentos/15min en ambos endpoints</td></tr>
+<tr><td>Rutas de Clientes/Cotizaciones/Actividades sin control por rol para <code>DELETE</code></td>
+<td><span class="tag mod">MODIFICADO</span> <code>requireRole("admin","coordinador")</code> agregado solo a los <code>DELETE</code> de esos 3 routers</td></tr>
+<tr><td>Búsqueda por <code>$regex</code> sin escapar en Clientes/Usuarios — riesgo de ReDoS con un patrón malicioso</td>
+<td><span class="tag nuevo">NUEVO</span> <code>utils/escapeRegex.js</code>, aplicado en ambos servicios</td></tr>
+<tr><td>Sin cabeceras de seguridad HTTP, sin límite de tamaño de body</td>
+<td><span class="tag mod">MODIFICADO</span> <code>helmet()</code> + <code>express.json({ limit: "100kb" })</code> en <code>app.js</code></td></tr>
+</table>
+
+<h3>Ronda 2</h3>
+<table>
+<tr><th>Problema</th><th>Corrección</th></tr>
+<tr><td>El access token (JWT) vivía en <code>localStorage</code> — robable vía XSS</td>
+<td><span class="tag nuevo">NUEVO</span> <code>core/auth/tokenStore.js</code>: el token ahora vive solo en memoria. Al recargar la página,
+<code>AuthProvider</code> lo recupera automáticamente con <code>POST /auth/refresh</code> usando la cookie httpOnly, mostrando un loader
+mientras tanto. Solo el nombre/rol del usuario (no sensible) se sigue cacheando en <code>localStorage</code>.</td></tr>
+<tr><td><code>passwordHash</code> en el modelo <code>Cliente</code> sin endpoint de login — ¿código muerto?</td>
+<td>Verificado: no es código muerto, <code>ClienteForm.jsx</code> sí lo usa (portal de clientes a futuro). Sin cambio, queda documentado.</td></tr>
+</table>
+
+<h3>Ronda 3 — endurecimiento para producción</h3>
+<div class="callout">
+Motivado por la pregunta: "¿alguien con solo la URL puede llegar a la configuración?" — la respuesta ya era no
+(todo pasa por JWT + rol, sin endpoints de config expuestos, sin secretos en el bundle del frontend, sin source maps
+en el build de producción). Estos 3 cambios cierran huecos operativos, no de código en sí:
+</div>
+<table>
+<tr><th>Cambio</th><th>Por qué</th></tr>
+<tr><td><span class="tag mod">MODIFICADO</span> <code>config/env.js</code>: en producción, exige <code>CORS_ORIGIN</code> explícito (ya no cae en silencio a <code>localhost</code>)</td>
+<td>Si se te olvida configurarlo en el servidor real, antes la app arrancaba igual apuntando a localhost. Ahora el backend se niega a arrancar.</td></tr>
+<tr><td><span class="tag mod">MODIFICADO</span> <code>config/env.js</code>: rechaza arrancar en producción si <code>JWT_SECRET</code>/<code>JWT_REFRESH_SECRET</code> siguen siendo los placeholders de <code>.env.example</code> (<code>change-me</code>)</td>
+<td>Si alguien copia <code>.env.example</code> a producción sin cambiar el secreto, cualquiera que lea el repo público podría firmar JWT válidos y falsificar sesiones de admin.</td></tr>
+<tr><td><span class="tag nuevo">NUEVO</span> <code>apiLimiter</code> en <code>rateLimiters.js</code>: 300 requests/15min por IP en toda <code>/api/*</code> (antes solo cubría login)</td>
+<td>No impide el uso normal de la app, pero frena scraping/extracción masiva automatizada de datos.</td></tr>
+</table>
+<p>Las 3 validaciones se probaron en vivo: arranque normal en desarrollo, rechazo correcto en producción con secretos de ejemplo,
+rechazo correcto sin <code>CORS_ORIGIN</code>, arranque correcto con configuración válida.</p>
+
+<h2>3. Módulo Actividades — completado de punta a punta</h2>
+<p>Antes era un calendario con eventos hardcodeados (<code>EVENTOS</code> fijo en el componente) y un botón "Nueva Actividad" sin función.</p>
+<table>
+<tr><th>Capa</th><th>Cambio</th></tr>
+<tr><td>Backend</td><td><span class="tag nuevo">NUEVO</span> <code>models/Actividad.js</code>, <code>services/actividad.service.js</code>,
+<code>controllers/actividad.controller.js</code>, <code>routes/actividad.routes.js</code>, montado en <code>/api/actividades</code>.
+Campos: fechaActividad, fechaLimite, técnico (ref a Usuario), reporteServicio (folio libre — Reportes sigue en mock),
+horaInicio/horaFin, actividad, comentarios, status.</td></tr>
+<tr><td>Frontend</td><td><span class="tag nuevo">NUEVO</span> <code>shared/components/AppTimePicker.jsx</code> (mismo estilo que
+<code>AppDatePicker</code>) y <code>shared/components/NuevaActividad/NuevaActividad.jsx</code> — modal con validación por tipo de campo
+(fecha solo acepta fecha, hora solo acepta hora, técnico se elige de una lista real de usuarios con rol <code>tecnico</code>).</td></tr>
+<tr><td>Calendario</td><td><span class="tag mod">MODIFICADO</span> <code>ActividadesPage.jsx</code> — ya no usa datos fijos; trae las
+actividades reales del mes visible, muestra cuántas hay por día con un badge, y clic en un día abre el modal con esa fecha
+precargada.</td></tr>
+</table>
+<div class="callout ok">
+<strong>Verificado en vivo</strong> (27 ago): backend corriendo, <code>MongoDB conectado</code>, <code>GET /api/health</code> → <code>{"ok":true}</code>,
+<code>GET /api/actividades</code> sin token → <code>401</code> (correcto). El calendario usa el mismo patrón autenticado que ya usa la
+pantalla General — no hace falta ningún cambio adicional para que jale registros reales.
+</div>
+
+<h2>4. Calidad — reconstruido contra el PHP real</h2>
+<div class="callout crit">
+<strong>Hallazgo:</strong> el mock de Calidad representaba un catálogo de "documentos y manuales" que no corresponde a nada
+real. <code>php/calidad.php</code> + <code>calidad_buscar.php</code> son en realidad un <strong>flujo de aprobación de certificados</strong>:
+lista <code>asignaciones</code> pendientes o rechazadas, con acciones Autorizar / Rechazar (con motivo) / ver Historial de rechazos.
+</div>
+<table>
+<tr><th>Archivo</th><th>Cambio</th></tr>
+<tr><td><code>pages/Calidad/mockData.js</code></td><td><span class="tag mod">REESCRITO</span> de "documentos SGC" a asignaciones
+(MET, cliente, técnico, fechas, statusAsignacion, statusCalidad, historial de rechazos)</td></tr>
+<tr><td><code>pages/Calidad/CalidadPage.jsx</code></td><td><span class="tag mod">REESCRITO</span> filtro por cliente (real, vía API),
+tabla con las columnas exactas del PHP (MET, Cliente, Fecha Asignación, Fecha Captura, Técnico, ID Cliente, Editar Portada,
+Portada, Gráfica, Estatus Calidad, Acción), modal de Rechazo con motivo, modal de Historial</td></tr>
+</table>
+<p>El botón "Exportar Excel" del PHP se implementó como un <strong>modal</strong> (no una pestaña aparte) donde se elige
+"Por técnico" o "General por año" — decisión de UX consolidada a pedido explícito, en vez de replicar dos pantallas casi
+idénticas del original.</p>
+
+<h2>5. Equipos y Patrones — reconstruido contra el PHP real</h2>
+<div class="callout crit">
+<strong>Hallazgo:</strong> "Equipos" en el mock representaba equipo del laboratorio con "próxima calibración" y "status" —
+pero en <code>php/nequipo.php</code>, un Equipo <strong>pertenece a un cliente</strong> (<code>empId</code>) y no tiene esos campos;
+en cambio tiene rango de uso/calibración, unidades, división mínima, y una lista de Patrones a utilizar. El menú real de
+"Equipo" tiene <strong>5 secciones</strong>, no 3: Alta de Equipo, Consultar Equipos, Historial Certificados, Administrar Patrones,
+Consultar Patrones — más "Exportar Patrones" y "Exportar Excel Certificados"/"Vencimiento Automático" como acciones sueltas.
+</div>
+<table>
+<tr><th>Archivo</th><th>Cambio</th></tr>
+<tr><td><code>pages/Equipos/mockData.js</code></td><td><span class="tag mod">REESCRITO</span> campos reales de <code>equipo</code> y <code>patrones</code></td></tr>
+<tr><td><code>pages/Equipos/categorias.js</code></td><td><span class="tag nuevo">NUEVO</span> catálogo de categorías compartido (Presión, Fuerza, Masa... — se corrigió el typo "Partorsional" → "Par Torsional")</td></tr>
+<tr><td><code>pages/Equipos/EquiposPage.jsx</code> / <code>EquipoForm.jsx</code></td><td><span class="tag mod">REESCRITO</span> cliente real (select vía API), categoría, rangos, y multi-select de Patrones a utilizar</td></tr>
+<tr><td><code>pages/Equipos/PatronesPage.jsx</code></td><td><span class="tag mod">REESCRITO</span> columnas reales + botón Exportar Patrones (CSV)</td></tr>
+<tr><td><code>pages/Equipos/PatronForm.jsx</code></td><td><span class="tag nuevo">NUEVO</span> — no existía. 4 secciones del PHP: Información General, Verificación y Mantenimiento, Procedimiento, Transporte/Almacenamiento, con carga de certificado PDF</td></tr>
+<tr><td><code>pages/Equipos/HistorialCertificadosPage.jsx</code></td><td><span class="tag nuevo">NUEVO</span> — página completa que no existía. Filtro por Cliente o ID Planta; columnas Portada/Gráfica deshabilitadas con tooltip explicando que dependen de Asignaciones (aún no migrado); botón Exportar Excel Certificados; botón Vencimiento Automático que muestra vista previa honesta de patrones por vencer en 30 días (no finge enviar correos que no puede enviar, porque node-cron no está instalado todavía)</td></tr>
+</table>
+
+<h2>6. Cuentas por Cobrar — reconstruido contra el PHP real</h2>
+<div class="callout crit">
+<strong>Hallazgo:</strong> el mock de Cobranza tenía folio + cotización + abono + saldo parcial — concepto que no existe en el
+legacy. <code>php/calendario_generar.php</code>/<code>calendario_consultar.php</code> usan la tabla <code>events</code>: cliente + OC + folio + monto +
+fecha C/R + días de pago (15/30/60/contado), que calculan automáticamente la fecha de vencimiento. Es binario
+(pagado/no pagado, sin abonos parciales) y no está ligado a Cotizaciones.
+</div>
+<table>
+<tr><th>Archivo</th><th>Cambio</th></tr>
+<tr><td><code>pages/Cobranza/mockData.js</code> / <code>CobranzaPage.jsx</code></td><td><span class="tag mod">REESCRITO</span> — modal
+"Nuevo Registro" con cálculo automático de vencimiento, 3 pestañas (Atrasadas / Por Pagar / Pagadas) con totales,
+acciones Aplicar pago / Reabrir, botón Exportar Reporte Excel</td></tr>
+<tr><td><code>pages/Cobranza/CalendarioPagosPage.jsx</code></td><td><span class="tag nuevo">NUEVO</span> — faltaba por completo.
+Replica <code>class_calendar.php</code>: calendario mensual real (semana empieza en lunes, como el original), cada día muestra
+"N Registros", clic abre el detalle del día</td></tr>
+</table>
+
+<h2>7. Performance — módulo nuevo</h2>
+<div class="callout">
+No es un dashboard de métricas — es un <strong>catálogo de plantillas de puntos de prueba y tolerancias</strong> usado al
+calibrar equipo (<code>performance_master</code> + <code>performance</code> en <code>php/nperformance.php</code>).
+</div>
+<table>
+<tr><th>Archivo</th><th>Cambio</th></tr>
+<tr><td><code>pages/Performance/*</code></td><td><span class="tag nuevo">NUEVO</span> módulo completo: listado, formulario con
+filas dinámicas de puntos de prueba y cálculo automático de Mínimo/Máximo (y su versión "real" ajustada por incertidumbre)
+replicando la fórmula exacta del JS original: <code>tolerancia = nominal·%RDG·0.01 + escala·%FS·0.01 + unidades</code></td></tr>
+</table>
+<p><strong>Decisión de UX tomada por cuenta propia (documentada, no oculta):</strong> el PHP pide elegir "cantidad de pruebas" en
+un dropdown (1–250) antes de generar las filas. Se reemplazó por un botón "Agregar punto de prueba" que añade filas una por
+una. Misma funcionalidad y mismos datos guardados — solo más cómodo de usar.</p>
+
+<h2>8. Corrección incidental de dos errores propios</h2>
+<ul>
+<li><span class="tag mod">FIX</span> Import roto en <code>components/Navbar/SearchBar.jsx</code> (buscador global) tras renombrar
+los campos de los mocks de Equipos y Cobranza — corregido en el momento.</li>
+<li><span class="tag mod">FIX</span> Ícono inexistente <code>@mui/icons-material/CheckCircleOutline</code> usado dos veces
+(Calidad y Cobranza) — el nombre correcto en este paquete es <code>CheckCircleOutlineOutlined</code>. Se detectó porque
+<code>npm run build</code> falla si un ícono no existe (no es un warning silencioso).</li>
+</ul>
+
+<h2>9. Qué sigue igual de pendiente</h2>
+<table>
+<tr><th>Pendiente</th><th>Estado</th></tr>
+<tr><td>Backend real para Calidad, Equipos, Patrones, Cobranza, Performance</td><td>Frontend ya correcto contra el PHP; siguen sin persistencia (se pierde al recargar)</td></tr>
+<tr><td>Reportes y Técnicos/Asignaciones</td><td>Bloqueados — dependen de modelar <code>asignaciones</code>, que no se ha diseñado todavía</td></tr>
+<tr><td>Estrategia de almacenamiento de archivos</td><td>Sin definir — bloquea PDFs de cotizaciones, certificados de Patrones, portada/gráfica</td></tr>
+<tr><td><code>node-cron</code></td><td>Sigue sin instalar — necesario para vencimientos automáticos reales (Patrones, Actividades)</td></tr>
+<tr><td>Contraseña temporal del admin</td><td>Sigue pendiente pantalla de perfil</td></tr>
+<tr><td>Limpieza menor</td><td><code>pages/Reportes/Reportes.jsx</code> y <code>pages/Resultados/Resultados.jsx</code> — archivos vacíos sin usar, se pueden borrar</td></tr>
+</table>
+
+<footer>
+Generado automáticamente al cierre de la sesión del 27 de agosto de 2026. Continúa el resumen del 21 de agosto de 2026.
+</footer>
+
+</div>
+</body>
+</html>

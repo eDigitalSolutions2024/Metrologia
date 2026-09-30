@@ -29,7 +29,7 @@ export default function SidebarHeader() {
           fontSize: 13,
         }}
       >
-        ERP v2.0
+Sistema ERP
       </Typography>
     </Box>
   );

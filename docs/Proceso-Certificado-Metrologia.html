@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>Proceso de generación del certificado — Metrología</title>
+<style>
+  :root{
+    --azul:#10265c; --azul2:#2563EB; --tinta:#0f172a; --gris:#475569;
+    --linea:#cbd5e1; --suave:#f1f5f9;
+  }
+  *{box-sizing:border-box}
+  html{-webkit-print-color-adjust:exact; print-color-adjust:exact}
+  body{
+    font-family:"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    color:var(--tinta); margin:0; padding:14mm 12mm;
+  }
+  /* Página única y continua para que el diagrama no se parta entre hojas. */
+  @page{ size:330mm 800mm; margin:0; }
+
+  .head{ display:flex; align-items:center; gap:14px; border-bottom:3px solid var(--azul); padding-bottom:10px; margin-bottom:6px; }
+  .ring{ width:40px; height:40px; border:3px solid var(--azul); border-radius:50%; position:relative; flex:0 0 auto; }
+  .ring::after{ content:""; position:absolute; width:17px; height:3px; background:var(--azul); top:18px; left:19px; transform:rotate(-40deg); transform-origin:left; border-radius:2px; }
+  .ring::before{ content:""; position:absolute; width:8px;height:8px;background:var(--azul);border-radius:50%; top:16px;left:16px; }
+  h1{ color:var(--azul); font-size:20pt; margin:0; }
+  .sub{ color:var(--gris); font-size:10.5pt; margin:2px 0 0; }
+  .brand{ font-size:8.5pt; letter-spacing:.24em; text-transform:uppercase; color:var(--gris); }
+
+  .mermaid{ margin-top:10px; }
+  .mermaid svg{ max-width:100%; height:auto; }
+
+  .leyenda{ margin-top:14px; font-size:9pt; color:var(--gris); display:flex; gap:20px; flex-wrap:wrap; border-top:1px solid var(--linea); padding-top:10px; }
+  .leyenda .item{ display:flex; align-items:center; gap:7px; }
+  .sw{ width:16px; height:16px; border-radius:4px; border:1px solid rgba(0,0,0,.15); }
+  .foot{ margin-top:10px; font-size:8pt; color:var(--gris); }
+</style>
+</head>
+<body>
+
+<div class="head">
+  <div class="ring"></div>
+  <div>
+    <div class="brand">Metrología · Sistema ERP</div>
+    <h1>Proceso de generación del certificado de calibración</h1>
+    <p class="sub">Del Reporte de Servicio al PDF firmado. Todo se opera desde el detalle del Reporte.</p>
+  </div>
+</div>
+
+<pre class="mermaid">
+flowchart TD
+
+subgraph CAT["Catálogo · se prepara una vez"]
+  direction TB
+  P1["Alta de Patrón"]:::cat
+  P2{"¿Certificado del patrón<br/>en PDF digital?"}:::dec
+  P3["Leer certificado (PDF)<br/>La IA precarga: U, k, unidad, intervalo,<br/>resolución, trazabilidad, laboratorio,<br/>N° de certificado, fecha, periodicidad"]:::cat
+  P4["Capturar a mano<br/>(PDF escaneado o sin IA)"]:::cat
+  P5["Revisar y Guardar patrón<br/>El PDF queda adjunto"]:::cat
+  TT["Plantilla de Tolerancia<br/>puntos nominales + EMP"]:::cat
+  TU["Plantilla de Incertidumbre<br/>contribuciones GUM / EA-4/02"]:::cat
+  P1 --> P2
+  P2 -- "Sí" --> P3 --> P5
+  P2 -- "No" --> P4 --> P5
+end
+
+A["Cliente / Cotización aprobada"]:::ini --> B["Crear Reporte de Servicio"]:::rep
+B --> C["Asignar equipo al Reporte<br/>Técnico + Patrones + Plantilla de Tolerancia"]:::rep
+P5 -. "patrón disponible" .-> C
+TT -. "precarga puntos" .-> C
+
+C --> D{"¿La asignación<br/>tiene patrón?"}:::dec
+D -- "No" --> D1["Aviso: sin trazabilidad.<br/>Editar asignación y agregar el patrón correcto"]:::warn
+D1 --> C
+D -- "Sí" --> E["Botón: Iniciar calibración"]:::rep
+
+subgraph POP["Popup «Iniciar calibración» · un solo formulario"]
+  direction TB
+  F["Datos del servicio<br/>razón · tipo · procedimiento"]:::cal
+  G["Condiciones ambientales<br/>temperatura · humedad"]:::cal
+  H["Magnitud → Tipo de instrumento → Plantilla"]:::cal
+  I["Puntos de calibración<br/>nominal · unidad · EMP (precargados)"]:::cal
+  J["Modo: Único  /  Como se encontró – Como se dejó"]:::cal
+  K["Capturar lecturas por punto<br/>chip PASA / NO PASA en vivo"]:::cal
+  L["Guardar y enviar a revisión"]:::cal
+  F --> G --> H --> I --> J --> K --> L
+end
+
+E --> F
+TU -. "arma el presupuesto" .-> H
+
+L --> M["Motor GUM: crea un cálculo de incertidumbre<br/>por cada punto y condición"]:::sys
+M --> N["Calibración = Terminada<br/>(automático)"]:::sys
+
+N --> O["Calidad: «Aprobar y autorizar certificado»<br/>aprueba todos los cálculos en bloque"]:::qa
+O --> P["Certificado = Autorizado"]:::sys
+P --> Q["«Emitir certificado»<br/>vigencia + quién revisó + quién autorizó"]:::qa
+Q --> R["Documento con folio + QR<br/>snapshot de equipo, cliente y patrones<br/>Certificado = En revisión"]:::sys
+
+R --> S{"Calidad revisa el PDF"}:::dec
+S -- "Todo bien" --> U["«Aprobar certificado»<br/>Certificado = Vigente"]:::qa
+S -- "Algo mal" --> T["«Rechazar» + motivo<br/>anula el documento<br/>Calibración vuelve a Pendiente"]:::rej
+T --> V["Técnico: «Editar calibración»"]:::cal
+V --> L
+
+U --> W["Ver / descargar certificado (PDF)"]:::fin
+W --> X["Entrega del equipo"]:::fin
+X --> Y["Finalizar Reporte"]:::fin
+
+classDef ini fill:#e2e8f0,stroke:#94a3b8,color:#0f172a;
+classDef rep fill:#dbeafe,stroke:#2563EB,color:#0f172a;
+classDef cat fill:#f1f5f9,stroke:#64748b,color:#0f172a;
+classDef cal fill:#d1fae5,stroke:#059669,color:#0f172a;
+classDef qa fill:#ede9fe,stroke:#7c3aed,color:#0f172a;
+classDef sys fill:#fef9c3,stroke:#ca8a04,color:#0f172a;
+classDef fin fill:#cffafe,stroke:#0891b2,color:#0f172a;
+classDef rej fill:#fee2e2,stroke:#dc2626,color:#0f172a;
+classDef warn fill:#fffbeb,stroke:#d97706,color:#0f172a;
+classDef dec fill:#ffffff,stroke:#475569,color:#0f172a;
+</pre>
+
+<div class="leyenda">
+  <div class="item"><span class="sw" style="background:#dbeafe"></span> Reporte / Asignación</div>
+  <div class="item"><span class="sw" style="background:#f1f5f9"></span> Catálogo (patrones y plantillas)</div>
+  <div class="item"><span class="sw" style="background:#d1fae5"></span> Captura de calibración (técnico)</div>
+  <div class="item"><span class="sw" style="background:#ede9fe"></span> Calidad (admin / coordinador)</div>
+  <div class="item"><span class="sw" style="background:#fef9c3"></span> Automático del sistema / motor GUM</div>
+  <div class="item"><span class="sw" style="background:#cffafe"></span> Cierre y entrega</div>
+  <div class="item"><span class="sw" style="background:#fee2e2"></span> Rechazo y corrección</div>
+</div>
+
+<p class="foot">Metrología · Sistema ERP — Proceso de certificado v1.1 · Septiembre 2026 · Uso interno.</p>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/mermaid/10.9.1/mermaid.min.js"></script>
+<script>
+  mermaid.initialize({
+    startOnLoad: true,
+    securityLevel: "loose",
+    flowchart: { htmlLabels: true, curve: "basis", nodeSpacing: 40, rankSpacing: 46, padding: 8 },
+    themeVariables: { fontFamily: "Segoe UI, Roboto, Helvetica, Arial, sans-serif", fontSize: "13px" },
+  });
+</script>
+
+</body>
+</html>

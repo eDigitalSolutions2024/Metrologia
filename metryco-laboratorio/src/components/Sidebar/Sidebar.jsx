@@ -1,9 +1,12 @@
-import { Box, List } from "@mui/material";
+import { useEffect, useState } from "react";
+import { Box, List, Typography } from "@mui/material";
 
-import menu from "./menuConfig";
-import SidebarHeader from "./SidebarHeader";
+import menu, { menuKey } from "./menuConfig";
 import SidebarItem from "./SidebarItem";
 import { useAuth } from "../../core/auth/useAuth";
+import { obtenerMenuPermisos, logoUrl } from "../../services/configuracion";
+import { fotoUrl } from "../../services/perfil";
+import { useLogoMarca } from "../../theme/AppThemeProvider";
 
 const ROL_LABELS = {
   admin: "Administrador",
@@ -12,11 +15,72 @@ const ROL_LABELS = {
   coordinador: "Coordinador",
 };
 
+function BrandMark({ size = 30 }) {
+  const ticks = Array.from({ length: 12 }, (_, i) => {
+    const a = (i * 30 * Math.PI) / 180;
+    const o = 21;
+    const inner = i % 3 === 0 ? 15 : 18;
+    return (
+      <line
+        key={i}
+        x1={24 + o * Math.cos(a)} y1={24 + o * Math.sin(a)}
+        x2={24 + inner * Math.cos(a)} y2={24 + inner * Math.sin(a)}
+        stroke="currentColor" strokeWidth={i % 3 === 0 ? 2 : 1} strokeLinecap="round"
+      />
+    );
+  });
+  return (
+    <Box component="svg" viewBox="0 0 48 48" sx={{ width: size, height: size, color: "#60A5FA", flexShrink: 0 }}>
+      <circle cx="24" cy="24" r="22" fill="none" stroke="currentColor" strokeWidth="1.5" opacity="0.35" />
+      <circle cx="24" cy="24" r="12.5" fill="none" stroke="currentColor" strokeWidth="1.5" opacity="0.5" />
+      {ticks}
+      <line x1="24" y1="24" x2="34" y2="14" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" />
+      <circle cx="24" cy="24" r="3.4" fill="currentColor" />
+    </Box>
+  );
+}
+
+// Un ítem sin `roles` (tras aplicar overrides) se muestra a cualquier rol.
+// Un grupo (item con `children`) solo aparece si al menos un hijo es visible.
+// La sección "Sistema" (Administración) nunca toma overrides — siempre fija.
+function rolesEfectivos(item, seccion, overrides) {
+  if (seccion === "Sistema") return item.roles;
+  return overrides[menuKey(item)] || item.roles;
+}
+
+function visiblePara(rol, seccion, overrides) {
+  return (item) => {
+    const roles = rolesEfectivos(item, seccion, overrides);
+    return !roles || roles.includes(rol);
+  };
+}
+
+function filtrarMenu(menuBase, rol, overrides) {
+  return menuBase
+    .map((grupo) => ({
+      ...grupo,
+      items: grupo.items
+        .filter(visiblePara(rol, grupo.section, overrides))
+        .map((item) => (item.children ? { ...item, children: item.children.filter(visiblePara(rol, grupo.section, overrides)) } : item))
+        .filter((item) => !item.children || item.children.length > 0),
+    }))
+    .filter((grupo) => grupo.items.length > 0);
+}
+
 export default function Sidebar({ open = true }) {
   const { user } = useAuth();
   const nombre = user?.nombre || user?.usuario || "Usuario";
   const inicial = nombre.charAt(0).toUpperCase();
   const rolLabel = ROL_LABELS[user?.rol] || user?.rol || "";
+
+  const [overrides, setOverrides] = useState({});
+  useEffect(() => {
+    obtenerMenuPermisos().then(setOverrides).catch(() => setOverrides({}));
+  }, []);
+
+  const { logo } = useLogoMarca();
+
+  const menuVisible = filtrarMenu(menu, user?.rol, overrides);
 
   return (
     <Box
@@ -27,90 +91,88 @@ export default function Sidebar({ open = true }) {
         position: "fixed",
         left: 0,
         top: 0,
-        background: "#0F172A",
-        color: "#fff",
+        color: "#E6EDF6",
         display: "flex",
         flexDirection: "column",
-        borderRight: "1px solid rgba(255,255,255,.08)",
+        borderRight: "1px solid rgba(255,255,255,.06)",
         overflowY: "auto",
         zIndex: 1200,
         transform: open ? "translateX(0)" : "translateX(-100%)",
-        transition: "transform .25s ease",
+        transition: "transform .28s cubic-bezier(.4,0,.2,1)",
+        background:
+          "radial-gradient(520px 220px at 15% -8%, rgba(59,130,246,.30), transparent 62%)," +
+          "linear-gradient(180deg, #0A101C 0%, #0C1424 55%, #0A101C 100%)",
+        "&::-webkit-scrollbar": { width: 6 },
+        "&::-webkit-scrollbar-thumb": { background: "rgba(255,255,255,.1)", borderRadius: 99 },
       }}
     >
-      {/* ==========================
-          CABECERA
-      ========================== */}
-
-      <SidebarHeader />
-
-      {/* ==========================
-          MENÚ
-      ========================== */}
-
-      <List
-        sx={{
-          mt: 2,
-          px: 1,
-          flex: 1,
-        }}
-      >
-        {menu.map((item) => (
-          <SidebarItem key={item.title} item={item} />
-        ))}
-      </List>
-
-      {/* ==========================
-          FOOTER
-      ========================== */}
-
-      <Box
-        sx={{
-          borderTop: "1px solid rgba(255,255,255,.08)",
-          p: 2,
-        }}
-      >
+      {/* Marca */}
+      <Box sx={{ px: 2.5, pt: 3, pb: 2, display: "flex", alignItems: "center", gap: 1.5 }}>
         <Box
           sx={{
-            display: "flex",
-            alignItems: "center",
-            gap: 2,
+            width: 40, height: 40, borderRadius: 2.5, display: "grid", placeItems: "center", flexShrink: 0,
+            background: "linear-gradient(135deg, rgba(37,99,235,.25), rgba(37,99,235,.05))",
+            border: "1px solid rgba(96,165,250,.25)",
+            overflow: "hidden",
           }}
         >
+          {logo ? (
+            <Box component="img" src={logoUrl(logo.nombreArchivo)} alt="Logo"
+              sx={{ width: "100%", height: "100%", objectFit: "contain" }} />
+          ) : (
+            <BrandMark size={24} />
+          )}
+        </Box>
+        <Box>
+          <Typography sx={{ fontWeight: 800, fontSize: 15, letterSpacing: ".14em", lineHeight: 1 }}>
+            METROLOGÍA
+          </Typography>
+          <Typography sx={{ fontSize: 10.5, letterSpacing: ".22em", color: "rgba(230,237,246,.45)" }}>
+            SISTEMA ERP
+          </Typography>
+        </Box>
+      </Box>
+
+      {/* Navegación por secciones */}
+      <Box sx={{ flex: 1, px: 1.25, pb: 1 }}>
+        {menuVisible.map((grupo) => (
+          <Box key={grupo.section} sx={{ mb: 1.5 }}>
+            <Typography
+              sx={{
+                px: 1.75, mt: 1.5, mb: 0.5,
+                fontSize: 10, fontWeight: 700, letterSpacing: ".14em",
+                textTransform: "uppercase", color: "rgba(230,237,246,.34)",
+              }}
+            >
+              {grupo.section}
+            </Typography>
+            <List disablePadding>
+              {grupo.items.map((item) => (
+                <SidebarItem key={item.title} item={item} />
+              ))}
+            </List>
+          </Box>
+        ))}
+      </Box>
+
+      {/* Usuario */}
+      <Box sx={{ borderTop: "1px solid rgba(255,255,255,.07)", p: 2 }}>
+        <Box sx={{ display: "flex", alignItems: "center", gap: 1.5 }}>
           <Box
             sx={{
-              width: 42,
-              height: 42,
-              borderRadius: "50%",
-              background: "#2563EB",
-              display: "flex",
-              justifyContent: "center",
-              alignItems: "center",
-              fontWeight: "bold",
-              fontSize: 18,
+              width: 38, height: 38, borderRadius: 2.5, display: "grid", placeItems: "center",
+              fontWeight: 800, fontSize: 15, color: "#fff", flexShrink: 0, overflow: "hidden",
+              background: user?.fotoUrl
+                ? `url(${fotoUrl(user.fotoUrl)}) center/cover`
+                : user?.avatarColor || "linear-gradient(135deg, var(--mui-palette-secondary-light), var(--mui-palette-secondary-dark))",
+              boxShadow: "0 6px 16px rgba(37,99,235,.35)",
             }}
           >
-            {inicial}
+            {!user?.fotoUrl && inicial}
           </Box>
-
-          <Box>
-            <Box
-              sx={{
-                fontWeight: 700,
-                fontSize: 14,
-              }}
-            >
-              {nombre}
-            </Box>
-
-            <Box
-              sx={{
-                fontSize: 12,
-                opacity: 0.7,
-              }}
-            >
-              {rolLabel}
-            </Box>
+          <Box sx={{ minWidth: 0 }}>
+            <Typography sx={{ fontWeight: 700, fontSize: 13.5, lineHeight: 1.2 }} noWrap>{nombre}</Typography>
+            <Typography sx={{ fontSize: 11.5, color: "rgba(230,237,246,.5)" }}>{rolLabel}</Typography>
           </Box>
         </Box>
       </Box>

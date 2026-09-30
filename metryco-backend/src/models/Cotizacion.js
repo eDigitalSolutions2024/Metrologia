@@ -3,6 +3,16 @@ const { Schema, model } = require("mongoose");
 const itemSchema = new Schema(
   {
     descripcion: { type: String, required: true, trim: true },
+    marca: { type: String, trim: true },
+    modelo: { type: String, trim: true },
+    tiempoEntrega: { type: String, trim: true }, // texto libre: "5 días hábiles", "2 semanas"...
+    // Catálogo SAT — se capturan aquí para que al facturar la cotización el
+    // CFDI ya traiga las claves y no haya que teclearlas de nuevo.
+    claveProdServ: { type: String, trim: true }, // c_ClaveProdServ, ej. 80101504
+    claveUnidad: { type: String, trim: true }, // c_ClaveUnidad, ej. E48
+    // Equipo registrado del cliente al que corresponde la partida — con esto, al abrir el reporte de
+    // esta cotización, el equipo se asigna solo (ver reporte.service.asignarEquiposDeCotizacion).
+    equipo: { type: Schema.Types.ObjectId, ref: "Equipo" },
     cantidad: { type: Number, required: true, min: 0 },
     precioUnitario: { type: Number, required: true, min: 0 },
   },
@@ -10,13 +20,29 @@ const itemSchema = new Schema(
 );
 
 const STATUS = ["pendiente", "aprobada", "rechazada", "facturada", "vencida"];
+const MONEDAS = ["MXN", "USD"];
+
+const adjuntoSchema = new Schema(
+  {
+    nombreArchivo: String, // nombre en disco
+    nombreOriginal: String,
+    mimetype: String,
+    tamano: Number,
+    subidoPor: { type: Schema.Types.ObjectId, ref: "Usuario" },
+    fecha: { type: Date, default: Date.now },
+  },
+  { _id: true }
+);
 
 const cotizacionSchema = new Schema(
   {
     folio: { type: String, required: true, unique: true },
     cliente: { type: Schema.Types.ObjectId, ref: "Cliente", required: true },
+    contacto: { type: Schema.Types.ObjectId, ref: "Contacto" },
+    razonSocial: { type: Schema.Types.ObjectId, ref: "RazonSocial" },
     fecha: { type: Date, default: Date.now },
     vigencia: { type: Date, required: true },
+    ordenCompra: { type: String, trim: true },
     items: {
       type: [itemSchema],
       validate: {
@@ -24,15 +50,20 @@ const cotizacionSchema = new Schema(
         message: "La cotización debe tener al menos una partida",
       },
     },
+    moneda: { type: String, enum: MONEDAS, default: "MXN" },
+    ivaPorcentaje: { type: Number, default: 16, min: 0, max: 100 },
     subtotal: { type: Number, required: true },
     iva: { type: Number, required: true },
     total: { type: Number, required: true },
     observaciones: { type: String, trim: true },
     status: { type: String, enum: STATUS, default: "pendiente" },
     creadoPor: { type: Schema.Types.ObjectId, ref: "Usuario" },
+    adjuntos: [adjuntoSchema],
   },
   { timestamps: true }
 );
+
+cotizacionSchema.statics.MONEDAS = MONEDAS;
 
 cotizacionSchema.statics.STATUS = STATUS;
 

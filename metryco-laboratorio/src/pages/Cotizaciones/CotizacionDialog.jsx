@@ -1,45 +1,121 @@
 import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { useForm, useFieldArray, Controller } from "react-hook-form";
 import {
   Dialog, DialogTitle, DialogContent, DialogActions, Box, Typography, Grid,
-  IconButton, Table, TableHead, TableRow, TableCell, TableBody, Paper,
+  IconButton, Table, TableHead, TableRow, TableCell, TableBody, Paper, Chip,
   MenuItem, Select, FormControl, InputLabel, Alert, CircularProgress,
+  Autocomplete, TextField,
 } from "@mui/material";
 import { AddCircleOutlined as AddCircleOutlineIcon } from "@mui/icons-material";
 import { DeleteOutlined as DeleteOutlineIcon } from "@mui/icons-material";
 import CloseIcon from "@mui/icons-material/Close";
+import FactCheckOutlinedIcon from "@mui/icons-material/FactCheckOutlined";
+import PrintOutlinedIcon from "@mui/icons-material/PrintOutlined";
+import AttachFileOutlinedIcon from "@mui/icons-material/AttachFileOutlined";
+import InsertDriveFileOutlinedIcon from "@mui/icons-material/InsertDriveFileOutlined";
+import DownloadOutlinedIcon from "@mui/icons-material/DownloadOutlined";
+import ReceiptLongOutlinedIcon from "@mui/icons-material/ReceiptLongOutlined";
+import ContentCopyOutlinedIcon from "@mui/icons-material/ContentCopyOutlined";
+import PersonOutlineIcon from "@mui/icons-material/PersonOutlineOutlined";
+import TuneOutlinedIcon from "@mui/icons-material/TuneOutlined";
+import ListAltOutlinedIcon from "@mui/icons-material/ListAltOutlined";
+import CheckCircleOutlineIcon from "@mui/icons-material/CheckCircleOutlineOutlined";
+import HighlightOffOutlinedIcon from "@mui/icons-material/HighlightOffOutlined";
 
 import AppButton from "../../shared/components/AppButton";
 import AppInput from "../../shared/components/AppInput";
+import AppCard from "../../shared/components/AppCard";
 import AppDatePicker from "../../shared/components/AppDatePicker";
 import { formatCurrency } from "../../shared/utils/currency";
+import { formatDate } from "../../shared/utils/formatDate";
 import { listarClientes } from "../../services/clientes";
-import { obtenerCotizacion, crearCotizacion, actualizarCotizacion } from "../../services/cotizaciones";
+import { listarRazonesSociales } from "../../services/razonesSociales";
+import { listarContactos } from "../../services/contactos";
+import { listarEquipos } from "../../services/equipos";
+import AvisoDeuda from "../../shared/components/AvisoDeuda";
+import {
+  obtenerCotizacion, crearCotizacion, actualizarCotizacion,
+  subirAdjuntoCotizacion, fetchAdjuntoCotizacionBlob, eliminarAdjuntoCotizacion,
+  obtenerSiguienteOrdenCompra,
+} from "../../services/cotizaciones";
+import { pedirRefrescoAlertas } from "../../shared/utils/alertasBus";
+
+const MONEDAS = ["MXN", "USD"];
+const IVAS = [0, 8, 16];
+
+function tamanoLegible(bytes) {
+  if (!bytes) return "";
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+const STATUS_MAP = {
+  pendiente: { label: "Pendiente", color: "warning" },
+  aprobada: { label: "Aprobada", color: "success" },
+  rechazada: { label: "Rechazada", color: "error" },
+  facturada: { label: "Facturada", color: "info" },
+  vencida: { label: "Vencida", color: "default" },
+};
+
+// 80101504 / E48: "Servicios de calibración" / "Unidad de servicio" del catálogo SAT — valores típicos de un laboratorio, editables por partida.
+const ITEM_VACIO = { descripcion: "", marca: "", modelo: "", tiempoEntrega: "", claveProdServ: "80101504", claveUnidad: "E48", cantidad: 1, precioUnitario: 0 };
 
 const DEFAULT_VALUES = {
   cliente: "",
+  razonSocial: "",
+  contacto: "",
   vigencia: "",
+  ordenCompra: "",
   observaciones: "",
-  items: [{ descripcion: "", cantidad: 1, precioUnitario: 0 }],
+  moneda: "MXN",
+  ivaPorcentaje: 16,
+  items: [ITEM_VACIO],
 };
 
-export default function CotizacionDialog({ open, cotizacionId, onClose, onSaved }) {
+export default function CotizacionDialog({ open, cotizacionId, duplicarDesdeId, prefill, onClose, onSaved, onGenerarFactura, onDuplicar }) {
   const isEdit = !!cotizacionId;
+  const navigate = useNavigate();
 
   const [clientes, setClientes] = useState([]);
+  const [razonesSociales, setRazonesSociales] = useState([]);
+  const [contactosCliente, setContactosCliente] = useState([]);
+  const [equiposCliente, setEquiposCliente] = useState([]);
+  const [cotizacionData, setCotizacionData] = useState(null); // folio, status, reporte ligado — solo lectura
   const [loadingData, setLoadingData] = useState(true);
   const [submitError, setSubmitError] = useState("");
   const [pasoClienteConfirmado, setPasoClienteConfirmado] = useState(isEdit);
+  const [adjuntos, setAdjuntos] = useState([]);
+  const [subiendoAdjunto, setSubiendoAdjunto] = useState(false);
+
+  const [ocAutoGenerada, setOcAutoGenerada] = useState(true);
 
   const {
-    register, control, handleSubmit, watch, reset, getValues,
+    register, control, handleSubmit, watch, reset, getValues, setValue,
     formState: { errors, isSubmitting },
   } = useForm({ defaultValues: DEFAULT_VALUES });
 
   const { fields, append, remove } = useFieldArray({ control, name: "items" });
   const items = watch("items");
+  const ivaPorcentaje = watch("ivaPorcentaje");
+  const moneda = watch("moneda");
   const clienteSeleccionado = watch("cliente");
-  const total = items.reduce((sum, i) => sum + (Number(i.cantidad) * Number(i.precioUnitario) || 0), 0);
+  const subtotal = items.reduce((sum, i) => sum + (Number(i.cantidad) * Number(i.precioUnitario) || 0), 0);
+  const ivaCalc = subtotal * (Number(ivaPorcentaje || 0) / 100);
+  const total = subtotal + ivaCalc;
+
+  // Sugiere una Orden de Compra "OC-<prefijo del cliente>-<año>-<consecutivo>"
+  // cuando el cliente ya está confirmado y el campo sigue sin tocar a mano —
+  // el usuario puede sobreescribirla libremente (es la OC real del cliente).
+  useEffect(() => {
+    if (isEdit || !pasoClienteConfirmado || !clienteSeleccionado || !ocAutoGenerada) return;
+    let cancelado = false;
+    obtenerSiguienteOrdenCompra(clienteSeleccionado)
+      .then((oc) => { if (!cancelado) setValue("ordenCompra", oc); })
+      .catch(() => {});
+    return () => { cancelado = true; };
+  }, [isEdit, pasoClienteConfirmado, clienteSeleccionado, ocAutoGenerada, setValue]);
 
   useEffect(() => {
     if (!open) return;
@@ -49,25 +125,74 @@ export default function CotizacionDialog({ open, cotizacionId, onClose, onSaved 
       setLoadingData(true);
       setSubmitError("");
       try {
-        const [{ items: clientesData }, cotizacion] = await Promise.all([
+        const [{ items: clientesData }, cotizacion, razonesData] = await Promise.all([
           listarClientes({ pageSize: 200 }),
-          isEdit ? obtenerCotizacion(cotizacionId) : Promise.resolve(null),
+          isEdit ? obtenerCotizacion(cotizacionId)
+            : duplicarDesdeId ? obtenerCotizacion(duplicarDesdeId)
+            : Promise.resolve(null),
+          listarRazonesSociales({ soloActivas: "true" }).catch(() => []),
         ]);
         if (cancelado) return;
 
         setClientes(clientesData);
+        setRazonesSociales(razonesData);
 
-        if (cotizacion) {
+        if (isEdit && cotizacion) {
           reset({
             cliente: cotizacion.cliente?._id || cotizacion.cliente,
+            razonSocial: cotizacion.razonSocial?._id || cotizacion.razonSocial || "",
+            contacto: cotizacion.contacto?._id || cotizacion.contacto || "",
             vigencia: cotizacion.vigencia ? cotizacion.vigencia.slice(0, 10) : "",
+            ordenCompra: cotizacion.ordenCompra || "",
             observaciones: cotizacion.observaciones || "",
+            moneda: cotizacion.moneda || "MXN",
+            ivaPorcentaje: cotizacion.ivaPorcentaje ?? 16,
             items: cotizacion.items,
           });
+          setCotizacionData(cotizacion);
+          setAdjuntos(cotizacion.adjuntos || []);
           setPasoClienteConfirmado(true);
+          setOcAutoGenerada(false);
+        } else if (duplicarDesdeId && cotizacion) {
+          // Duplicar: mismo cliente/partidas/moneda, sin folio/adjuntos/vigencia
+          // — se captura como una cotización nueva desde cero.
+          reset({
+            cliente: cotizacion.cliente?._id || cotizacion.cliente,
+            razonSocial: cotizacion.razonSocial?._id || cotizacion.razonSocial || "",
+            contacto: cotizacion.contacto?._id || cotizacion.contacto || "",
+            vigencia: "",
+            ordenCompra: "",
+            observaciones: cotizacion.observaciones || "",
+            moneda: cotizacion.moneda || "MXN",
+            ivaPorcentaje: cotizacion.ivaPorcentaje ?? 16,
+            items: cotizacion.items.map((i) => ({
+              descripcion: i.descripcion, marca: i.marca || "", modelo: i.modelo || "",
+              tiempoEntrega: i.tiempoEntrega || "", claveProdServ: i.claveProdServ || "80101504", claveUnidad: i.claveUnidad || "E48",
+              cantidad: i.cantidad, precioUnitario: i.precioUnitario, equipo: i.equipo || "",
+            })),
+          });
+          setCotizacionData(null);
+          setAdjuntos([]);
+          setPasoClienteConfirmado(true);
+          setOcAutoGenerada(true);
+        } else if (prefill) {
+          // Datos iniciales desde otro módulo (ej. recalibración desde un certificado).
+          reset({
+            ...DEFAULT_VALUES,
+            cliente: prefill.cliente, contacto: prefill.contacto || "", moneda: prefill.moneda || "MXN",
+            ivaPorcentaje: prefill.ivaPorcentaje ?? 16, observaciones: prefill.observaciones || "",
+            items: prefill.items,
+          });
+          setCotizacionData(null);
+          setAdjuntos([]);
+          setPasoClienteConfirmado(true);
+          setOcAutoGenerada(true);
         } else {
           reset(DEFAULT_VALUES);
+          setCotizacionData(null);
+          setAdjuntos([]);
           setPasoClienteConfirmado(false);
+          setOcAutoGenerada(true);
         }
       } catch {
         if (!cancelado) setSubmitError("No se pudieron cargar los datos de la cotización.");
@@ -79,7 +204,29 @@ export default function CotizacionDialog({ open, cotizacionId, onClose, onSaved 
     return () => {
       cancelado = true;
     };
-  }, [open, cotizacionId, isEdit, reset]);
+  }, [open, cotizacionId, duplicarDesdeId, prefill, isEdit, reset]);
+
+  // Contactos del cliente elegido — se recargan cada vez que cambia (permite
+  // elegir cuál va como "Requisitor" de la cotización, como en el legacy).
+  useEffect(() => {
+    if (!clienteSeleccionado) { setContactosCliente([]); return; }
+    let cancelado = false;
+    listarContactos(clienteSeleccionado)
+      .then((lista) => { if (!cancelado) setContactosCliente(lista); })
+      .catch(() => { if (!cancelado) setContactosCliente([]); });
+    return () => { cancelado = true; };
+  }, [clienteSeleccionado]);
+
+  // Equipos ya registrados del cliente — se sugieren como partidas (evita
+  // volver a escribir marca/modelo/descripción si ya se calibró antes).
+  useEffect(() => {
+    if (!clienteSeleccionado) { setEquiposCliente([]); return; }
+    let cancelado = false;
+    listarEquipos({ clienteId: clienteSeleccionado, pageSize: 500 })
+      .then(({ items }) => { if (!cancelado) setEquiposCliente(items); })
+      .catch(() => { if (!cancelado) setEquiposCliente([]); });
+    return () => { cancelado = true; };
+  }, [clienteSeleccionado]);
 
   const onSubmit = async (data) => {
     setSubmitError("");
@@ -89,13 +236,68 @@ export default function CotizacionDialog({ open, cotizacionId, onClose, onSaved 
       } else {
         await crearCotizacion(data);
       }
+      pedirRefrescoAlertas();
       onSaved();
     } catch (err) {
       setSubmitError(err.response?.data?.message || "No se pudo guardar la cotización.");
     }
   };
 
-  const clienteNombre = clientes.find((c) => c._id === clienteSeleccionado)?.nombre;
+  const clienteObj = (isEdit && cotizacionData?.cliente) || clientes.find((c) => c._id === clienteSeleccionado);
+  const clienteNombre = clienteObj?.nombre;
+  const contactoSeleccionadoId = watch("contacto");
+  const contactoSeleccionado = contactosCliente.find((c) => c._id === contactoSeleccionadoId);
+  const telefonoMostrado = contactoSeleccionado?.telefono || (!contactoSeleccionadoId ? clienteObj?.contacto?.telefono : "");
+
+  const subirArchivo = async (archivo) => {
+    if (!archivo || !cotizacionId) return;
+    setSubiendoAdjunto(true);
+    try {
+      const cot = await subirAdjuntoCotizacion(cotizacionId, archivo);
+      setAdjuntos(cot.adjuntos || []);
+    } catch {
+      setSubmitError("No se pudo subir el archivo adjunto.");
+    } finally {
+      setSubiendoAdjunto(false);
+    }
+  };
+
+  const descargarAdjunto = async (adjunto) => {
+    try {
+      const blob = await fetchAdjuntoCotizacionBlob(cotizacionId, adjunto._id);
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url; a.download = adjunto.nombreOriginal || "archivo";
+      a.click();
+      setTimeout(() => URL.revokeObjectURL(url), 60000);
+    } catch {
+      setSubmitError("No se pudo descargar el archivo.");
+    }
+  };
+
+  const quitarAdjunto = async (adjunto) => {
+    try {
+      const cot = await eliminarAdjuntoCotizacion(cotizacionId, adjunto._id);
+      setAdjuntos(cot.adjuntos || []);
+    } catch {
+      setSubmitError("No se pudo eliminar el archivo.");
+    }
+  };
+
+  const [cambiandoStatus, setCambiandoStatus] = useState(false);
+  const cambiarStatus = async (status) => {
+    setCambiandoStatus(true);
+    setSubmitError("");
+    try {
+      const actualizada = await actualizarCotizacion(cotizacionId, { status });
+      setCotizacionData((prev) => ({ ...prev, status: actualizada.status }));
+      pedirRefrescoAlertas();
+    } catch (err) {
+      setSubmitError(err.response?.data?.message || "No se pudo cambiar el estatus de la cotización.");
+    } finally {
+      setCambiandoStatus(false);
+    }
+  };
 
   return (
     <Dialog open={open} onClose={onClose} maxWidth="lg" fullWidth scroll="paper">
@@ -114,6 +316,9 @@ export default function CotizacionDialog({ open, cotizacionId, onClose, onSaved 
         ) : (
           <Box component="form" id="cotizacion-form" onSubmit={handleSubmit(onSubmit)}>
             {submitError && <Alert severity="error" sx={{ mb: 3, borderRadius: 2 }}>{submitError}</Alert>}
+            {prefill?.aviso && !isEdit && <Alert severity="info" sx={{ mb: 3, borderRadius: 2 }}>{prefill.aviso}</Alert>}
+
+            {clienteSeleccionado && <AvisoDeuda clienteId={clienteSeleccionado} sx={{ mb: 2.5 }} />}
 
             {clientes.length === 0 && (
               <Alert severity="warning" sx={{ mb: 3, borderRadius: 2 }}>
@@ -130,15 +335,23 @@ export default function CotizacionDialog({ open, cotizacionId, onClose, onSaved 
                   <Grid size={{ xs: 12, md: 8 }}>
                     <FormControl fullWidth size="small" error={!!errors.cliente}>
                       <InputLabel>Cliente</InputLabel>
-                      <Select label="Cliente" defaultValue="" {...register("cliente", { required: true })} sx={{ borderRadius: 2 }}>
-                        {clientes.map((c) => (
-                          <MenuItem key={c._id} value={c._id}>{c.nombre}</MenuItem>
-                        ))}
-                      </Select>
+                      <Controller
+                        name="cliente"
+                        control={control}
+                        rules={{ required: true }}
+                        render={({ field }) => (
+                          <Select label="Cliente" {...field} value={field.value ?? ""} sx={{ borderRadius: 2 }}>
+                            {clientes.map((c) => (
+                              <MenuItem key={c._id} value={c._id}>{c.nombre}</MenuItem>
+                            ))}
+                          </Select>
+                        )}
+                      />
                     </FormControl>
                   </Grid>
                   <Grid size={{ xs: 12, md: 4 }}>
                     <AppButton
+                      type="button"
                       fullWidth
                       disabled={!getValues("cliente") && !clienteSeleccionado}
                       onClick={() => {
@@ -153,39 +366,197 @@ export default function CotizacionDialog({ open, cotizacionId, onClose, onSaved 
               </Box>
             ) : (
               <>
-                <Box sx={{ display: "flex", alignItems: "center", gap: 1.5, mb: 3, p: 1.5, borderRadius: 2, bgcolor: "background.default" }}>
-                  <Typography variant="body2" color="text.secondary">Cliente:</Typography>
-                  <Typography variant="body2" fontWeight={700}>{clienteNombre}</Typography>
-                  {!isEdit && (
-                    <AppButton variant="text" size="small" onClick={() => setPasoClienteConfirmado(false)} sx={{ ml: "auto" }}>
-                      Cambiar cliente
-                    </AppButton>
-                  )}
-                </Box>
-
-                <Grid container spacing={2} sx={{ mb: 3 }}>
-                  <Grid size={{ xs: 12, md: 4 }}>
-                    <Controller
-                      name="vigencia"
-                      control={control}
-                      rules={{ required: "Campo obligatorio" }}
-                      render={({ field, fieldState }) => (
-                        <AppDatePicker
-                          label="Fecha de vigencia"
-                          value={field.value}
-                          onChange={field.onChange}
-                          error={fieldState.error}
-                        />
+                {isEdit && cotizacionData && (
+                  <AppCard
+                    dense
+                    sx={{ mb: 2.5 }}
+                    title={`Cotización ${cotizacionData.folio}`}
+                    subtitle={`Creada ${formatDate(cotizacionData.fecha)}`}
+                    action={
+                      <Chip size="small" label={STATUS_MAP[cotizacionData.status]?.label || cotizacionData.status}
+                        color={STATUS_MAP[cotizacionData.status]?.color || "default"} />
+                    }
+                  >
+                    <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap" }}>
+                      {cotizacionData.status === "pendiente" && (
+                        <>
+                          <AppButton
+                            type="button" size="small" startIcon={<CheckCircleOutlineIcon />}
+                            disabled={cambiandoStatus} onClick={() => cambiarStatus("aprobada")} sx={{ borderRadius: 2 }}
+                          >
+                            Aprobar
+                          </AppButton>
+                          <AppButton
+                            type="button" size="small" variant="outlined" color="error" startIcon={<HighlightOffOutlinedIcon />}
+                            disabled={cambiandoStatus} onClick={() => cambiarStatus("rechazada")} sx={{ borderRadius: 2 }}
+                          >
+                            Rechazar
+                          </AppButton>
+                        </>
                       )}
-                    />
-                  </Grid>
-                </Grid>
+                      {cotizacionData.facturacion?.parcial && (
+                        <Typography variant="caption" color="warning.main" fontWeight={700} sx={{ alignSelf: "center" }}>
+                          Facturación parcial: {cotizacionData.facturacion.partidasFacturadas} de {cotizacionData.facturacion.partidasTotal} partidas
+                        </Typography>
+                      )}
+                      {cotizacionData.cfdi && (
+                        <AppButton type="button" size="small" variant="outlined" startIcon={<ReceiptLongOutlinedIcon />}
+                          onClick={() => { onClose(); navigate(`/facturacion?cfdi=${cotizacionData.cfdi._id}`); }}
+                          sx={{ borderRadius: 2 }}>
+                          Factura: {cotizacionData.cfdi.folioInterno}
+                        </AppButton>
+                      )}
+                      {cotizacionData.reporte && (
+                        <AppButton type="button" size="small" variant="outlined" startIcon={<FactCheckOutlinedIcon />}
+                          onClick={() => { onClose(); navigate(`/reportes/${cotizacionData.reporte._id}`); }}
+                          sx={{ borderRadius: 2 }}>
+                          Reporte: {cotizacionData.reporte.folio}
+                        </AppButton>
+                      )}
+                      {cotizacionData.status === "aprobada" && onGenerarFactura && (
+                        <AppButton type="button" size="small" startIcon={<ReceiptLongOutlinedIcon />} onClick={() => onGenerarFactura(cotizacionData)} sx={{ borderRadius: 2 }}>
+                          Generar Factura
+                        </AppButton>
+                      )}
+                      {onDuplicar && (
+                        <AppButton type="button" size="small" variant="outlined" startIcon={<ContentCopyOutlinedIcon />} onClick={() => onDuplicar(cotizacionId)} sx={{ borderRadius: 2 }}>
+                          Duplicar
+                        </AppButton>
+                      )}
+                      <AppButton type="button" size="small" variant="outlined" startIcon={<PrintOutlinedIcon />}
+                        onClick={() => window.open(`/informe/cotizacion/${cotizacionId}`, "_blank")} sx={{ borderRadius: 2 }}>
+                        Imprimir
+                      </AppButton>
+                    </Box>
+                  </AppCard>
+                )}
 
-                <Typography variant="subtitle2" fontWeight={700} sx={{ mb: 1.5 }}>
-                  Servicios / Partidas
-                </Typography>
-                <Paper elevation={0} sx={{ border: 1, borderColor: "divider", borderRadius: 2, overflow: "hidden", mb: 2 }}>
-                  <Table size="small">
+                <AppCard
+                  dense
+                  title="Cliente"
+                  icon={<PersonOutlineIcon />}
+                  sx={{ mb: 2.5 }}
+                  action={
+                    !isEdit && (
+                      <AppButton type="button" variant="text" size="small" onClick={() => setPasoClienteConfirmado(false)}>
+                        Cambiar cliente
+                      </AppButton>
+                    )
+                  }
+                >
+                  <Grid container spacing={2}>
+                    <Grid size={{ xs: 12, md: 6 }}>
+                      <Typography variant="caption" color="text.secondary" sx={{ display: "block" }}>Cliente</Typography>
+                      <Typography variant="body2" fontWeight={700}>{clienteNombre}</Typography>
+                    </Grid>
+                    <Grid size={{ xs: 12, md: 6 }}>
+                      <Typography variant="caption" color="text.secondary" sx={{ display: "block" }}>Dirección</Typography>
+                      <Typography variant="body2">
+                        {[
+                          [clienteObj?.domicilioFiscal?.calle, clienteObj?.domicilioFiscal?.numExterior].filter(Boolean).join(" "),
+                          clienteObj?.domicilioFiscal?.colonia,
+                          clienteObj?.domicilioFiscal?.ciudad || clienteObj?.domicilioFiscal?.municipio,
+                        ].filter(Boolean).join(", ") || "—"}
+                      </Typography>
+                    </Grid>
+                    <Grid size={{ xs: 12, md: 6 }}>
+                      <FormControl fullWidth size="small">
+                        <InputLabel>Contacto</InputLabel>
+                        <Controller
+                          name="contacto" control={control}
+                          render={({ field }) => (
+                            <Select label="Contacto" {...field} sx={{ borderRadius: 2 }}>
+                              <MenuItem value="">
+                                {contactosCliente.length === 0 ? "Sin contactos registrados para este cliente" : "— Sin especificar —"}
+                              </MenuItem>
+                              {contactosCliente.map((c) => <MenuItem key={c._id} value={c._id}>{c.nombre}</MenuItem>)}
+                            </Select>
+                          )}
+                        />
+                      </FormControl>
+                    </Grid>
+                    <Grid size={{ xs: 12, md: 6 }}>
+                      <Typography variant="caption" color="text.secondary" sx={{ display: "block" }}>Teléfono</Typography>
+                      <Typography variant="body2">{telefonoMostrado || "—"}</Typography>
+                    </Grid>
+                  </Grid>
+                </AppCard>
+
+                <AppCard dense title="Configuración de la cotización" icon={<TuneOutlinedIcon />} sx={{ mb: 2.5 }}>
+                  <Grid container spacing={2}>
+                    <Grid size={{ xs: 12, md: 3 }}>
+                      <FormControl fullWidth size="small" error={!!errors.razonSocial}>
+                        <InputLabel>Razón Social Interna</InputLabel>
+                        <Controller
+                          name="razonSocial" control={control} rules={{ required: "Elige la razón social" }}
+                          render={({ field }) => (
+                            <Select label="Razón Social Interna" {...field} sx={{ borderRadius: 2 }}>
+                              {razonesSociales.map((r) => <MenuItem key={r._id} value={r._id}>{r.nombre}</MenuItem>)}
+                            </Select>
+                          )}
+                        />
+                      </FormControl>
+                    </Grid>
+                    <Grid size={{ xs: 12, md: 3 }}>
+                      <Controller
+                        name="vigencia"
+                        control={control}
+                        rules={{ required: "Campo obligatorio" }}
+                        render={({ field, fieldState }) => (
+                          <AppDatePicker
+                            label="Fecha de vigencia"
+                            value={field.value}
+                            onChange={field.onChange}
+                            error={fieldState.error}
+                          />
+                        )}
+                      />
+                    </Grid>
+                    <Grid size={{ xs: 6, md: 3 }}>
+                      <FormControl fullWidth size="small">
+                        <InputLabel>Moneda</InputLabel>
+                        <Controller
+                          name="moneda" control={control}
+                          render={({ field }) => (
+                            <Select label="Moneda" {...field} sx={{ borderRadius: 2 }}>
+                              {MONEDAS.map((m) => <MenuItem key={m} value={m}>{m}</MenuItem>)}
+                            </Select>
+                          )}
+                        />
+                      </FormControl>
+                    </Grid>
+                    <Grid size={{ xs: 6, md: 3 }}>
+                      <FormControl fullWidth size="small">
+                        <InputLabel>IVA</InputLabel>
+                        <Controller
+                          name="ivaPorcentaje" control={control}
+                          render={({ field }) => (
+                            <Select label="IVA" {...field} sx={{ borderRadius: 2 }}>
+                              {IVAS.map((v) => <MenuItem key={v} value={v}>{v}%</MenuItem>)}
+                            </Select>
+                          )}
+                        />
+                      </FormControl>
+                    </Grid>
+                    <Grid size={{ xs: 12, md: 3 }}>
+                      <AppInput
+                        label="Orden de Compra"
+                        helperText={ocAutoGenerada ? "Sugerida — puedes cambiarla por la OC real del cliente" : undefined}
+                        {...register("ordenCompra", { onChange: () => setOcAutoGenerada(false) })}
+                        placeholder="Ej: OC-2026-045"
+                      />
+                    </Grid>
+                  </Grid>
+                </AppCard>
+
+                <Box sx={{ display: "flex", alignItems: "center", gap: 0.75, mb: 1.5 }}>
+                  <ListAltOutlinedIcon fontSize="small" sx={{ color: "secondary.main" }} />
+                  <Typography variant="subtitle2" fontWeight={700}>
+                    Servicios / Partidas
+                  </Typography>
+                </Box>
+                <Paper elevation={0} sx={{ border: 1, borderColor: "divider", borderRadius: 1.5, overflow: "hidden", mb: 2 }}>
+                  <Table size="small" sx={{ "& .MuiTableCell-root": { py: 1.5, px: 2.25 } }}>
                     <TableHead>
                       <TableRow sx={{ bgcolor: "background.default" }}>
                         <TableCell sx={{ fontWeight: 700 }}>Descripción del servicio</TableCell>
@@ -199,7 +570,75 @@ export default function CotizacionDialog({ open, cotizacionId, onClose, onSaved 
                       {fields.map((field, idx) => (
                         <TableRow key={field.id}>
                           <TableCell>
-                            <AppInput {...register(`items.${idx}.descripcion`, { required: true })} placeholder="Ej: Calibración de vernier" />
+                            <Controller
+                              name={`items.${idx}.descripcion`}
+                              control={control}
+                              rules={{ required: true }}
+                              render={({ field: rhf }) => (
+                                <Autocomplete
+                                  freeSolo
+                                  options={equiposCliente}
+                                  getOptionLabel={(opt) =>
+                                    typeof opt === "string" ? opt : `Calibración de ${[opt.marca, opt.modelo].filter(Boolean).join(" ")} (${opt.idInterno})`
+                                  }
+                                  value={rhf.value ?? ""}
+                                  onChange={(_, val) => {
+                                    if (val && typeof val === "object") {
+                                      rhf.onChange(`Calibración de ${[val.marca, val.modelo].filter(Boolean).join(" ")} (${val.idInterno})`);
+                                      setValue(`items.${idx}.marca`, val.marca || "");
+                                      setValue(`items.${idx}.modelo`, val.modelo || "");
+                                      setValue(`items.${idx}.equipo`, val._id); // la partida queda ligada al equipo registrado
+                                    } else {
+                                      rhf.onChange(val ?? "");
+                                      setValue(`items.${idx}.equipo`, "");
+                                    }
+                                  }}
+                                  onInputChange={(_, val, reason) => {
+                                    if (reason !== "reset") rhf.onChange(val);
+                                    if (reason === "input") setValue(`items.${idx}.equipo`, ""); // si edita el texto a mano, se rompe el vínculo
+                                  }}
+                                  onBlur={rhf.onBlur}
+                                  renderInput={(params) => (
+                                    <TextField
+                                      {...params} inputRef={rhf.ref} placeholder="Ej: Calibración de vernier"
+                                      helperText={items[idx]?.equipo
+                                        ? `Equipo registrado: ${equiposCliente.find((e) => e._id === items[idx].equipo)?.idInterno || "vinculado"} — se asignará solo al abrir el reporte`
+                                        : undefined}
+                                    />
+                                  )}
+                                />
+                              )}
+                            />
+                            <Box sx={{ display: "flex", gap: 1, mt: 1.25 }}>
+                              <AppInput
+                                label="Marca" size="small" fullWidth
+                                slotProps={{ inputLabel: { shrink: !!items[idx]?.marca } }}
+                                {...register(`items.${idx}.marca`)}
+                              />
+                              <AppInput
+                                label="Modelo" size="small" fullWidth
+                                slotProps={{ inputLabel: { shrink: !!items[idx]?.modelo } }}
+                                {...register(`items.${idx}.modelo`)}
+                              />
+                              <AppInput
+                                label="Tiempo de entrega" size="small" fullWidth
+                                placeholder="Ej: 3 días hábiles"
+                                slotProps={{ inputLabel: { shrink: !!items[idx]?.tiempoEntrega } }}
+                                {...register(`items.${idx}.tiempoEntrega`)}
+                              />
+                            </Box>
+                            <Box sx={{ display: "flex", gap: 1, mt: 1.25 }}>
+                              <AppInput
+                                label="Clave SAT prod/serv" size="small" fullWidth placeholder="80101504"
+                                slotProps={{ inputLabel: { shrink: true } }}
+                                {...register(`items.${idx}.claveProdServ`, { pattern: /^\d{6,8}$/ })}
+                              />
+                              <AppInput
+                                label="Clave unidad SAT" size="small" fullWidth placeholder="E48"
+                                slotProps={{ inputLabel: { shrink: true } }}
+                                {...register(`items.${idx}.claveUnidad`)}
+                              />
+                            </Box>
                           </TableCell>
                           <TableCell>
                             <AppInput type="number" {...register(`items.${idx}.cantidad`, { required: true, min: 1 })} inputProps={{ min: 1 }} />
@@ -213,7 +652,7 @@ export default function CotizacionDialog({ open, cotizacionId, onClose, onSaved 
                             </Typography>
                           </TableCell>
                           <TableCell>
-                            <IconButton size="small" onClick={() => remove(idx)} disabled={fields.length === 1}>
+                            <IconButton type="button" size="small" onClick={() => remove(idx)} disabled={fields.length === 1}>
                               <DeleteOutlineIcon fontSize="small" sx={{ color: "error.main" }} />
                             </IconButton>
                           </TableCell>
@@ -225,17 +664,18 @@ export default function CotizacionDialog({ open, cotizacionId, onClose, onSaved 
 
                 <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 3 }}>
                   <AppButton
+                    type="button"
                     variant="outlined"
                     startIcon={<AddCircleOutlineIcon />}
-                    onClick={() => append({ descripcion: "", cantidad: 1, precioUnitario: 0 })}
+                    onClick={() => append({ ...ITEM_VACIO })}
                     sx={{ borderRadius: 2 }}
                   >
                     Agregar partida
                   </AppButton>
                   <Box sx={{ textAlign: "right" }}>
-                    <Typography color="text.secondary" variant="body2">Total estimado (antes de IVA)</Typography>
-                    <Typography variant="h5" fontWeight={700} color="secondary.main">{formatCurrency(total)}</Typography>
-                    <Typography variant="caption" color="text.secondary">El IVA (16%) se calcula al guardar</Typography>
+                    <Typography color="text.secondary" variant="body2">Subtotal: {formatCurrency(subtotal)}</Typography>
+                    <Typography color="text.secondary" variant="body2">IVA ({ivaPorcentaje || 0}%): {formatCurrency(ivaCalc)}</Typography>
+                    <Typography variant="h5" fontWeight={700} color="secondary.main">{formatCurrency(total)} {moneda}</Typography>
                   </Box>
                 </Box>
 
@@ -244,7 +684,47 @@ export default function CotizacionDialog({ open, cotizacionId, onClose, onSaved 
                   multiline
                   rows={3}
                   {...register("observaciones")}
+                  sx={{ mb: 3 }}
                 />
+
+                <Typography variant="subtitle2" fontWeight={700} sx={{ mb: 1.5 }}>
+                  Archivos adjuntos
+                </Typography>
+                {!isEdit ? (
+                  <Typography variant="caption" color="text.secondary">
+                    Podrás adjuntar archivos extra una vez que guardes la cotización.
+                  </Typography>
+                ) : (
+                  <Box>
+                    {adjuntos.length > 0 && (
+                      <Box sx={{ display: "flex", flexDirection: "column", gap: 0.75, mb: 1.5 }}>
+                        {adjuntos.map((a) => (
+                          <Box key={a._id} sx={{ display: "flex", alignItems: "center", gap: 1, p: 1, borderRadius: 2, border: 1, borderColor: "divider" }}>
+                            <InsertDriveFileOutlinedIcon fontSize="small" sx={{ color: "text.secondary" }} />
+                            <Typography variant="body2" sx={{ flex: 1, minWidth: 0 }} noWrap>{a.nombreOriginal}</Typography>
+                            <Typography variant="caption" color="text.secondary">{tamanoLegible(a.tamano)}</Typography>
+                            <IconButton type="button" size="small" onClick={() => descargarAdjunto(a)}>
+                              <DownloadOutlinedIcon fontSize="small" sx={{ color: "secondary.main" }} />
+                            </IconButton>
+                            <IconButton type="button" size="small" onClick={() => quitarAdjunto(a)}>
+                              <DeleteOutlineIcon fontSize="small" sx={{ color: "error.main" }} />
+                            </IconButton>
+                          </Box>
+                        ))}
+                      </Box>
+                    )}
+                    <AppButton
+                      component="label" variant="outlined" size="small" startIcon={<AttachFileOutlinedIcon />}
+                      loading={subiendoAdjunto} sx={{ borderRadius: 2 }}
+                    >
+                      Adjuntar archivo
+                      <input
+                        type="file" hidden
+                        onChange={(e) => { const f = e.target.files?.[0]; if (f) subirArchivo(f); e.target.value = ""; }}
+                      />
+                    </AppButton>
+                  </Box>
+                )}
               </>
             )}
           </Box>

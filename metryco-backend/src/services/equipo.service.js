@@ -1,0 +1,135 @@
+const mongoose = require("mongoose");
+const Equipo = require("../models/Equipo");
+const Cliente = require("../models/Cliente");
+const AppError = require("../utils/AppError");
+const escapeRegex = require("../utils/escapeRegex");
+const qr = require("../utils/qr");
+const { publicWebUrl } = require("../config/env");
+const { prefijoDesdeNombre: prefijoBase } = require("../utils/prefijoCliente");
+
+const prefijoDesdeNombre = (nombre) => prefijoBase(nombre, "EQ");
+
+/**
+ * ID interno consecutivo por CLIENTE (no global), con prefijo ligado a su
+ * nombre para que sea identificable a simple vista: "AB-001", "AB-002"...
+ * Solo se usa cuando el usuario no captura uno propio (código de activo del
+ * cliente).
+ *
+ * Se calcula a partir del MAYOR consecutivo que YA EXISTE con ese mismo
+ * prefijo (incluyendo códigos capturados a mano, no solo los auto-generados
+ * antes) — un contador aparte se podía desincronizar de la realidad si
+ * alguien capturaba un código manual; así siempre sigue la secuencia real.
+ */
+async function siguienteIdInterno(clienteId) {
+  const cliente = await Cliente.findById(clienteId).select("nombre nombreComercial");
+  const prefijo = prefijoDesdeNombre(cliente?.nombreComercial || cliente?.nombre);
+  const regex = new RegExp(`^${prefijo}-(\\d+)$`);
+
+  const existentes = await Equipo.find({ cliente: clienteId, idInterno: regex }).select("idInterno");
+  const maxActual = existentes.reduce((max, e) => {
+    const n = parseInt(e.idInterno.match(regex)[1], 10);
+    return n > max ? n : max;
+  }, 0);
+
+  let siguiente = maxActual + 1;
+  let idInterno = `${prefijo}-${String(siguiente).padStart(3, "0")}`;
+  // Por si dos altas se cruzan justo entre el cálculo y el guardado real.
+  while (await Equipo.exists({ cliente: clienteId, idInterno })) {
+    siguiente++;
+    idInterno = `${prefijo}-${String(siguiente).padStart(3, "0")}`;
+  }
+  return idInterno;
+}
+
+function urlInterna(id) {
+  return `${publicWebUrl.replace(/\/$/, "")}/equipos/${id}/editar`;
+}
+
+async function listar({ search = "", clienteId = "", categoria = "", incluirInactivos = false, page = 0, pageSize = 10 }) {
+  const match = {};
+  if (!incluirInactivos) match.status = "activo";
+  if (clienteId && mongoose.isValidObjectId(clienteId)) {
+    match.cliente = new mongoose.Types.ObjectId(clienteId);
+  }
+  if (categoria) match.categoria = categoria;
+  if (search) {
+    const rx = new RegExp(escapeRegex(search), "i");
+    match.$or = [{ idInterno: rx }, { marca: rx }, { modelo: rx }, { serie: rx }, { descripcion: rx }];
+  }
+
+  const [items, total] = await Promise.all([
+    Equipo.find(match)
+      .populate("cliente", "nombre rfc")
+      .populate("patronesSugeridos", "codigo nombre")
+      .sort({ createdAt: -1 })
+      .skip(page * pageSize)
+      .limit(pageSize),
+    Equipo.countDocuments(match),
+  ]);
+  return { items, total };
+}
+
+async function obtener(id) {
+  const equipo = await Equipo.findById(id)
+    .populate("cliente", "nombre rfc")
+    .populate("patronesSugeridos", "codigo nombre categoria");
+  if (!equipo) throw new AppError("Equipo no encontrado", 404);
+  return equipo;
+}
+
+async function crear(datos, usuarioId) {
+  if (!mongoose.isValidObjectId(datos.cliente)) throw new AppError("Cliente inválido", 400);
+  if (!(await Cliente.exists({ _id: datos.cliente }))) throw new AppError("Cliente no encontrado", 404);
+  const idInterno = datos.idInterno?.trim() || (await siguienteIdInterno(datos.cliente));
+  return Equipo.create({ ...datos, idInterno, registradoPor: usuarioId });
+}
+
+async function actualizar(id, datos) {
+  if (datos.cliente && !mongoose.isValidObjectId(datos.cliente)) {
+    throw new AppError("Cliente inválido", 400);
+  }
+  const equipo = await Equipo.findByIdAndUpdate(id, datos, { new: true, runValidators: true });
+  if (!equipo) throw new AppError("Equipo no encontrado", 404);
+  return equipo;
+}
+
+// "Eliminar" un equipo es un soft-delete (inactivar): un equipo de cliente
+// puede tener historial de calibraciones detrás, borrarlo de verdad
+// rompería esas referencias. Deja de aparecer en los listados normales
+// (listar() ya filtra por status:"activo" salvo que se pida incluirInactivos)
+// pero sigue existiendo para consultas directas por id.
+async function eliminar(id) {
+  const equipo = await Equipo.findByIdAndUpdate(id, { status: "inactivo" }, { new: true });
+  if (!equipo) throw new AppError("Equipo no encontrado", 404);
+  return equipo;
+}
+
+async function reactivar(id) {
+  const equipo = await Equipo.findByIdAndUpdate(id, { status: "activo" }, { new: true });
+  if (!equipo) throw new AppError("Equipo no encontrado", 404);
+  return equipo;
+}
+
+async function qrPng(id) {
+  const equipo = await Equipo.findById(id).select("_id");
+  if (!equipo) throw new AppError("Equipo no encontrado", 404);
+  return qr.pngBuffer(urlInterna(equipo._id));
+}
+
+async function qrSvg(id) {
+  const equipo = await Equipo.findById(id).select("_id");
+  if (!equipo) throw new AppError("Equipo no encontrado", 404);
+  return qr.svg(urlInterna(equipo._id));
+}
+
+// Sujeta el consecutivo (misma función que usa crear() cuando idInterno
+// viene vacío) para que el técnico vea el ID real antes de guardar. Si al
+// final cancela el alta, ese número simplemente se salta — igual que pasa
+// con los folios de Reporte/Certificado cuando algo no se completa.
+async function previewSiguienteIdInterno(clienteId) {
+  if (!mongoose.isValidObjectId(clienteId)) throw new AppError("Cliente inválido", 400);
+  if (!(await Cliente.exists({ _id: clienteId }))) throw new AppError("Cliente no encontrado", 404);
+  return siguienteIdInterno(clienteId);
+}
+
+module.exports = { listar, obtener, crear, actualizar, eliminar, reactivar, qrPng, qrSvg, previewSiguienteIdInterno };

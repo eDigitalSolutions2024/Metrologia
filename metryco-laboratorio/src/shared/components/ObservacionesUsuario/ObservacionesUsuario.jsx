@@ -1,7 +1,7 @@
 import { useState } from "react";
 import {
   Dialog, DialogTitle, DialogContent, DialogActions, Box, Typography,
-  Alert, Stack, Avatar, TextField, Chip, IconButton, Tooltip,
+  Alert, Avatar, TextField, Chip, IconButton, Tooltip,
 } from "@mui/material";
 import ChatBubbleOutlineOutlinedIcon from "@mui/icons-material/ChatBubbleOutlineOutlined";
 import DeleteOutlineIcon from "@mui/icons-material/DeleteOutlineOutlined";
@@ -112,14 +112,14 @@ export default function ObservacionesUsuario({ open, onClose, usuario, onSaved }
           </Box>
         </Box>
 
-        <Stack direction="row" spacing={1} sx={{ alignItems: "center", mb: 1.5 }}>
+        <Box sx={{ display: "flex", flexDirection: "row", gap: 1, alignItems: "center", mb: 1.5 }}>
           <Typography variant="subtitle2" color="text.secondary">
             Historial
           </Typography>
           {lista.length > 0 && (
             <Chip label={lista.length} size="small" sx={{ height: 18, fontSize: 11 }} />
           )}
-        </Stack>
+        </Box>
 
         {lista.length === 0 ? (
           <Box sx={{ textAlign: "center", py: 4, color: "text.secondary" }}>
@@ -127,7 +127,7 @@ export default function ObservacionesUsuario({ open, onClose, usuario, onSaved }
             <Typography variant="body2">Todavía no hay observaciones registradas.</Typography>
           </Box>
         ) : (
-          <Stack spacing={1.5} sx={{ maxHeight: 340, overflowY: "auto", pr: 0.5 }}>
+          <Box sx={{ display: "flex", flexDirection: "column", gap: 1.5, maxHeight: 340, overflowY: "auto", pr: 0.5 }}>
             {lista.map((o, i) => (
               <Box key={o._id || i} sx={{ display: "flex", gap: 1.5 }}>
                 <Avatar
@@ -163,7 +163,7 @@ export default function ObservacionesUsuario({ open, onClose, usuario, onSaved }
                 </Box>
               </Box>
             ))}
-          </Stack>
+          </Box>
         )}
       </DialogContent>
 

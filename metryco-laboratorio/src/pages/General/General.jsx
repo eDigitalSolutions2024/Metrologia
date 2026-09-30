@@ -1,12 +1,15 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   Box, Typography, TextField, InputAdornment, Chip, Avatar, Alert,
 } from "@mui/material";
 import SearchIcon from "@mui/icons-material/Search";
+import ContactsOutlinedIcon from "@mui/icons-material/ContactsOutlined";
 
 import AppTable from "../../shared/components/AppTable";
+import PageHeader from "../../shared/components/PageHeader";
 import { obtenerDirectorio } from "../../services/usuarios";
 import { useDebounce } from "../../shared/hooks/useDebounce";
+import { usePolling } from "../../shared/hooks/usePolling";
 
 const ROL_MAP = {
   admin: { label: "Administrador", color: "error" },
@@ -25,32 +28,33 @@ export default function General() {
   const [directorio, setDirectorio] = useState([]);
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(0);
+  const [rowsPerPage, setRowsPerPage] = useState(10);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
   const debouncedSearch = useDebounce(search, 300);
 
-  useEffect(() => {
-    let cancelado = false;
-
-    (async () => {
-      setLoading(true);
-      setError("");
-      try {
-        const data = await obtenerDirectorio();
-        if (cancelado) return;
-        setDirectorio(data);
-      } catch {
-        if (!cancelado) setError("No se pudo cargar el directorio general.");
-      } finally {
-        if (!cancelado) setLoading(false);
-      }
-    })();
-
-    return () => {
-      cancelado = true;
-    };
+  // Protege contra condiciones de carrera entre llamadas que se traslapen
+  // (ver misma nota en CotizacionesPage.jsx) — aquí es poco probable porque
+  // `cargar` no depende de filtros, pero el refresco de fondo (usePolling)
+  // sí puede traslaparse con una recarga manual lenta.
+  const cargaIdRef = useRef(0);
+  const cargar = useCallback(async (silencioso = false) => {
+    const miId = ++cargaIdRef.current;
+    if (!silencioso) { setLoading(true); setError(""); }
+    try {
+      const data = await obtenerDirectorio();
+      if (cargaIdRef.current !== miId) return;
+      setDirectorio(data);
+    } catch {
+      if (cargaIdRef.current === miId && !silencioso) setError("No se pudo cargar el directorio general.");
+    } finally {
+      if (cargaIdRef.current === miId && !silencioso) setLoading(false);
+    }
   }, []);
+
+  useEffect(() => { cargar(); }, [cargar]);
+  usePolling(() => cargar(true));
 
   const filtrado = directorio.filter((u) => {
     const q = debouncedSearch.toLowerCase();
@@ -63,13 +67,14 @@ export default function General() {
   });
 
   const rows = filtrado
-    .slice(page * 10, page * 10 + 10)
+    .slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage)
     .map((u) => ({ ...u, id: u._id }));
 
   const columns = [
     {
       field: "nombre",
       headerName: "Usuario",
+      minWidth: 200,
       renderCell: (row) => (
         <Box sx={{ display: "flex", alignItems: "center", gap: 1.5 }}>
           <Avatar sx={{ width: 32, height: 32, fontSize: 13, bgcolor: "secondary.main" }}>
@@ -86,10 +91,11 @@ export default function General() {
         </Box>
       ),
     },
-    { field: "email", headerName: "Correo" },
+    { field: "email", headerName: "Correo", hideBelow: "md", renderCell: (row) => row.email || "—" },
     {
       field: "rol",
       headerName: "Rol",
+      nowrap: true,
       renderCell: (row) => {
         const r = ROL_MAP[row.rol] ?? { label: row.rol, color: "default" };
         return <Chip label={r.label} color={r.color} size="small" />;
@@ -98,20 +104,19 @@ export default function General() {
     {
       field: "sucursal",
       headerName: "Sucursal",
+      nowrap: true,
+      hideBelow: "sm",
       renderCell: (row) => SUCURSAL_LABELS[row.sucursal] || row.sucursal || "—",
     },
   ];
 
   return (
     <Box sx={{ "& > * + *": { mt: 3 } }}>
-      <Box>
-        <Typography variant="h5" fontWeight={700}>
-          Directorio General
-        </Typography>
-        <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
-          Consulta de todo el personal de la empresa
-        </Typography>
-      </Box>
+      <PageHeader
+        icon={<ContactsOutlinedIcon />}
+        title="Directorio General"
+        subtitle="Consulta de todo el personal de la empresa"
+      />
 
       {error && <Alert severity="error" sx={{ borderRadius: 2 }}>{error}</Alert>}
 
@@ -125,12 +130,14 @@ export default function General() {
             setPage(0);
           }}
           sx={{ width: 340, "& .MuiOutlinedInput-root": { borderRadius: 2 } }}
-          InputProps={{
-            startAdornment: (
-              <InputAdornment position="start">
-                <SearchIcon fontSize="small" sx={{ color: "text.secondary" }} />
-              </InputAdornment>
-            ),
+          slotProps={{
+            input: {
+              startAdornment: (
+                <InputAdornment position="start">
+                  <SearchIcon fontSize="small" sx={{ color: "text.secondary" }} />
+                </InputAdornment>
+              ),
+            },
           }}
         />
       </Box>
@@ -141,8 +148,9 @@ export default function General() {
         loading={loading}
         totalCount={filtrado.length}
         page={page}
-        rowsPerPage={10}
+        rowsPerPage={rowsPerPage}
         onPageChange={setPage}
+        onRowsPerPageChange={(n) => { setRowsPerPage(n); setPage(0); }}
       />
     </Box>
   );

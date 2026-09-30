@@ -1,20 +1,26 @@
+const fs = require("fs");
+const path = require("path");
 const mongoose = require("mongoose");
 const Cotizacion = require("../models/Cotizacion");
 const Cliente = require("../models/Cliente");
 const Counter = require("../models/Counter");
+const Reporte = require("../models/Reporte");
+const ComprobanteFiscal = require("../models/ComprobanteFiscal");
+const cotizacionFacturacion = require("./cotizacionFacturacion");
 const AppError = require("../utils/AppError");
-
-const IVA_RATE = 0.16;
+const configuracionService = require("./configuracion.service");
+const { destinoAdjuntosCotizacion } = require("../middleware/upload");
+const { prefijoDesdeNombre } = require("../utils/prefijoCliente");
 
 function redondear(n) {
   return Math.round(n * 100) / 100;
 }
 
-function calcularTotales(items) {
+function calcularTotales(items, ivaPorcentaje = 16) {
   const subtotal = redondear(
     items.reduce((sum, i) => sum + Number(i.cantidad) * Number(i.precioUnitario), 0)
   );
-  const iva = redondear(subtotal * IVA_RATE);
+  const iva = redondear(subtotal * (Number(ivaPorcentaje) / 100));
   const total = redondear(subtotal + iva);
   return { subtotal, iva, total };
 }
@@ -28,6 +34,37 @@ async function generarFolio() {
     { new: true, upsert: true }
   );
   return `COT-${year}-${String(counter.seq).padStart(3, "0")}`;
+}
+
+/**
+ * Sugerencia de Orden de Compra para cuando el cliente no trae ya la suya:
+ * "OC-<prefijo del cliente>-<año>-<consecutivo>", ej. "OC-IE-2026-001".
+ * Igual que idInterno/código de Equipo/Patrón, el consecutivo se calcula del
+ * MAYOR folio real ya usado por ese cliente (no un contador aparte), para no
+ * desincronizarse si alguien más adelante captura una OC manual.
+ */
+async function siguienteOrdenCompra(clienteId) {
+  const cliente = await Cliente.findById(clienteId).select("nombre nombreComercial");
+  if (!cliente) throw new AppError("Cliente no encontrado", 404);
+
+  const prefijo = prefijoDesdeNombre(cliente.nombreComercial || cliente.nombre, "OC");
+  const anio = new Date().getFullYear();
+  const base = `OC-${prefijo}-${anio}`;
+  const regex = new RegExp(`^${base}-(\\d+)$`);
+
+  const existentes = await Cotizacion.find({ cliente: clienteId, ordenCompra: regex }).select("ordenCompra");
+  const maxActual = existentes.reduce((max, c) => {
+    const n = parseInt(c.ordenCompra.match(regex)[1], 10);
+    return n > max ? n : max;
+  }, 0);
+
+  let siguiente = maxActual + 1;
+  let ordenCompra = `${base}-${String(siguiente).padStart(3, "0")}`;
+  while (await Cotizacion.exists({ ordenCompra })) {
+    siguiente++;
+    ordenCompra = `${base}-${String(siguiente).padStart(3, "0")}`;
+  }
+  return ordenCompra;
 }
 
 async function listar({ search = "", status = "todos", mes = "", anio = "", clienteId = "", page = 0, pageSize = 10 }) {
@@ -55,6 +92,21 @@ async function listar({ search = "", status = "todos", mes = "", anio = "", clie
     { $unwind: "$clienteInfo" },
     { $lookup: { from: "usuarios", localField: "creadoPor", foreignField: "_id", as: "vendedorInfo" } },
     { $unwind: { path: "$vendedorInfo", preserveNullAndEmptyArrays: true } },
+    // CFDI de ingreso vigente (no cancelado) que nació de esta cotización, el más reciente.
+    {
+      $lookup: {
+        from: ComprobanteFiscal.collection.name,
+        let: { cotizacionId: "$_id" },
+        pipeline: [
+          { $match: { $expr: { $and: [{ $eq: ["$cotizacion", "$$cotizacionId"] }, { $eq: ["$tipoComprobante", "I"] }, { $ne: ["$estado", "cancelada"] }] } } },
+          { $sort: { createdAt: -1 } },
+          { $limit: 1 },
+          { $project: { folioInterno: 1, estado: 1, metodoPago: 1, total: 1, saldoPendiente: 1 } },
+        ],
+        as: "cfdiInfo",
+      },
+    },
+    { $addFields: { cfdi: { $arrayElemAt: ["$cfdiInfo", 0] } } },
   ];
 
   if (search) {
@@ -78,17 +130,40 @@ async function listar({ search = "", status = "todos", mes = "", anio = "", clie
     Cotizacion.aggregate([...pipeline, { $count: "total" }]),
   ]);
 
+  const avances = await cotizacionFacturacion.avanceVarios(items);
+  for (const it of items) {
+    const av = avances.get(String(it._id));
+    it.facturacion = { parcial: av.parcial, completa: av.completa, partidasFacturadas: av.partidasFacturadas, partidasTotal: av.partidasTotal };
+  }
+
   return { items, total: totalResult[0]?.total ?? 0 };
 }
 
 async function obtener(id) {
-  const cotizacion = await Cotizacion.findById(id).populate("cliente", "nombre rfc");
+  const cotizacion = await Cotizacion.findById(id)
+    .populate("cliente", "nombre rfc contacto domicilioFiscal")
+    .populate("razonSocial")
+    .populate("contacto")
+    .lean();
   if (!cotizacion) throw new AppError("Cotización no encontrada", 404);
+
+  // Liga inversa: qué Reporte de Servicio (si alguno) se abrió a partir de esta
+  // cotización, para poder saltar de una a otro igual que en el PHP legacy.
+  const reporte = await Reporte.findOne({ cotizacion: id }).select("folio status").lean();
+  cotizacion.reporte = reporte || null;
+
+  cotizacion.facturacion = (await cotizacionFacturacion.avanceVarios([cotizacion])).get(String(cotizacion._id));
+
+  cotizacion.cfdi = await ComprobanteFiscal.findOne({ cotizacion: id, tipoComprobante: "I", estado: { $ne: "cancelada" } })
+    .sort({ createdAt: -1 })
+    .select("folioInterno estado metodoPago total saldoPendiente")
+    .lean();
+
   return cotizacion;
 }
 
 async function crear(datos, usuarioId) {
-  const { cliente, vigencia, items, observaciones } = datos;
+  const { cliente, razonSocial, contacto, vigencia, ordenCompra, items, observaciones, moneda, ivaPorcentaje } = datos;
 
   if (!mongoose.isValidObjectId(cliente)) {
     throw new AppError("Cliente inválido", 400);
@@ -101,22 +176,28 @@ async function crear(datos, usuarioId) {
   }
 
   const folio = await generarFolio();
-  const totales = calcularTotales(items);
+  const totales = calcularTotales(items, ivaPorcentaje);
 
   return Cotizacion.create({
     folio,
     cliente,
+    contacto: contacto || undefined,
+    razonSocial: razonSocial || undefined,
     vigencia,
+    ordenCompra: ordenCompra || undefined,
     items,
     observaciones,
+    moneda: moneda || "MXN",
+    ivaPorcentaje: ivaPorcentaje ?? 16,
     creadoPor: usuarioId,
     ...totales,
   });
 }
 
 async function actualizar(id, datos) {
-  const { cliente, vigencia, items, observaciones, status } = datos;
+  const { cliente, razonSocial, contacto, vigencia, ordenCompra, items, observaciones, status, moneda, ivaPorcentaje } = datos;
   const cambios = {};
+  if (ordenCompra !== undefined) cambios.ordenCompra = ordenCompra;
 
   if (cliente) {
     if (!mongoose.isValidObjectId(cliente)) throw new AppError("Cliente inválido", 400);
@@ -124,17 +205,28 @@ async function actualizar(id, datos) {
     if (!clienteExiste) throw new AppError("Cliente no encontrado", 404);
     cambios.cliente = cliente;
   }
+  if (razonSocial !== undefined) cambios.razonSocial = razonSocial || null;
+  if (contacto !== undefined) cambios.contacto = contacto || null;
 
   if (vigencia) cambios.vigencia = vigencia;
   if (observaciones !== undefined) cambios.observaciones = observaciones;
   if (status) cambios.status = status;
+  if (moneda) cambios.moneda = moneda;
 
   if (items) {
     if (!Array.isArray(items) || items.length === 0) {
       throw new AppError("Agrega al menos una partida", 400);
     }
     cambios.items = items;
-    Object.assign(cambios, calcularTotales(items));
+    const cotizacionActual = ivaPorcentaje === undefined ? await Cotizacion.findById(id).select("ivaPorcentaje") : null;
+    const tasa = ivaPorcentaje ?? cotizacionActual?.ivaPorcentaje ?? 16;
+    cambios.ivaPorcentaje = tasa;
+    Object.assign(cambios, calcularTotales(items, tasa));
+  } else if (ivaPorcentaje !== undefined) {
+    const actual = await Cotizacion.findById(id).select("items");
+    if (!actual) throw new AppError("Cotización no encontrada", 404);
+    cambios.ivaPorcentaje = ivaPorcentaje;
+    Object.assign(cambios, calcularTotales(actual.items, ivaPorcentaje));
   }
 
   const cotizacion = await Cotizacion.findByIdAndUpdate(id, cambios, {
@@ -151,4 +243,73 @@ async function eliminar(id) {
   return cotizacion;
 }
 
-module.exports = { listar, obtener, crear, actualizar, eliminar };
+/** Datos completos para la vista imprimible (equivalente a cotizacion_pdf.php). */
+async function paraImprimir(id) {
+  const cotizacion = await Cotizacion.findById(id)
+    .populate("cliente")
+    .populate("razonSocial")
+    .populate("contacto")
+    .populate("creadoPor", "nombre usuario");
+  if (!cotizacion) throw new AppError("Cotización no encontrada", 404);
+
+  const laboratorioBase = await configuracionService.obtenerLaboratorio();
+  // Si la cotización tiene una razón social propia, su membrete manda sobre
+  // los datos generales del laboratorio (mismo criterio que el legacy).
+  const laboratorio = cotizacion.razonSocial
+    ? {
+        nombre: cotizacion.razonSocial.nombre,
+        rfc: cotizacion.razonSocial.rfc,
+        domicilio: cotizacion.razonSocial.domicilio,
+        telefono: cotizacion.razonSocial.telefono,
+        acreditacion: cotizacion.razonSocial.acreditacion,
+      }
+    : laboratorioBase;
+  const logo = await configuracionService.obtenerLogo();
+  return { cotizacion, laboratorio, logo };
+}
+
+async function subirAdjunto(id, file, usuarioId) {
+  if (!file) throw new AppError("No se recibió el archivo", 400);
+  const cotizacion = await Cotizacion.findById(id);
+  if (!cotizacion) {
+    fs.unlink(file.path, () => {});
+    throw new AppError("Cotización no encontrada", 404);
+  }
+  cotizacion.adjuntos.push({
+    nombreArchivo: file.filename,
+    nombreOriginal: file.originalname,
+    mimetype: file.mimetype,
+    tamano: file.size,
+    subidoPor: usuarioId,
+    fecha: new Date(),
+  });
+  await cotizacion.save();
+  return cotizacion;
+}
+
+async function archivoAdjuntoStream(id, adjuntoId) {
+  const cotizacion = await Cotizacion.findById(id).select("adjuntos");
+  if (!cotizacion) throw new AppError("Cotización no encontrada", 404);
+  const adjunto = cotizacion.adjuntos.id(adjuntoId);
+  if (!adjunto) throw new AppError("Adjunto no encontrado", 404);
+  const ruta = path.join(destinoAdjuntosCotizacion, adjunto.nombreArchivo);
+  if (!fs.existsSync(ruta)) throw new AppError("El archivo ya no existe en el servidor", 404);
+  return { ruta, nombre: adjunto.nombreOriginal };
+}
+
+async function eliminarAdjunto(id, adjuntoId) {
+  const cotizacion = await Cotizacion.findById(id);
+  if (!cotizacion) throw new AppError("Cotización no encontrada", 404);
+  const adjunto = cotizacion.adjuntos.id(adjuntoId);
+  if (!adjunto) throw new AppError("Adjunto no encontrado", 404);
+  const ruta = path.join(destinoAdjuntosCotizacion, adjunto.nombreArchivo);
+  if (fs.existsSync(ruta)) fs.unlink(ruta, () => {});
+  adjunto.deleteOne();
+  await cotizacion.save();
+  return cotizacion;
+}
+
+module.exports = {
+  listar, obtener, crear, actualizar, eliminar, paraImprimir,
+  subirAdjunto, archivoAdjuntoStream, eliminarAdjunto, siguienteOrdenCompra,
+};

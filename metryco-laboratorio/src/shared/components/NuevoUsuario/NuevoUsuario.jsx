@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   Dialog, DialogTitle, DialogContent, DialogActions, Grid, Alert, Box, Divider, Typography,
   MenuItem, Select, FormControl, InputLabel, IconButton, InputAdornment, Tooltip,
@@ -8,11 +8,24 @@ import PersonAddAltOutlinedIcon from "@mui/icons-material/PersonAddAltOutlined";
 import RefreshIcon from "@mui/icons-material/Refresh";
 import ContentCopyIcon from "@mui/icons-material/ContentCopy";
 import VpnKeyOutlinedIcon from "@mui/icons-material/VpnKeyOutlined";
+import DrawOutlinedIcon from "@mui/icons-material/DrawOutlined";
+import { Button } from "@mui/material";
 import { useForm } from "react-hook-form";
 import AppInput from "../AppInput";
 import AppButton from "../AppButton";
-import { crearUsuario } from "../../../services/usuarios";
+import { crearUsuario, subirFirmaUsuario } from "../../../services/usuarios";
 import { generarPasswordSegura } from "../../utils/generarPassword";
+
+// "Juan Pérez" -> "juanp" (nombre completo + inicial del/los apellidos),
+// sin acentos ni espacios — mismo patrón que ya usan las cuentas reales.
+function usuarioDesdeNombre(nombre) {
+  const limpio = (nombre || "")
+    .normalize("NFD").replace(/[̀-ͯ]/g, "")
+    .toLowerCase().replace(/[^a-z\s]/g, "").trim();
+  const partes = limpio.split(/\s+/).filter(Boolean);
+  if (!partes.length) return "";
+  return partes[0] + partes.slice(1).map((p) => p[0]).join("");
+}
 
 const ROLES = [
   { value: "admin", label: "Administrador" },
@@ -42,6 +55,8 @@ export default function NuevoUsuario({ open, onClose, onCreated }) {
   const theme = useTheme();
   const [submitError, setSubmitError] = useState("");
   const [copiado, setCopiado] = useState(false);
+  const [usuarioTocado, setUsuarioTocado] = useState(false);
+  const [firmaFile, setFirmaFile] = useState(null);
   const {
     register,
     handleSubmit,
@@ -56,11 +71,23 @@ export default function NuevoUsuario({ open, onClose, onCreated }) {
   });
 
   const password = watch("password");
+  const nombre = watch("nombre");
+  const usuario = watch("usuario");
+  const { onChange: onChangeUsuarioRHF, ...usuarioReg } = register("usuario", { required: "Campo obligatorio" });
+
+  // Mientras el usuario no haya escrito su propio login, se lo proponemos a
+  // partir del nombre (editable en cualquier momento — deja de auto-rellenarse
+  // en cuanto lo toca a mano).
+  useEffect(() => {
+    if (!usuarioTocado) setValue("usuario", usuarioDesdeNombre(nombre));
+  }, [nombre, usuarioTocado, setValue]);
 
   const cerrar = () => {
     reset({ password: generarPasswordSegura() });
     setSubmitError("");
     setCopiado(false);
+    setUsuarioTocado(false);
+    setFirmaFile(null);
     onClose();
   };
 
@@ -82,8 +109,12 @@ export default function NuevoUsuario({ open, onClose, onCreated }) {
   const onSubmit = async (data) => {
     setSubmitError("");
     try {
-      await crearUsuario(data);
+      const creado = await crearUsuario(data);
+      if (firmaFile && creado?.id) {
+        try { await subirFirmaUsuario(creado.id, firmaFile); } catch { /* se puede subir luego en Editar */ }
+      }
       reset({ password: generarPasswordSegura() });
+      setFirmaFile(null);
       onCreated?.();
       onClose();
     } catch (err) {
@@ -105,7 +136,7 @@ export default function NuevoUsuario({ open, onClose, onCreated }) {
             <PersonAddAltOutlinedIcon />
           </Box>
           <Box>
-            <Typography variant="h6" fontWeight={700} lineHeight={1.2}>Nuevo Usuario</Typography>
+            <Typography variant="h6" fontWeight={700} sx={{ lineHeight: 1.2 }}>Nuevo Usuario</Typography>
             <Typography variant="body2" color="text.secondary">Registra un nuevo usuario en el sistema</Typography>
           </Box>
         </Box>
@@ -129,8 +160,11 @@ export default function NuevoUsuario({ open, onClose, onCreated }) {
               <AppInput
                 label="Usuario"
                 placeholder="Ej. juanp"
+                helperText="Se sugiere solo a partir del nombre — puedes cambiarlo"
                 error={errors.usuario}
-                {...register("usuario", { required: "Campo obligatorio" })}
+                {...usuarioReg}
+                value={usuario}
+                onChange={(e) => { setUsuarioTocado(true); onChangeUsuarioRHF(e); }}
               />
             </Grid>
             <Grid size={{ xs: 12, sm: 6 }}>
@@ -184,7 +218,7 @@ export default function NuevoUsuario({ open, onClose, onCreated }) {
           <SeccionTitulo>Contraseña temporal</SeccionTitulo>
           <Box
             sx={{
-              p: 2, borderRadius: 3, border: 1, borderColor: "divider",
+              p: 2, borderRadius: 2, border: 1, borderColor: "divider",
               bgcolor: "background.default", display: "flex", alignItems: "center", gap: 1.5,
             }}
           >
@@ -213,12 +247,12 @@ export default function NuevoUsuario({ open, onClose, onCreated }) {
                     endAdornment: (
                       <InputAdornment position="end">
                         <Tooltip title={copiado ? "¡Copiado!" : "Copiar"}>
-                          <IconButton size="small" onClick={copiarPassword} edge="end">
+                          <IconButton type="button" size="small" onClick={copiarPassword} edge="end">
                             <ContentCopyIcon fontSize="small" />
                           </IconButton>
                         </Tooltip>
                         <Tooltip title="Generar otra">
-                          <IconButton size="small" onClick={regenerarPassword} edge="end">
+                          <IconButton type="button" size="small" onClick={regenerarPassword} edge="end">
                             <RefreshIcon fontSize="small" />
                           </IconButton>
                         </Tooltip>
@@ -232,10 +266,30 @@ export default function NuevoUsuario({ open, onClose, onCreated }) {
           <Typography variant="caption" color="text.secondary" sx={{ display: "block", mt: 1 }}>
             Cópiala y compártela con el usuario. Podrá cambiarla después.
           </Typography>
+
+          <Divider sx={{ my: 2.5 }} />
+
+          <SeccionTitulo>Firma digital (opcional)</SeccionTitulo>
+          <Box sx={{ display: "flex", alignItems: "center", gap: 2, flexWrap: "wrap" }}>
+            <Box sx={{ width: 160, height: 60, border: "1px dashed", borderColor: "divider", borderRadius: 2, display: "grid", placeItems: "center", bgcolor: "background.default", overflow: "hidden" }}>
+              {firmaFile
+                ? <Box component="img" src={URL.createObjectURL(firmaFile)} alt="Firma" sx={{ maxWidth: "90%", maxHeight: "80%", objectFit: "contain" }} />
+                : <DrawOutlinedIcon color="disabled" />}
+            </Box>
+            <Button component="label" size="small" variant="outlined" sx={{ borderRadius: 2 }}>
+              {firmaFile ? "Cambiar" : "Subir firma"}
+              <input type="file" accept="image/png,image/jpeg,image/svg+xml,image/webp" hidden
+                onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ""; if (f) setFirmaFile(f); }} />
+            </Button>
+            {firmaFile && <Button size="small" color="error" onClick={() => setFirmaFile(null)} sx={{ borderRadius: 2 }}>Quitar</Button>}
+          </Box>
+          <Typography variant="caption" color="text.secondary" sx={{ display: "block", mt: 1 }}>
+            Aparece en los certificados que el usuario elabore, revise o autorice. Se puede subir después desde Editar.
+          </Typography>
         </DialogContent>
 
         <DialogActions sx={{ px: 3, pb: 3, pt: 1 }}>
-          <AppButton variant="outlined" onClick={cerrar} sx={{ borderRadius: 2 }}>Cancelar</AppButton>
+          <AppButton type="button" variant="outlined" onClick={cerrar} sx={{ borderRadius: 2 }}>Cancelar</AppButton>
           <AppButton type="submit" loading={isSubmitting} sx={{ borderRadius: 2 }}>Crear Usuario</AppButton>
         </DialogActions>
       </Box>

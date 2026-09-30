@@ -16,12 +16,14 @@ export default function ContactoDialog({ open, contacto, onClose, onSave, loadin
 
   useEffect(() => {
     if (open) {
-      reset(contacto ? { nombre: contacto.nombre, telefono: contacto.telefono, correo: contacto.correo } : { nombre: "", telefono: "", correo: "" });
+      reset(contacto
+        ? { nombre: contacto.nombre, telefono: contacto.telefono, correo: contacto.correo || "" }
+        : { nombre: "", telefono: "", correo: "" });
     }
   }, [open, contacto, reset]);
 
   return (
-    <Dialog open={open} onClose={onClose} maxWidth="xs" fullWidth>
+    <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth>
       <DialogTitle sx={{ fontWeight: 700 }}>{isEdit ? "Editar Contacto" : "Agregar Contacto"}</DialogTitle>
       <Box component="form" onSubmit={handleSubmit(onSave)}>
         <DialogContent sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
@@ -34,7 +36,7 @@ export default function ContactoDialog({ open, contacto, onClose, onSave, loadin
           <AppInput label="Correo" {...register("correo")} />
         </DialogContent>
         <DialogActions sx={{ px: 3, pb: 2 }}>
-          <Button onClick={onClose} disabled={loading}>Cancelar</Button>
+          <Button type="button" onClick={onClose} disabled={loading}>Cancelar</Button>
           <Button type="submit" variant="contained" disabled={loading}>Guardar</Button>
         </DialogActions>
       </Box>

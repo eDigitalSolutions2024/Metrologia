@@ -1,159 +1,486 @@
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { useForm, Controller } from "react-hook-form";
+import { useForm, useFieldArray, Controller } from "react-hook-form";
 import {
-  Box, Typography, Grid, MenuItem, Select, FormControl, InputLabel, Button,
+  Box, Typography, Grid, MenuItem, TextField, IconButton, Button, Alert, Chip, Divider, Autocomplete,
 } from "@mui/material";
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
+import AddIcon from "@mui/icons-material/Add";
+import DeleteOutlineIcon from "@mui/icons-material/DeleteOutlined";
 import UploadFileOutlinedIcon from "@mui/icons-material/UploadFileOutlined";
+import AutoAwesomeOutlinedIcon from "@mui/icons-material/AutoAwesomeOutlined";
 import DescriptionOutlinedIcon from "@mui/icons-material/DescriptionOutlined";
+import BadgeOutlinedIcon from "@mui/icons-material/BadgeOutlined";
+import SquareFootOutlinedIcon from "@mui/icons-material/SquareFootOutlined";
+import FunctionsOutlinedIcon from "@mui/icons-material/FunctionsOutlined";
+import VerifiedOutlinedIcon from "@mui/icons-material/VerifiedOutlined";
+import BuildOutlinedIcon from "@mui/icons-material/BuildOutlined";
 
 import AppButton from "../../shared/components/AppButton";
 import AppCard from "../../shared/components/AppCard";
-import AppInput from "../../shared/components/AppInput";
-import AppDatePicker from "../../shared/components/AppDatePicker";
-import { CATEGORIAS } from "./categorias";
-import { PATRONES_MOCK } from "./mockData";
+import PageHeader from "../../shared/components/PageHeader";
+import StraightenOutlinedIcon from "@mui/icons-material/StraightenOutlined";
+import { CATEGORIAS, iconoCategoria, colorCategoria, unidadesSugeridas } from "./categorias";
+import { obtenerPatron, crearPatron, actualizarPatron, adjuntarCertificadoPatron, obtenerSiguienteCodigoPatron, importarCertificadoPatron } from "../../services/patrones";
 
-// Refleja php/npatron.php: Información General + Verificación y Mantenimiento
-// (manejo/proceso/transporte/almacenamiento) + certificado PDF.
+const num = (v) => (v === "" || v == null ? undefined : Number(v));
+
+function vencimientoPreview(fecha, meses) {
+  if (!fecha || !meses) return null;
+  const d = new Date(fecha);
+  d.setMonth(d.getMonth() + Number(meses));
+  return d.toISOString().slice(0, 10);
+}
+
 export default function PatronForm() {
   const { id } = useParams();
   const navigate = useNavigate();
   const isEdit = !!id;
-  const patronActual = isEdit ? PATRONES_MOCK.find((p) => String(p.id) === id) : null;
 
-  const { register, control, handleSubmit, formState: { errors } } = useForm({
-    defaultValues: patronActual ?? {},
+  const [cargando, setCargando] = useState(isEdit);
+  const [error, setError] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [patronId, setPatronId] = useState(id || null);
+  const [archivoInfo, setArchivoInfo] = useState(null);
+  const [codigoAutoGenerado, setCodigoAutoGenerado] = useState(!isEdit);
+  const [generandoCodigo, setGenerandoCodigo] = useState(false);
+  const [importando, setImportando] = useState(false);
+  const [avisoImport, setAvisoImport] = useState(null); // { modo, advertencias, textoExtraido }
+  const [pdfImportado, setPdfImportado] = useState(null); // File — se adjunta al crear el patrón
+
+  const { register, control, handleSubmit, watch, reset, setValue, formState: { errors } } = useForm({
+    defaultValues: {
+      codigo: "", nombre: "", descripcion: "", comentarios: "", categoria: "", magnitud: "",
+      marca: "", modelo: "", serie: "",
+      unidad: "", intervaloMedicion: "", resolucion: "",
+      incertidumbre: { modo: "fija", k: 2, unidad: "", valor: "", puntos: [{ nominal: "", U: "" }] },
+      deriva: { valor: "", unidad: "", periodoMeses: 12 },
+      trazabilidad: "",
+      calibracion: { laboratorio: "", numeroCertificado: "", fecha: "", periodicidadMeses: 12 },
+      condicionesReferencia: "", manejo: "", procedimiento: "", transporte: "", almacenamiento: "",
+      estado: "activo",
+    },
   });
 
-  const onSubmit = (data) => {
-    // Sin backend de Patrones todavía (ver memoria del proyecto): se simula el guardado.
-    console.log(data);
-    navigate("/equipos/patrones");
+  const { fields, append, remove, replace } = useFieldArray({ control, name: "incertidumbre.puntos" });
+  const codigoValor = watch("codigo");
+  const categoriaElegida = watch("categoria");
+  const opcionesUnidades = unidadesSugeridas(categoriaElegida);
+  const modo = watch("incertidumbre.modo");
+  const fecha = watch("calibracion.fecha");
+  const periodicidad = watch("calibracion.periodicidadMeses");
+  const vencPreview = useMemo(() => vencimientoPreview(fecha, periodicidad), [fecha, periodicidad]);
+
+  // En alta: se muestra de una vez el código que le tocaría (consecutivo
+  // global), editable si se prefiere capturar uno propio.
+  useEffect(() => {
+    if (isEdit) return;
+    setGenerandoCodigo(true);
+    obtenerSiguienteCodigoPatron()
+      .then((codigo) => setValue("codigo", codigo))
+      .catch(() => {})
+      .finally(() => setGenerandoCodigo(false));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isEdit]);
+
+  useEffect(() => {
+    if (!isEdit) return;
+    obtenerPatron(id)
+      .then((p) => {
+        reset({
+          codigo: p.codigo || "", nombre: p.nombre || "", descripcion: p.descripcion || "",
+          comentarios: p.comentarios || "",
+          categoria: p.categoria || "", magnitud: p.magnitud || "",
+          marca: p.marca || "", modelo: p.modelo || "", serie: p.serie || "",
+          unidad: p.unidad || "", intervaloMedicion: p.intervaloMedicion || "", resolucion: p.resolucion || "",
+          incertidumbre: {
+            modo: p.incertidumbre?.modo || "fija",
+            k: p.incertidumbre?.k ?? 2,
+            unidad: p.incertidumbre?.unidad || "",
+            valor: p.incertidumbre?.valor ?? "",
+            puntos: p.incertidumbre?.puntos?.length ? p.incertidumbre.puntos : [{ nominal: "", U: "" }],
+          },
+          deriva: {
+            valor: p.deriva?.valor ?? "", unidad: p.deriva?.unidad || "",
+            periodoMeses: p.deriva?.periodoMeses ?? 12,
+          },
+          trazabilidad: p.trazabilidad || "",
+          calibracion: {
+            laboratorio: p.calibracion?.laboratorio || "",
+            numeroCertificado: p.calibracion?.numeroCertificado || "",
+            fecha: p.calibracion?.fecha ? p.calibracion.fecha.slice(0, 10) : "",
+            periodicidadMeses: p.calibracion?.periodicidadMeses ?? 12,
+          },
+          condicionesReferencia: p.condicionesReferencia || "", manejo: p.manejo || "",
+          procedimiento: p.procedimiento || "", transporte: p.transporte || "", almacenamiento: p.almacenamiento || "",
+          estado: p.estado || "activo",
+        });
+        setArchivoInfo(p.calibracion?.archivo || null);
+      })
+      .catch(() => setError("No se pudo cargar el patrón."))
+      .finally(() => setCargando(false));
+  }, [id, isEdit, reset]);
+
+  const onSubmit = async (v) => {
+    setSaving(true); setError("");
+    const payload = {
+      ...v,
+      incertidumbre: {
+        modo: v.incertidumbre.modo,
+        k: num(v.incertidumbre.k) ?? 2,
+        unidad: v.incertidumbre.unidad || v.unidad,
+        valor: v.incertidumbre.modo === "fija" ? num(v.incertidumbre.valor) : undefined,
+        puntos: v.incertidumbre.modo === "tabla"
+          ? v.incertidumbre.puntos.map((p) => ({ nominal: num(p.nominal), U: num(p.U) })).filter((p) => p.nominal != null && p.U != null)
+          : [],
+      },
+      deriva: v.deriva.valor
+        ? { valor: num(v.deriva.valor), unidad: v.deriva.unidad || v.unidad, periodoMeses: num(v.deriva.periodoMeses) }
+        : undefined,
+      calibracion: {
+        ...v.calibracion,
+        fecha: v.calibracion.fecha || undefined,
+        periodicidadMeses: num(v.calibracion.periodicidadMeses),
+      },
+    };
+    try {
+      const saved = isEdit ? await actualizarPatron(id, payload) : await crearPatron(payload);
+      setPatronId(saved._id);
+      if (!isEdit && pdfImportado) {
+        // El PDF que la IA leyó es el propio certificado: se adjunta ya.
+        try { await adjuntarCertificadoPatron(saved._id, pdfImportado); } catch { /* se puede adjuntar luego a mano */ }
+      }
+      if (!isEdit) { navigate(`/equipos/patrones/${saved._id}/editar`, { replace: true }); }
+      else navigate("/equipos/patrones");
+    } catch (e) {
+      setError(e?.response?.data?.message || "No se pudo guardar el patrón.");
+    } finally { setSaving(false); }
   };
+
+  // Vuelca en el formulario los campos que la IA leyó del certificado. No pisa
+  // lo que ya esté escrito con vacío; el usuario revisa todo antes de guardar.
+  const aplicarCertificado = (p) => {
+    const set = (path, val) => {
+      if (val === undefined || val === null || val === "") return;
+      setValue(path, val, { shouldDirty: true });
+    };
+    set("nombre", p.nombre);
+    set("marca", p.marca);
+    set("modelo", p.modelo);
+    set("serie", p.serie);
+    set("magnitud", p.magnitud ? String(p.magnitud).toLowerCase() : undefined);
+    if (p.categoria && CATEGORIAS.includes(p.categoria)) set("categoria", p.categoria);
+    set("unidad", p.unidad);
+    set("intervaloMedicion", p.intervaloMedicion);
+    set("resolucion", p.resolucion);
+    set("trazabilidad", p.trazabilidad);
+    set("calibracion.laboratorio", p.laboratorio);
+    set("calibracion.numeroCertificado", p.numeroCertificado);
+    set("calibracion.fecha", p.fecha);
+    if (Number.isFinite(Number(p.periodicidadMeses))) setValue("calibracion.periodicidadMeses", Number(p.periodicidadMeses), { shouldDirty: true });
+    set("condicionesReferencia", p.condicionesReferencia);
+
+    const inc = p.incertidumbre || {};
+    const pts = (Array.isArray(inc.puntos) ? inc.puntos : [])
+      .filter((x) => Number.isFinite(Number(x?.nominal)) && Number.isFinite(Number(x?.U)))
+      .map((x) => ({ nominal: Number(x.nominal), U: Number(x.U) }));
+    const modoInc = inc.modo === "tabla" || inc.modo === "fija" ? inc.modo : pts.length >= 2 ? "tabla" : "fija";
+    setValue("incertidumbre.modo", modoInc, { shouldDirty: true });
+    if (Number.isFinite(Number(inc.k))) setValue("incertidumbre.k", Number(inc.k), { shouldDirty: true });
+    set("incertidumbre.unidad", inc.unidad);
+    if (modoInc === "fija") {
+      if (Number.isFinite(Number(inc.valor))) setValue("incertidumbre.valor", Number(inc.valor), { shouldDirty: true });
+    } else if (pts.length) {
+      replace(pts);
+    }
+
+    const der = p.deriva || {};
+    if (Number.isFinite(Number(der.valor)) && Number(der.valor) > 0) {
+      setValue("deriva.valor", Number(der.valor), { shouldDirty: true });
+      if (der.unidad) setValue("deriva.unidad", der.unidad, { shouldDirty: true });
+      if (Number.isFinite(Number(der.periodoMeses))) setValue("deriva.periodoMeses", Number(der.periodoMeses), { shouldDirty: true });
+    }
+  };
+
+  const onCertificadoPdf = async (file) => {
+    if (!file) return;
+    setImportando(true); setError(""); setAvisoImport(null);
+    try {
+      const res = await importarCertificadoPatron(file);
+      if (res.modo === "ia" && res.patron) aplicarCertificado(res.patron);
+      setPdfImportado(file); // el PDF se adjunta al crear el patrón, con IA o sin ella
+      setAvisoImport({ modo: res.modo, advertencias: res.advertencias || [], textoExtraido: res.textoExtraido });
+    } catch (e) {
+      setError(e?.response?.data?.message || "No se pudo leer el certificado.");
+    } finally {
+      setImportando(false);
+    }
+  };
+
+  const subirPdf = async (file) => {
+    if (!file || !patronId) return;
+    try {
+      const saved = await adjuntarCertificadoPatron(patronId, file);
+      setArchivoInfo(saved.calibracion?.archivo || null);
+    } catch (e) {
+      setError(e?.response?.data?.message || "No se pudo subir el certificado.");
+    }
+  };
+
+  if (cargando) return <Box sx={{ p: 4 }}><Typography color="text.secondary">Cargando…</Typography></Box>;
 
   return (
     <Box>
-      <Box sx={{ display: "flex", alignItems: "center", gap: 2, mb: 3 }}>
-        <AppButton variant="outlined" startIcon={<ArrowBackIcon />} onClick={() => navigate("/equipos/patrones")} sx={{ borderRadius: 2 }}>
-          Regresar
-        </AppButton>
-        <Box>
-          <Typography variant="h5" fontWeight={700}>{isEdit ? "Edición de Patrón" : "Alta de Patrón"}</Typography>
-          <Typography variant="body2" color="text.secondary">Patrón de referencia trazable del laboratorio</Typography>
-        </Box>
-      </Box>
+      <PageHeader
+        icon={<StraightenOutlinedIcon />}
+        title={isEdit ? "Edición de Patrón" : "Alta de Patrón"}
+        subtitle="Patrón de referencia trazable del laboratorio"
+        actions={
+          <AppButton variant="outlined" startIcon={<ArrowBackIcon />} onClick={() => navigate("/equipos/patrones")} sx={{ borderRadius: 2 }}>
+            Regresar
+          </AppButton>
+        }
+      />
 
-      <Box component="form" onSubmit={handleSubmit(onSubmit)}>
-        <AppCard title="Información General" sx={{ mb: 3 }}>
+      {error && <Alert severity="error" sx={{ mb: 2, borderRadius: 2 }}>{error}</Alert>}
+
+      {!isEdit && (
+        <Box
+          sx={{
+            mb: 2, p: 2, borderRadius: 2, border: "1px dashed", borderColor: "primary.main",
+            bgcolor: "action.hover", display: "flex", gap: 2, alignItems: "center", flexWrap: "wrap",
+          }}
+        >
+          <AutoAwesomeOutlinedIcon color="primary" />
+          <Box sx={{ flex: 1, minWidth: 240 }}>
+            <Typography variant="subtitle2" fontWeight={700}>
+              ¿Tienes el certificado de calibración del patrón en PDF?
+            </Typography>
+            <Typography variant="caption" color="text.secondary">
+              Súbelo y el sistema llena marca, unidad, incertidumbre (U y k), trazabilidad, laboratorio y fechas para que solo confirmes. El PDF queda adjunto al guardar. Funciona con PDFs digitales, no con escaneos.
+            </Typography>
+          </Box>
+          <Button
+            component="label" variant="contained" startIcon={<AutoAwesomeOutlinedIcon />}
+            disabled={importando} sx={{ borderRadius: 2 }}
+          >
+            {importando ? "Leyendo…" : "Leer certificado (PDF)"}
+            <input
+              type="file" accept="application/pdf" hidden
+              onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ""; onCertificadoPdf(f); }}
+            />
+          </Button>
+        </Box>
+      )}
+
+      {avisoImport && (
+        <Alert
+          severity={avisoImport.modo === "ia" ? "success" : "warning"}
+          sx={{ mb: 2, borderRadius: 2 }}
+          onClose={() => setAvisoImport(null)}
+        >
+          <Typography variant="body2" fontWeight={700}>
+            {avisoImport.modo === "ia"
+              ? "Campos precargados del certificado — revísalos contra el PDF antes de guardar."
+              : "No se pudo interpretar el certificado automáticamente."}
+          </Typography>
+          {avisoImport.advertencias?.length > 0 && (
+            <Box component="ul" sx={{ m: "6px 0 0", pl: 2.5 }}>
+              {avisoImport.advertencias.map((a, i) => (
+                <li key={i}><Typography variant="caption">{a}</Typography></li>
+              ))}
+            </Box>
+          )}
+          {avisoImport.textoExtraido && (
+            <Typography
+              variant="caption" component="pre"
+              sx={{ mt: 1, maxHeight: 180, overflow: "auto", whiteSpace: "pre-wrap", bgcolor: "action.hover", p: 1, borderRadius: 1 }}
+            >
+              {avisoImport.textoExtraido}
+            </Typography>
+          )}
+        </Alert>
+      )}
+
+      <Box component="form" onSubmit={handleSubmit(onSubmit)} sx={{ display: "flex", flexDirection: "column", gap: 3 }}>
+
+        <AppCard title="Información general" icon={<BadgeOutlinedIcon />}>
           <Grid container spacing={2}>
             <Grid size={{ xs: 12, md: 3 }}>
-              <AppInput label="ID Interno" error={errors.idInterno} {...register("idInterno", { required: "Obligatorio" })} />
+              <TextField
+                fullWidth size="small" label="Código"
+                helperText={
+                  isEdit ? undefined
+                  : generandoCodigo ? "Generando…"
+                  : codigoAutoGenerado ? "Generado automáticamente — puedes cambiarlo"
+                  : "Editado manualmente"
+                }
+                slotProps={{ inputLabel: { shrink: !!codigoValor } }}
+                {...register("codigo", { onChange: () => setCodigoAutoGenerado(false) })}
+              />
             </Grid>
-            <Grid size={{ xs: 12, md: 4 }}>
-              <FormControl fullWidth size="small">
-                <InputLabel>Categoría</InputLabel>
-                <Select label="Categoría" defaultValue={patronActual?.categoria ?? ""} {...register("categoria")} sx={{ borderRadius: 2 }}>
-                  {CATEGORIAS.map((c) => <MenuItem key={c} value={c}>{c}</MenuItem>)}
-                </Select>
-              </FormControl>
+            <Grid size={{ xs: 12, md: 6 }}>
+              <TextField fullWidth size="small" label="Nombre *" error={!!errors.nombre} helperText={errors.nombre && "Obligatorio"} {...register("nombre", { required: true })} />
             </Grid>
-            <Grid size={{ xs: 12, md: 5 }}>
-              <AppInput label="Certificado de calibración" error={errors.certificado} {...register("certificado", { required: "Obligatorio" })} />
+            <Grid size={{ xs: 12, md: 3 }}>
+              <Controller
+                name="estado"
+                control={control}
+                render={({ field }) => (
+                  <TextField select fullWidth size="small" label="Estado" {...field} value={field.value ?? "activo"}>
+                    <MenuItem value="activo">Activo</MenuItem>
+                    <MenuItem value="en_calibracion">En calibración</MenuItem>
+                    <MenuItem value="baja">Baja</MenuItem>
+                  </TextField>
+                )}
+              />
             </Grid>
-            <Grid size={{ xs: 12, md: 4 }}>
-              <AppInput label="Marca" {...register("marca")} />
-            </Grid>
-            <Grid size={{ xs: 12, md: 4 }}>
-              <AppInput label="Modelo" error={errors.modelo} {...register("modelo", { required: "Obligatorio" })} />
-            </Grid>
-            <Grid size={{ xs: 12, md: 4 }}>
-              <AppInput label="Serie" error={errors.serie} {...register("serie", { required: "Obligatorio" })} />
+            <Grid size={{ xs: 12, md: 8 }}>
+              <TextField fullWidth size="small" label="Descripción" {...register("descripcion")} />
             </Grid>
             <Grid size={{ xs: 12 }}>
-              <AppInput label="Descripción" error={errors.descripcion} {...register("descripcion", { required: "Obligatorio" })} />
+              <TextField fullWidth size="small" label="Comentarios" multiline minRows={2} {...register("comentarios")} />
             </Grid>
-            <Grid size={{ xs: 12, md: 6 }}>
-              <AppInput label="Trazabilidad" error={errors.trazabilidad} {...register("trazabilidad", { required: "Obligatorio" })} />
-            </Grid>
-            <Grid size={{ xs: 12, md: 6 }}>
-              <AppInput label="Comentarios" {...register("comentarios")} />
-            </Grid>
-            <Grid size={{ xs: 12, md: 3 }}>
+            <Grid size={{ xs: 12, md: 4 }}>
               <Controller
-                name="fechaCalibracion"
+                name="categoria"
                 control={control}
-                rules={{ required: "Obligatorio" }}
                 render={({ field }) => (
-                  <AppDatePicker label="Fecha de calibración" error={errors.fechaCalibracion} {...field} />
+                  <TextField select fullWidth size="small" label="Categoría" {...field} value={field.value ?? ""}>
+                    <MenuItem value="">—</MenuItem>
+                    {CATEGORIAS.map((c) => {
+                      const Icono = iconoCategoria(c);
+                      return (
+                        <MenuItem key={c} value={c} sx={{ display: "flex", gap: 1 }}>
+                          <Icono fontSize="small" sx={{ color: colorCategoria(c) }} /> {c}
+                        </MenuItem>
+                      );
+                    })}
+                  </TextField>
                 )}
               />
             </Grid>
-            <Grid size={{ xs: 12, md: 3 }}>
-              <Controller
-                name="fechaVencimiento"
-                control={control}
-                rules={{ required: "Obligatorio" }}
-                render={({ field }) => (
-                  <AppDatePicker label="Fecha de vencimiento" error={errors.fechaVencimiento} {...field} />
-                )}
-              />
-            </Grid>
-            <Grid size={{ xs: 12, md: 3 }}>
-              <AppInput label="Unidades" {...register("unidades")} />
-            </Grid>
-            <Grid size={{ xs: 12, md: 3 }}>
-              <AppInput label="Capacidad" error={errors.capacidad} {...register("capacidad", { required: "Obligatorio" })} />
-            </Grid>
-            <Grid size={{ xs: 12, md: 3 }}>
-              <AppInput label="División mínima" {...register("divMin")} />
-            </Grid>
-            <Grid size={{ xs: 12, md: 9 }}>
-              <Button
-                component="label"
-                variant="outlined"
-                startIcon={<UploadFileOutlinedIcon />}
-                sx={{ borderRadius: 2, height: 40 }}
-              >
-                Importar certificado (PDF)
-                <input type="file" accept="application/pdf" hidden {...register("filePdf")} />
-              </Button>
-              {patronActual?.filePdf && (
-                <AppButton
-                  variant="text"
-                  startIcon={<DescriptionOutlinedIcon />}
-                  sx={{ ml: 2 }}
-                  onClick={() => window.open(`/${patronActual.filePdf}`, "_blank")}
-                >
-                  Ver archivo actual
-                </AppButton>
-              )}
-            </Grid>
+            <Grid size={{ xs: 12, md: 4 }}><TextField fullWidth size="small" label="Marca" {...register("marca")} /></Grid>
+            <Grid size={{ xs: 12, md: 4 }}><TextField fullWidth size="small" label="Modelo" {...register("modelo")} /></Grid>
+            <Grid size={{ xs: 12, md: 4 }}><TextField fullWidth size="small" label="Serie" {...register("serie")} /></Grid>
           </Grid>
         </AppCard>
 
-        <AppCard title="Verificación y Mantenimiento" sx={{ mb: 3 }}>
-          <AppInput label="Manejo" multiline minRows={2} {...register("manejo")} />
-        </AppCard>
-
-        <AppCard title="Procedimiento" sx={{ mb: 3 }}>
-          <AppInput label="Proceso" multiline minRows={2} {...register("proceso")} />
-        </AppCard>
-
-        <AppCard title="Transporte y almacenamiento" sx={{ mb: 3 }}>
+        <AppCard title="Metrología" icon={<SquareFootOutlinedIcon />}>
           <Grid container spacing={2}>
-            <Grid size={{ xs: 12, md: 6 }}>
-              <AppInput label="Transporte" multiline minRows={2} {...register("transporte")} />
+            <Grid size={{ xs: 6, md: 3 }}>
+              <Controller
+                name="unidad"
+                control={control}
+                render={({ field: { onChange, onBlur, value, ref } }) => (
+                  <Autocomplete
+                    freeSolo
+                    options={opcionesUnidades}
+                    value={value ?? ""}
+                    onChange={(_, val) => onChange(val ?? "")}
+                    onInputChange={(_, val) => onChange(val)}
+                    onBlur={onBlur}
+                    renderInput={(params) => (
+                      <TextField {...params} inputRef={ref} label="Unidad" size="small" placeholder="mm, bar, °C…" />
+                    )}
+                  />
+                )}
+              />
             </Grid>
-            <Grid size={{ xs: 12, md: 6 }}>
-              <AppInput label="Almacenamiento" multiline minRows={2} {...register("almacenamiento")} />
+            <Grid size={{ xs: 6, md: 5 }}><TextField fullWidth size="small" label="Intervalo de medición" placeholder="0–100 mm" {...register("intervaloMedicion")} /></Grid>
+            <Grid size={{ xs: 12, md: 4 }}><TextField fullWidth size="small" label="Resolución" {...register("resolucion")} /></Grid>
+          </Grid>
+        </AppCard>
+
+        <AppCard title="Incertidumbre del certificado del patrón" subtitle="Es la U que informa el certificado del patrón, con su k. El motor usa u = U / k." icon={<FunctionsOutlinedIcon />}>
+          <Grid container spacing={2}>
+            <Grid size={{ xs: 12, md: 4 }}>
+              <Controller
+                name="incertidumbre.modo"
+                control={control}
+                render={({ field }) => (
+                  <TextField select fullWidth size="small" label="Modo" {...field} value={field.value ?? "fija"}>
+                    <MenuItem value="fija">Fija (un valor)</MenuItem>
+                    <MenuItem value="tabla">Tabla por punto</MenuItem>
+                  </TextField>
+                )}
+              />
             </Grid>
+            <Grid size={{ xs: 6, md: 4 }}><TextField fullWidth size="small" label="k" type="number" {...register("incertidumbre.k")} /></Grid>
+            <Grid size={{ xs: 6, md: 4 }}><TextField fullWidth size="small" label="Unidad de U" placeholder="= unidad del patrón" {...register("incertidumbre.unidad")} /></Grid>
+
+            {modo === "fija" ? (
+              <Grid size={{ xs: 12, md: 4 }}>
+                <TextField fullWidth size="small" label="U (del certificado)" type="number" slotProps={{ htmlInput: { step: "any" } }} {...register("incertidumbre.valor")} />
+              </Grid>
+            ) : (
+              <Grid size={{ xs: 12 }}>
+                <Typography variant="caption" color="text.secondary">Puntos {"{ nominal, U }"} — el motor interpola linealmente.</Typography>
+                {fields.map((f, i) => (
+                  <Box key={f.id} sx={{ display: "flex", gap: 1.5, alignItems: "center", mt: 1 }}>
+                    <TextField size="small" label="Nominal" type="number" slotProps={{ htmlInput: { step: "any" } }} sx={{ width: 150 }} {...register(`incertidumbre.puntos.${i}.nominal`)} />
+                    <TextField size="small" label="U" type="number" slotProps={{ htmlInput: { step: "any" } }} sx={{ width: 180 }} {...register(`incertidumbre.puntos.${i}.U`)} />
+                    <IconButton size="small" onClick={() => remove(i)} disabled={fields.length === 1}>
+                      <DeleteOutlineIcon fontSize="small" sx={{ color: "error.main" }} />
+                    </IconButton>
+                  </Box>
+                ))}
+                <Button size="small" startIcon={<AddIcon />} onClick={() => append({ nominal: "", U: "" })} sx={{ mt: 1, borderRadius: 2 }}>Punto</Button>
+              </Grid>
+            )}
+          </Grid>
+
+          <Divider sx={{ my: 2.5 }} />
+          <Typography variant="subtitle2" fontWeight={700} gutterBottom>Deriva (opcional)</Typography>
+          <Grid container spacing={2}>
+            <Grid size={{ xs: 6, md: 4 }}><TextField fullWidth size="small" label="Deriva máx." type="number" slotProps={{ htmlInput: { step: "any" } }} {...register("deriva.valor")} /></Grid>
+            <Grid size={{ xs: 6, md: 4 }}><TextField fullWidth size="small" label="Unidad" {...register("deriva.unidad")} /></Grid>
+            <Grid size={{ xs: 12, md: 4 }}><TextField fullWidth size="small" label="En cuántos meses" type="number" {...register("deriva.periodoMeses")} /></Grid>
+          </Grid>
+        </AppCard>
+
+        <AppCard title="Calibración y vigencia" icon={<VerifiedOutlinedIcon />}>
+          <Grid container spacing={2}>
+            <Grid size={{ xs: 12, md: 4 }}><TextField fullWidth size="small" label="Trazabilidad" placeholder="CENAM, NIST vía Fluke…" {...register("trazabilidad")} /></Grid>
+            <Grid size={{ xs: 12, md: 4 }}><TextField fullWidth size="small" label="Laboratorio calibrante" {...register("calibracion.laboratorio")} /></Grid>
+            <Grid size={{ xs: 12, md: 4 }}><TextField fullWidth size="small" label="N° de certificado" {...register("calibracion.numeroCertificado")} /></Grid>
+            <Grid size={{ xs: 6, md: 4 }}>
+              <TextField fullWidth size="small" type="date" label="Fecha de calibración" slotProps={{ inputLabel: { shrink: true } }} {...register("calibracion.fecha")} />
+            </Grid>
+            <Grid size={{ xs: 6, md: 4 }}><TextField fullWidth size="small" label="Periodicidad (meses)" type="number" {...register("calibracion.periodicidadMeses")} /></Grid>
+            <Grid size={{ xs: 12, md: 4 }}>
+              <TextField fullWidth size="small" label="Vencimiento (calculado)" value={vencPreview || "—"}
+                slotProps={{ input: { readOnly: true }, inputLabel: { shrink: true } }} />
+            </Grid>
+          </Grid>
+
+          <Box sx={{ mt: 2, display: "flex", gap: 1.5, alignItems: "center", flexWrap: "wrap" }}>
+            <Button component="label" variant="outlined" startIcon={<UploadFileOutlinedIcon />} disabled={!patronId} sx={{ borderRadius: 2 }}>
+              Subir certificado (PDF)
+              <input type="file" accept="application/pdf" hidden onChange={(e) => subirPdf(e.target.files?.[0])} />
+            </Button>
+            {!patronId && <Typography variant="caption" color="text.secondary">Guarda el patrón primero para adjuntar el PDF.</Typography>}
+            {archivoInfo && (
+              <Chip icon={<DescriptionOutlinedIcon />} label={archivoInfo.nombreOriginal || "certificado.pdf"} variant="outlined" />
+            )}
+          </Box>
+        </AppCard>
+
+        <AppCard title="Operación" icon={<BuildOutlinedIcon />}>
+          <Grid container spacing={2}>
+            <Grid size={{ xs: 12 }}><TextField fullWidth size="small" label="Condiciones de referencia" placeholder="20 ± 1 °C, 45–55 % HR" {...register("condicionesReferencia")} /></Grid>
+            <Grid size={{ xs: 12, md: 6 }}><TextField fullWidth size="small" multiline minRows={2} label="Manejo" {...register("manejo")} /></Grid>
+            <Grid size={{ xs: 12, md: 6 }}><TextField fullWidth size="small" multiline minRows={2} label="Procedimiento" {...register("procedimiento")} /></Grid>
+            <Grid size={{ xs: 12, md: 6 }}><TextField fullWidth size="small" multiline minRows={2} label="Transporte" {...register("transporte")} /></Grid>
+            <Grid size={{ xs: 12, md: 6 }}><TextField fullWidth size="small" multiline minRows={2} label="Almacenamiento" {...register("almacenamiento")} /></Grid>
           </Grid>
         </AppCard>
 
         <Box sx={{ display: "flex", gap: 2, justifyContent: "flex-end" }}>
-          <AppButton variant="outlined" onClick={() => navigate("/equipos/patrones")} sx={{ borderRadius: 2 }}>Cancelar</AppButton>
-          <AppButton type="submit" sx={{ borderRadius: 2 }}>{isEdit ? "Guardar cambios" : "Crear Patrón"}</AppButton>
+          <AppButton type="button" variant="outlined" onClick={() => navigate("/equipos/patrones")} sx={{ borderRadius: 2 }}>Cancelar</AppButton>
+          <AppButton type="submit" loading={saving} sx={{ borderRadius: 2 }}>
+            {isEdit ? "Guardar cambios" : "Crear patrón"}
+          </AppButton>
         </Box>
       </Box>
     </Box>

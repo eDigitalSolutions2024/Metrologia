@@ -1,0 +1,284 @@
+const mongoose = require("mongoose");
+const Reporte = require("../models/Reporte");
+const Asignacion = require("../models/Asignacion");
+const Cliente = require("../models/Cliente");
+const Cotizacion = require("../models/Cotizacion");
+const Equipo = require("../models/Equipo");
+const AppError = require("../utils/AppError");
+const escapeRegex = require("../utils/escapeRegex");
+const { crearEvento } = require("../utils/historial");
+const { prefijoDesdeNombre } = require("../utils/prefijoCliente");
+const configuracionService = require("./configuracion.service");
+
+async function listar({ search = "", status = "todos", clienteId = "", mes = "", anio = "", page = 0, pageSize = 10 }) {
+  const match = {};
+  if (status && status !== "todos") match.status = status;
+  if (clienteId && mongoose.isValidObjectId(clienteId)) {
+    match.cliente = new mongoose.Types.ObjectId(clienteId);
+  }
+  if (search) {
+    const rx = new RegExp(escapeRegex(search), "i");
+    match.$or = [{ folio: rx }, { ordenCompra: rx }, { factura: rx }];
+  }
+  if (anio) {
+    const y = Number(anio);
+    const m = mes ? Number(mes) : null; // 1-12
+    const desde = m ? new Date(y, m - 1, 1) : new Date(y, 0, 1);
+    const hasta = m ? new Date(y, m, 1) : new Date(y + 1, 0, 1);
+    match.fechaRecepcion = { $gte: desde, $lt: hasta };
+  }
+
+  const [items, total] = await Promise.all([
+    Reporte.find(match)
+      .populate("cliente", "nombre rfc")
+      .populate("creadoPor", "nombre usuario")
+      .populate("cotizacion", "folio items")
+      .sort({ createdAt: -1 })
+      .skip(page * pageSize)
+      .limit(pageSize)
+      .lean(),
+    Reporte.countDocuments(match),
+  ]);
+
+  // Conteo de asignaciones por reporte (columna "Cantidad Asignaciones").
+  const ids = items.map((r) => r._id);
+  const conteos = await Asignacion.aggregate([
+    { $match: { reporte: { $in: ids } } },
+    { $group: { _id: "$reporte", n: { $sum: 1 } } },
+  ]);
+  const mapa = Object.fromEntries(conteos.map((c) => [String(c._id), c.n]));
+  items.forEach((r) => {
+    r.numEquipos = mapa[String(r._id)] || 0;
+    // "Cantidad en Proceso" = total de piezas cotizadas (suma de cantidades de la cotización ligada).
+    r.cantidadEnProceso = (r.cotizacion?.items || []).reduce((acc, it) => acc + (it.cantidad || 0), 0);
+  });
+
+  return { items, total };
+}
+
+async function obtener(id) {
+  const reporte = await Reporte.findById(id)
+    .populate("cliente", "nombre rfc domicilioFiscal")
+    .populate("contacto", "nombre correo telefono")
+    // items sin `precioUnitario`: el detalle del reporte muestra los equipos
+    // cotizados como referencia, sin precios.
+    .populate("cotizacion", "folio total items.descripcion items.marca items.modelo items.tiempoEntrega items.cantidad")
+    .populate("creadoPor", "nombre usuario")
+    .populate("historial.usuario.id", "nombre usuario");
+  if (!reporte) throw new AppError("Reporte no encontrado", 404);
+
+  const asignaciones = await Asignacion.find({ reporte: id })
+    .populate("equipo", "idInterno marca modelo serie descripcion categoria")
+    .populate("tecnicoAsignado", "nombre usuario")
+    .populate("tecnicoEjecutor", "nombre usuario")
+    .populate("patrones", "codigo nombre trazabilidad calibracion");
+
+  return { reporte, asignaciones };
+}
+
+/**
+ * Folio del Reporte con las siglas del cliente para que sea identificable a
+ * simple vista: "REP-IE-2026-0001" en vez de un REP-2026-#### genérico donde
+ * no se distingue de quién es. Igual criterio que idInterno (Equipo), código
+ * (Patrón) y Orden de Compra (Cotización): se calcula del MAYOR consecutivo
+ * REAL ya usado con ese mismo prefijo, no de un contador aparte.
+ */
+async function siguienteFolioReporte(clienteDoc) {
+  const prefijo = prefijoDesdeNombre(clienteDoc.nombreComercial || clienteDoc.nombre, "REP");
+  const anio = new Date().getFullYear();
+  const base = `REP-${prefijo}-${anio}`;
+  const regex = new RegExp(`^${base}-(\\d+)$`);
+
+  const existentes = await Reporte.find({ folio: regex }).select("folio");
+  const maxActual = existentes.reduce((max, r) => {
+    const n = parseInt(r.folio.match(regex)[1], 10);
+    return n > max ? n : max;
+  }, 0);
+
+  let siguiente = maxActual + 1;
+  let folio = `${base}-${String(siguiente).padStart(4, "0")}`;
+  while (await Reporte.exists({ folio })) {
+    siguiente++;
+    folio = `${base}-${String(siguiente).padStart(4, "0")}`;
+  }
+  return folio;
+}
+
+async function crear(datos, reqUser) {
+  const { cliente } = datos;
+  if (!mongoose.isValidObjectId(cliente)) throw new AppError("Cliente inválido", 400);
+  const clienteDoc = await Cliente.findById(cliente).select("nombre nombreComercial");
+  if (!clienteDoc) throw new AppError("Cliente no encontrado", 404);
+
+  // Si nace de una cotización, hereda su OC y su contacto cuando no se
+  // capturaron aparte — la OC ya se sabe, no debe teclearse dos veces.
+  let { ordenCompra, contacto } = datos;
+  if (datos.cotizacion && mongoose.isValidObjectId(datos.cotizacion)) {
+    const cot = await Cotizacion.findById(datos.cotizacion).select("ordenCompra contacto");
+    if (cot) {
+      ordenCompra = ordenCompra || cot.ordenCompra;
+      contacto = contacto || cot.contacto;
+    }
+  }
+
+  const folio = await siguienteFolioReporte(clienteDoc);
+  const evento = await crearEvento(reqUser, "reporte_creado", { folio });
+
+  const reporte = await Reporte.create({
+    folio,
+    cliente,
+    contacto: contacto || undefined,
+    cotizacion: datos.cotizacion || undefined,
+    ordenCompra,
+    factura: datos.factura,
+    observaciones: datos.observaciones,
+    fechaCompromiso: datos.fechaCompromiso,
+    creadoPor: reqUser?.id,
+    historial: [evento],
+  });
+
+  // Si nace de una cotización, sus equipos ya registrados se asignan solos.
+  if (reporte.cotizacion) {
+    try { await asignarEquiposDeCotizacion(reporte._id, reqUser); } catch (err) { console.error("[reporte] No se pudieron asignar los equipos de la cotización:", err.message); }
+  }
+  return reporte;
+}
+
+/**
+ * Crea las asignaciones de un reporte a partir de las partidas de su cotización:
+ * cada partida ligada a un equipo registrado del cliente (o, en cotizaciones
+ * anteriores a ese vínculo, cuyo texto trae el código interno del equipo entre
+ * paréntesis) se asigna sin capturar nada. El técnico y los patrones se eligen después.
+ * Omite lo que no puede asignar y dice por qué, sin fallar el resto.
+ */
+async function asignarEquiposDeCotizacion(reporteId, reqUser) {
+  const asignacionService = require("./asignacion.service"); // lazy: evita dependencia circular al cargar
+  const reporte = await Reporte.findById(reporteId).select("cliente cotizacion");
+  if (!reporte) throw new AppError("Reporte no encontrado", 404);
+  if (!reporte.cotizacion) return { creadas: 0, omitidas: [], sinCotizacion: true };
+
+  const cot = await Cotizacion.findById(reporte.cotizacion).select("items");
+  const equiposCliente = await Equipo.find({ cliente: reporte.cliente, status: "activo" }).select("idInterno");
+  const porId = new Map(equiposCliente.map((e) => [String(e._id), e]));
+  const norm = (v) => String(v || "").toLowerCase();
+
+  const creadas = [];
+  const omitidas = [];
+  const vistos = new Set();
+  for (const item of cot?.items || []) {
+    let equipo = item.equipo ? porId.get(String(item.equipo)) : null;
+    if (!equipo) equipo = equiposCliente.find((e) => e.idInterno && norm(item.descripcion).includes(norm(`(${e.idInterno})`)));
+    if (!equipo) {
+      omitidas.push({ descripcion: item.descripcion, motivo: item.equipo ? "el equipo ya no está activo o no es de este cliente" : "no está ligada a un equipo registrado" });
+      continue;
+    }
+    if (vistos.has(String(equipo._id))) continue;
+    vistos.add(String(equipo._id));
+    try {
+      await asignacionService.crear({ reporte: reporte._id, equipo: equipo._id }, reqUser);
+      creadas.push(equipo.idInterno);
+    } catch (err) {
+      omitidas.push({ descripcion: item.descripcion, motivo: err.message });
+    }
+  }
+  return { creadas: creadas.length, equipos: creadas, omitidas };
+}
+
+async function actualizar(id, datos, reqUser) {
+  const reporte = await Reporte.findById(id);
+  if (!reporte) throw new AppError("Reporte no encontrado", 404);
+
+  const camposEditables = [
+    "contacto", "cotizacion", "ordenCompra", "factura",
+    "observaciones", "fechaCompromiso", "fechaEntrega",
+  ];
+  const cambios = {};
+  for (const c of camposEditables) if (datos[c] !== undefined) cambios[c] = datos[c];
+
+  if (datos.status && datos.status !== reporte.status) {
+    if (!Reporte.STATUS.includes(datos.status)) throw new AppError("Status inválido", 400);
+    // Finalizar/reabrir/cancelar es una decisión de supervisión (Calidad/Admin),
+    // no de quien solo captura datos comerciales (ventas).
+    if (!["admin", "coordinador"].includes(reqUser?.rol)) {
+      throw new AppError("Solo Admin o Coordinador pueden cambiar el estatus del reporte", 403);
+    }
+
+    // No se puede marcar "terminado"/"entregado" con asignaciones a medias:
+    // evita reportes cerrados cuyo certificado nunca fue autorizado por
+    // Calidad, o marcados como entregados sin que el equipo haya salido.
+    if (["terminado", "entregado"].includes(datos.status)) {
+      const asignaciones = await Asignacion.find({ reporte: id }).select("equipo estados");
+      if (!asignaciones.length) {
+        throw new AppError("Este reporte no tiene asignaciones — no se puede finalizar", 409);
+      }
+      const sinAutorizar = asignaciones.filter((a) => a.estados.certificado !== "autorizado");
+      if (sinAutorizar.length) {
+        throw new AppError(
+          `Hay ${sinAutorizar.length} asignación(es) sin certificado autorizado por Calidad — no se puede finalizar el reporte`,
+          409
+        );
+      }
+      if (datos.status === "entregado") {
+        const sinEntregar = asignaciones.filter((a) => a.estados.entrega !== "entregado");
+        if (sinEntregar.length) {
+          throw new AppError(
+            `Hay ${sinEntregar.length} asignación(es) sin marcar como entregadas — no se puede cerrar el reporte como entregado`,
+            409
+          );
+        }
+      }
+    }
+
+    cambios.status = datos.status;
+    reporte.historial.push(
+      await crearEvento(reqUser, "reporte_status", { de: reporte.status, a: datos.status })
+    );
+    if (datos.status === "entregado" && !reporte.fechaEntrega) cambios.fechaEntrega = new Date();
+  }
+
+  Object.assign(reporte, cambios);
+  await reporte.save();
+  return reporte;
+}
+
+async function paraImprimir(id) {
+  const reporte = await Reporte.findById(id)
+    .populate("cliente")
+    .populate("contacto", "nombre correo telefono")
+    .populate("cotizacion", "folio total")
+    .populate("creadoPor", "nombre usuario firmaUrl");
+  if (!reporte) throw new AppError("Reporte no encontrado", 404);
+
+  const asignaciones = await Asignacion.find({ reporte: id })
+    .populate("equipo")
+    .populate("tecnicoAsignado", "nombre usuario")
+    .populate("tecnicoEjecutor", "nombre usuario firmaUrl")
+    .populate("patrones", "codigo nombre trazabilidad")
+    .populate("performance", "nombre magnitud tipoInstrumento");
+
+  const laboratorio = await configuracionService.obtenerLaboratorio();
+  const logo = await configuracionService.obtenerLogo();
+  return { reporte, asignaciones, laboratorio, logo };
+}
+
+async function agregarComentario(id, texto, reqUser) {
+  if (!texto?.trim()) throw new AppError("El comentario no puede estar vacío", 400);
+  const reporte = await Reporte.findById(id);
+  if (!reporte) throw new AppError("Reporte no encontrado", 404);
+  const evento = await crearEvento(reqUser, "comentario", {});
+  reporte.comentarios.push({ texto: texto.trim(), usuario: { id: evento.usuario?.id, nombre: evento.usuario?.nombre } });
+  await reporte.save();
+  return reporte;
+}
+
+async function eliminar(id) {
+  const tieneAsignaciones = await Asignacion.exists({ reporte: id });
+  if (tieneAsignaciones) {
+    throw new AppError("No se puede eliminar: el reporte tiene asignaciones. Cancélalo en su lugar.", 409);
+  }
+  const reporte = await Reporte.findByIdAndDelete(id);
+  if (!reporte) throw new AppError("Reporte no encontrado", 404);
+  return reporte;
+}
+
+module.exports = { listar, obtener, crear, actualizar, eliminar, paraImprimir, agregarComentario, asignarEquiposDeCotizacion };

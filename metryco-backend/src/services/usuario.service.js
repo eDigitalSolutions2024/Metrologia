@@ -80,6 +80,16 @@ async function desactivar(id) {
   return usuario;
 }
 
+async function reactivar(id) {
+  const usuario = await Usuario.findByIdAndUpdate(
+    id,
+    { status: "activo" },
+    { new: true }
+  );
+  if (!usuario) throw new AppError("Usuario no encontrado", 404);
+  return usuario;
+}
+
 async function eliminar(id) {
   const usuario = await Usuario.findByIdAndDelete(id);
   if (!usuario) throw new AppError("Usuario no encontrado", 404);
@@ -111,6 +121,6 @@ async function eliminarObservacion(id, observacionId) {
 }
 
 module.exports = {
-  listar, obtener, crear, actualizar, desactivar, eliminar,
+  listar, obtener, crear, actualizar, desactivar, reactivar, eliminar,
   agregarObservacion, eliminarObservacion, directorio,
 };

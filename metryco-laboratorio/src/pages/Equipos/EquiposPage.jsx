@@ -1,28 +1,47 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
-  Box, Typography, TextField, InputAdornment, IconButton,
+  Box, TextField, InputAdornment, IconButton, Typography, Avatar,
   Tooltip, MenuItem, Select, FormControl, InputLabel, Button,
+  Chip, Alert, FormControlLabel, Checkbox,
 } from "@mui/material";
 import SearchIcon from "@mui/icons-material/Search";
 import AddIcon from "@mui/icons-material/Add";
 import EditOutlinedIcon from "@mui/icons-material/EditOutlined";
+import QrCode2OutlinedIcon from "@mui/icons-material/QrCode2Outlined";
+import CheckCircleOutlineIcon from "@mui/icons-material/CheckCircleOutlineOutlined";
+import BlockOutlinedIcon from "@mui/icons-material/BlockOutlined";
 
 import AppButton from "../../shared/components/AppButton";
 import AppTable from "../../shared/components/AppTable";
+import MenuAcciones from "../../shared/components/MenuAcciones";
+import PageHeader from "../../shared/components/PageHeader";
+import EtiquetaEquipoDialog from "../../shared/components/EtiquetaEquipoDialog";
+import ConfirmDialog from "../../shared/components/ConfirmDialog";
+import PrecisionManufacturingOutlinedIcon from "@mui/icons-material/PrecisionManufacturingOutlined";
 import { listarClientes } from "../../services/clientes";
-import { EQUIPOS_MOCK } from "./mockData";
+import { listarEquipos, fetchQrEquipoBlob, eliminarEquipo, reactivarEquipo } from "../../services/equipos";
+import { iconoCategoria, colorCategoria } from "./categorias";
+import { usePolling } from "../../shared/hooks/usePolling";
 
 // Consultar Equipos = php/equipo_buscar.php: el equipo pertenece a un cliente
-// (tabla `equipo`, campo empId). Certificado/Portada/Gráfica dependen de las
-// asignaciones de calibración (aún no migradas), por eso van en Historial
-// de Certificados, no aquí.
+// (tabla `equipo`, campo empId). Certificado/Portada/Gráfica van en Historial
+// de Certificados (con datos reales de Asignaciones/Certificados), no aquí.
 export default function EquiposPage() {
   const navigate = useNavigate();
   const [clientes, setClientes] = useState([]);
   const [clienteFiltro, setClienteFiltro] = useState("");
   const [search, setSearch] = useState("");
+  const [buscar, setBuscar] = useState("");
+  const [incluirInactivos, setIncluirInactivos] = useState(false);
   const [page, setPage] = useState(0);
+  const [rowsPerPage, setRowsPerPage] = useState(10);
+  const [items, setItems] = useState([]);
+  const [total, setTotal] = useState(0);
+  const [loading, setLoading] = useState(true);
+  const [etiquetaEquipo, setEtiquetaEquipo] = useState(null);
+  const [bajaTarget, setBajaTarget] = useState(null);
+  const [error, setError] = useState("");
 
   useEffect(() => {
     listarClientes({ pageSize: 200 })
@@ -30,69 +49,135 @@ export default function EquiposPage() {
       .catch(() => setClientes([]));
   }, []);
 
-  const filtered = EQUIPOS_MOCK.filter((e) => {
-    const matchCliente = !clienteFiltro || String(e.clienteId) === String(clienteFiltro);
-    const term = search.toLowerCase();
-    const matchSearch =
-      !term ||
-      e.idInterno.toLowerCase().includes(term) ||
-      e.descripcion.toLowerCase().includes(term) ||
-      e.marca.toLowerCase().includes(term) ||
-      e.serie.toLowerCase().includes(term);
-    return matchCliente && matchSearch;
-  });
+  const cargar = (silencioso = false) => {
+    if (!silencioso) setLoading(true);
+    listarEquipos({ search: buscar, clienteId: clienteFiltro, incluirInactivos, page, pageSize: rowsPerPage })
+      .then(({ items, total }) => { setItems(items); setTotal(total); })
+      .catch(() => { if (!silencioso) { setItems([]); setTotal(0); } })
+      .finally(() => { if (!silencioso) setLoading(false); });
+  };
+  useEffect(() => { cargar(); }, [buscar, clienteFiltro, incluirInactivos, page, rowsPerPage]); // eslint-disable-line react-hooks/exhaustive-deps
+  usePolling(() => cargar(true));
+
+  const activar = async (row) => {
+    setError("");
+    try {
+      await reactivarEquipo(row._id);
+      cargar();
+    } catch {
+      setError("No se pudo activar el equipo. Intenta de nuevo.");
+    }
+  };
+
+  const confirmarBaja = async () => {
+    const target = bajaTarget;
+    setBajaTarget(null);
+    try {
+      await eliminarEquipo(target._id);
+      cargar();
+    } catch {
+      setError("No se pudo dar de baja el equipo. Intenta de nuevo.");
+    }
+  };
+
+  const editar = (row) => navigate(`/equipos/${row._id}/editar`);
 
   const columns = [
-    { field: "id", headerName: "MET" },
-    { field: "clienteNombre", headerName: "Cliente" },
-    { field: "idInterno", headerName: "ID Cliente" },
-    { field: "descripcion", headerName: "Descripción" },
-    { field: "marca", headerName: "Marca" },
-    { field: "modelo", headerName: "Modelo" },
-    { field: "serie", headerName: "Serie" },
-    { field: "categoria", headerName: "Categoría" },
-    { field: "rango", headerName: "Rango" },
+    {
+      field: "idInterno", headerName: "Equipo", minWidth: 200,
+      renderCell: (row) => {
+        const Icono = iconoCategoria(row.categoria);
+        const color = colorCategoria(row.categoria);
+        return (
+          <Box sx={{ display: "flex", alignItems: "center", gap: 1.25 }}>
+            <Avatar sx={{ width: 32, height: 32, bgcolor: `${color}1a`, color }}>
+              <Icono fontSize="small" />
+            </Avatar>
+            <Box sx={{ minWidth: 0 }}>
+              <Typography variant="body2" fontWeight={700}>{row.idInterno}</Typography>
+              <Typography variant="caption" color="text.secondary" sx={{ display: "block" }}>{row.descripcion || "—"}</Typography>
+            </Box>
+          </Box>
+        );
+      },
+    },
+    { field: "cliente", headerName: "Cliente", minWidth: 150, renderCell: (row) => row.cliente?.nombre || "—" },
+    {
+      field: "marcaModelo", headerName: "Marca / Modelo", minWidth: 150, hideBelow: "md",
+      renderCell: (row) => (
+        <Box>
+          <Typography variant="body2">{[row.marca, row.modelo].filter(Boolean).join(" / ") || "—"}</Typography>
+          <Typography variant="caption" color="text.secondary" sx={{ display: "block" }}>{row.serie ? `Serie: ${row.serie}` : "Sin serie"}</Typography>
+        </Box>
+      ),
+    },
+    {
+      field: "categoria", headerName: "Categoría", nowrap: true, hideBelow: "lg",
+      renderCell: (row) => row.categoria
+        ? <Chip size="small" variant="outlined" label={row.categoria} sx={{ borderColor: colorCategoria(row.categoria), color: colorCategoria(row.categoria) }} />
+        : "—",
+    },
+    { field: "rango", headerName: "Rango", nowrap: true, hideBelow: "xl" },
+    {
+      field: "status", headerName: "Estado", nowrap: true,
+      renderCell: (row) => (
+        <Chip size="small" label={row.status === "activo" ? "Activo" : "Inactivo"} color={row.status === "activo" ? "success" : "default"} />
+      ),
+    },
     {
       field: "acciones",
       headerName: "Acciones",
       align: "center",
+      nowrap: true,
       renderCell: (row) => (
-        <Tooltip title="Editar equipo">
-          <IconButton size="small" onClick={() => navigate(`/equipos/${row.id}/editar`)}>
-            <EditOutlinedIcon fontSize="small" sx={{ color: "secondary.main" }} />
-          </IconButton>
-        </Tooltip>
+        <Box sx={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 0.5, flexWrap: "nowrap" }}>
+          <Tooltip title="Etiqueta / imprimir">
+            <IconButton size="small" onClick={() => setEtiquetaEquipo(row)}>
+              <QrCode2OutlinedIcon fontSize="small" sx={{ color: "primary.main" }} />
+            </IconButton>
+          </Tooltip>
+          <MenuAcciones
+            acciones={[
+              { label: "Editar equipo", icon: <EditOutlinedIcon fontSize="small" />, onClick: () => editar(row) },
+              row.status === "inactivo"
+                ? { label: "Activar", icon: <CheckCircleOutlineIcon fontSize="small" />, color: "success", onClick: () => activar(row), separador: true }
+                : { label: "Dar de baja", icon: <BlockOutlinedIcon fontSize="small" />, color: "error", onClick: () => setBajaTarget(row), separador: true },
+            ]}
+          />
+        </Box>
       ),
     },
   ];
 
   return (
     <Box>
-      <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 3 }}>
-        <Box>
-          <Typography variant="h5" fontWeight={700}>Consultar Equipos</Typography>
-          <Typography variant="body2" color="text.secondary">
-            {filtered.length} de {EQUIPOS_MOCK.length} equipos de clientes
-          </Typography>
-        </Box>
-        <AppButton startIcon={<AddIcon />} onClick={() => navigate("/equipos/nuevo")} sx={{ borderRadius: 2 }}>
-          Alta de Equipo
-        </AppButton>
-      </Box>
+      <PageHeader
+        icon={<PrecisionManufacturingOutlinedIcon />}
+        title="Consultar Equipos"
+        subtitle={`${total} equipos de clientes`}
+        actions={
+          <AppButton startIcon={<AddIcon />} onClick={() => navigate("/equipos/nuevo")} sx={{ borderRadius: 2 }}>
+            Alta de Equipo
+          </AppButton>
+        }
+      />
 
       <Box sx={{ display: "flex", gap: 2, mb: 2, flexWrap: "wrap", alignItems: "center" }}>
         <TextField
           placeholder="Buscar por ID, descripción, marca o serie..."
           size="small"
           value={search}
-          onChange={(e) => { setSearch(e.target.value); setPage(0); }}
+          onChange={(e) => setSearch(e.target.value)}
+          onKeyDown={(e) => { if (e.key === "Enter") { setPage(0); setBuscar(search); } }}
           sx={{ width: 360, "& .MuiOutlinedInput-root": { borderRadius: 2 } }}
-          InputProps={{
-            startAdornment: (
-              <InputAdornment position="start">
-                <SearchIcon fontSize="small" sx={{ color: "text.secondary" }} />
-              </InputAdornment>
-            ),
+          slotProps={{
+            input: {
+              startAdornment: (
+                <InputAdornment position="start">
+                  <SearchIcon fontSize="small" sx={{ color: "text.secondary" }} />
+                </InputAdornment>
+              ),
+            },
           }}
         />
         <FormControl size="small" sx={{ minWidth: 260 }}>
@@ -107,16 +192,42 @@ export default function EquiposPage() {
             {clientes.map((c) => <MenuItem key={c._id} value={c._id}>{c.nombre}</MenuItem>)}
           </Select>
         </FormControl>
-        <Button variant="contained" onClick={() => setPage(0)} sx={{ borderRadius: 2 }}>Buscar</Button>
+        <Button variant="contained" onClick={() => { setPage(0); setBuscar(search); }} sx={{ borderRadius: 2 }}>Buscar</Button>
+        <FormControlLabel
+          control={<Checkbox checked={incluirInactivos} onChange={(e) => { setIncluirInactivos(e.target.checked); setPage(0); }} />}
+          label="Mostrar dados de baja"
+        />
       </Box>
+
+      {error && <Alert severity="error" sx={{ mb: 2, borderRadius: 2 }} onClose={() => setError("")}>{error}</Alert>}
 
       <AppTable
         columns={columns}
-        rows={filtered.slice(page * 10, page * 10 + 10)}
-        totalCount={filtered.length}
+        rows={items}
+        totalCount={total}
         page={page}
-        rowsPerPage={10}
+        rowsPerPage={rowsPerPage}
         onPageChange={setPage}
+        onRowsPerPageChange={(n) => { setRowsPerPage(n); setPage(0); }}
+        loading={loading}
+        onRowClick={editar}
+      />
+
+      <EtiquetaEquipoDialog
+        open={!!etiquetaEquipo}
+        onClose={() => setEtiquetaEquipo(null)}
+        item={etiquetaEquipo}
+        tipo="equipo"
+        fetchQr={fetchQrEquipoBlob}
+      />
+
+      <ConfirmDialog
+        open={!!bajaTarget}
+        title="Dar de baja el equipo"
+        message={`¿Deseas dar de baja "${bajaTarget?.idInterno}"? Deja de aparecer disponible para asignar en nuevos reportes, pero conserva su historial de calibraciones.`}
+        confirmLabel="Dar de baja"
+        onConfirm={confirmarBaja}
+        onCancel={() => setBajaTarget(null)}
       />
     </Box>
   );

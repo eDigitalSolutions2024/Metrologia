@@ -1,0 +1,68 @@
+const { Schema, model } = require("mongoose");
+
+/**
+ * Configuración global del sistema — documento único (`clave: "global"`).
+ * Empieza solo con `menuPermisos` (qué roles ven cada ítem del menú lateral,
+ * antes fijo en el código en components/Sidebar/menuConfig.js). Pensado para
+ * crecer: nombre de la empresa, colores de la interfaz, logotipos, etc.
+ */
+const configuracionSchema = new Schema(
+  {
+    clave: { type: String, required: true, unique: true, default: "global" },
+    // Map de key de ítem de menú -> arreglo de roles que lo pueden ver.
+    // La key es `item.path` para hojas, o el título del grupo para los
+    // encabezados sin ruta propia (ej. "Reportes", "Equipos").
+    menuPermisos: { type: Map, of: [String], default: undefined },
+
+    // Datos del laboratorio para los PDFs (Reportes/Certificados) y la
+    // verificación pública — antes fijos en variables de entorno (LAB_*),
+    // ahora editables desde Administración sin tocar el .env ni reiniciar.
+    laboratorio: {
+      nombre: String,
+      acreditacion: String,
+      rfc: String,
+      domicilio: String,
+      telefono: String,
+      // Datos fiscales del EMISOR para CFDI 4.0 — se piden aparte de `rfc`
+      // porque un CFDI real también exige régimen fiscal y el código postal
+      // exacto del lugar de expedición (no siempre es el mismo texto que
+      // `domicilio`, que es de formato libre para los PDFs). Mientras no se
+      // configuren, no se puede generar ni un borrador de CFDI válido — ver
+      // cfdi.service.js `obtenerEmisorFiscal`.
+      regimenFiscal: String, // catálogo SAT c_RegimenFiscal, ej. "601"
+      codigoPostalFiscal: String, // lugar de expedición
+      serieCFDI: String, // opcional, serie con la que se timbra (ej. "A")
+      // Texto del bloque "Remarks" del certificado (declaración de
+      // trazabilidad / ISO 17025 / regla de decisión). Editable sin tocar el
+      // código; si está vacío se usa el texto por defecto.
+      remarks: String,
+      // Cola de la línea al pie del certificado (después de folio · fecha ·
+      // nivel de confianza). Por defecto: "método GUM (JCGM 100:2008) — …".
+      notaCertificado: String,
+    },
+
+    // Logo de la empresa — reemplaza el ícono genérico (BrandMark SVG) en
+    // sidebar, login y encabezado de PDFs cuando se sube uno.
+    logo: {
+      nombreArchivo: String, // nombre en disco (uploads/logos/<esto>)
+      nombreOriginal: String,
+      mimetype: String,
+      tamano: Number,
+      fecha: Date,
+    },
+
+    // Colores de marca de la interfaz — antes fijos en theme/theme.js.
+    // primario = tono oscuro (sidebar, botones principales); secundario =
+    // acento (botones de acción, enlaces, focos); acento = color "info"
+    // (chips/badges informativos, detalles secundarios). Se aplican en vivo
+    // vía ThemeProvider, sin rebuild.
+    colores: {
+      primario: String,
+      secundario: String,
+      acento: String,
+    },
+  },
+  { timestamps: true }
+);
+
+module.exports = model("Configuracion", configuracionSchema);

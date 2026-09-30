@@ -1,254 +1,357 @@
-import { useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useNavigate, useSearchParams } from "react-router-dom";
+import AvisoDeuda from "../../shared/components/AvisoDeuda";
 import {
-  Box, Typography, TextField, InputAdornment, IconButton,
-  Chip, Tooltip, MenuItem, Select, FormControl, InputLabel,
-  Grid, Paper, Avatar,
+  Box, Typography, TextField, InputAdornment, Chip, Tooltip, IconButton,
+  MenuItem, Select, FormControl, InputLabel, Grid,
+  Dialog, DialogTitle, DialogContent, DialogActions, Button, Alert,
 } from "@mui/material";
 import { useTheme } from "@mui/material/styles";
 import SearchIcon from "@mui/icons-material/Search";
 import AddIcon from "@mui/icons-material/Add";
-import VisibilityOutlinedIcon from "@mui/icons-material/VisibilityOutlined";
 import FileDownloadOutlinedIcon from "@mui/icons-material/FileDownloadOutlined";
-import EditOutlinedIcon from "@mui/icons-material/EditOutlined";
+import PictureAsPdfOutlinedIcon from "@mui/icons-material/PictureAsPdfOutlined";
 import DescriptionOutlinedIcon from "@mui/icons-material/DescriptionOutlined";
 import HourglassTopOutlinedIcon from "@mui/icons-material/HourglassTopOutlined";
-import RateReviewOutlinedIcon from "@mui/icons-material/RateReviewOutlined";
 import TaskAltOutlinedIcon from "@mui/icons-material/TaskAltOutlined";
+import LocalShippingOutlinedIcon from "@mui/icons-material/LocalShippingOutlined";
+import RequestQuoteOutlinedIcon from "@mui/icons-material/RequestQuoteOutlined";
 
 import AppButton from "../../shared/components/AppButton";
 import AppTable from "../../shared/components/AppTable";
+import PageHeader from "../../shared/components/PageHeader";
+import StatCard from "../../shared/components/StatCard";
+import FactCheckOutlinedIcon from "@mui/icons-material/FactCheckOutlined";
 import { formatDate } from "../../shared/utils/formatDate";
-import { MOCK } from "./mockData";
+import { listarClientes } from "../../services/clientes";
+import { listarReportes, crearReporte } from "../../services/reportes";
+import { listarContactos, crearContacto } from "../../services/contactos";
+import { listarCotizaciones } from "../../services/cotizaciones";
+import { useAuth } from "../../core/auth/useAuth";
+import { usePolling } from "../../shared/hooks/usePolling";
 
-const STATUS_MAP = {
-  proceso:   { label: "En Proceso",  color: "warning" },
-  revision:  { label: "En Revisión", color: "info" },
-  emitido:   { label: "Emitido",     color: "success" },
-  entregado: { label: "Entregado",   color: "default" },
+const STATUS = {
+  recepcion:  { label: "Recepción",  color: "default" },
+  en_proceso: { label: "En proceso", color: "warning" },
+  terminado:  { label: "Terminado",  color: "info" },
+  entregado:  { label: "Entregado",  color: "success" },
+  cancelado:  { label: "Cancelado",  color: "error" },
 };
 
-const TIPO_COLOR = {
-  "Dimensional":   "#2563EB",
-  "Eléctrica":     "#10B981",
-  "Temperatura":   "#F59E0B",
-  "Presión":       "#EF4444",
-  "Fuerza":        "#8B5CF6",
-  "Masa":          "#06B6D4",
-};
+const MESES = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
+  "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"];
+const ANIO_ACTUAL = new Date().getFullYear();
+const ANIOS = [ANIO_ACTUAL, ANIO_ACTUAL - 1, ANIO_ACTUAL - 2, ANIO_ACTUAL - 3];
 
 export default function ReportesPage() {
   const navigate = useNavigate();
   const theme = useTheme();
-  const [search, setSearch] = useState("");
-  const [statusFilter, setStatusFilter] = useState("todos");
-  const [tipoFilter, setTipoFilter] = useState("todos");
-  const [page, setPage] = useState(0);
+  const { user } = useAuth();
+  const puedeCrearReporte = ["admin", "coordinador", "ventas"].includes(user?.rol);
 
-  const filtered = MOCK.filter((r) => {
-    const matchSearch =
-      r.folio.toLowerCase().includes(search.toLowerCase()) ||
-      r.cliente.toLowerCase().includes(search.toLowerCase()) ||
-      r.tecnico.toLowerCase().includes(search.toLowerCase());
-    const matchStatus = statusFilter === "todos" || r.status === statusFilter;
-    const matchTipo   = tipoFilter   === "todos" || r.tipo   === tipoFilter;
-    return matchSearch && matchStatus && matchTipo;
-  });
+  const [rows, setRows] = useState([]);
+  const [total, setTotal] = useState(0);
+  const [loading, setLoading] = useState(true);
+  const [search, setSearch] = useState("");
+  const [status, setStatus] = useState("todos");
+  const [mes, setMes] = useState("");
+  const [anio, setAnio] = useState("");
+  const [page, setPage] = useState(0);
+  const [rowsPerPage, setRowsPerPage] = useState(10);
+  const [searchParams, setSearchParams] = useSearchParams();
+  // Enlace desde Cotizaciones ("Crear reporte"): /reportes?nuevo=1&cliente=..&cotizacion=..
+  const [prefillReporte, setPrefillReporte] = useState(() => (
+    searchParams.get("nuevo") ? { cliente: searchParams.get("cliente") || "", cotizacion: searchParams.get("cotizacion") || "" } : null
+  ));
+  const [nuevoOpen, setNuevoOpen] = useState(() => !!searchParams.get("nuevo"));
+
+  const cargar = useCallback((silencioso = false) => {
+    if (!silencioso) setLoading(true);
+    listarReportes({ search, status, mes, anio, page, pageSize: rowsPerPage })
+      .then(({ items, total }) => { setRows(items); setTotal(total); })
+      .catch(() => { if (!silencioso) { setRows([]); setTotal(0); } })
+      .finally(() => { if (!silencioso) setLoading(false); });
+  }, [search, status, mes, anio, page, rowsPerPage]);
+  useEffect(() => { cargar(); }, [cargar]);
+  usePolling(() => cargar(true));
 
   const stats = useMemo(() => {
-    const total = MOCK.length;
-    const porEstado = (estado) => MOCK.filter((r) => r.status === estado).length;
+    const c = (s) => rows.filter((r) => r.status === s).length;
     return [
-      { titulo: "Total de Reportes", valor: total, icono: <DescriptionOutlinedIcon sx={{ fontSize: 28 }} />, color: theme.palette.secondary.main, sub: "Este periodo" },
-      { titulo: "En Proceso",        valor: porEstado("proceso"),   icono: <HourglassTopOutlinedIcon sx={{ fontSize: 28 }} />, color: theme.palette.warning.main, sub: "Pendientes de avance" },
-      { titulo: "En Revisión",       valor: porEstado("revision"),  icono: <RateReviewOutlinedIcon sx={{ fontSize: 28 }} />,   color: theme.palette.info?.main || "#0288D1", sub: "Antes de emitir" },
-      { titulo: "Entregados",        valor: porEstado("entregado"), icono: <TaskAltOutlinedIcon sx={{ fontSize: 28 }} />,      color: theme.palette.success.main, sub: "Ciclo completo" },
+      { t: "Total (página)", v: rows.length, icon: <DescriptionOutlinedIcon />, color: theme.palette.secondary.main },
+      { t: "En proceso", v: c("en_proceso"), icon: <HourglassTopOutlinedIcon />, color: theme.palette.warning.main },
+      { t: "Terminados", v: c("terminado"), icon: <TaskAltOutlinedIcon />, color: theme.palette.info?.main || "#0288D1" },
+      { t: "Entregados", v: c("entregado"), icon: <LocalShippingOutlinedIcon />, color: theme.palette.success.main },
     ];
-  }, [theme]);
+  }, [rows, theme]);
 
   const columns = [
     {
-      field: "folio",
-      headerName: "Reporte",
-      renderCell: (row) => (
-        <Box sx={{ display: "flex", alignItems: "center", gap: 1.25, minWidth: 0 }}>
-          <Avatar
-            sx={{
-              width: 32, height: 32, flexShrink: 0, fontSize: 13, fontWeight: 700,
-              bgcolor: (TIPO_COLOR[row.tipo] ?? theme.palette.secondary.main) + "1F",
-              color: TIPO_COLOR[row.tipo] ?? theme.palette.secondary.main,
-            }}
-          >
-            {row.tipo.charAt(0)}
-          </Avatar>
-          <Box sx={{ minWidth: 0 }}>
-            <Typography variant="body2" fontWeight={700} noWrap>{row.folio}</Typography>
-            <Typography variant="caption" color="text.secondary" noWrap sx={{ display: "block" }}>
-              {row.cliente}
-            </Typography>
-          </Box>
+      field: "folio", headerName: "Reporte", nowrap: true,
+      renderCell: (r) => (
+        <Box>
+          <Typography variant="body2" fontWeight={700}>{r.folio}</Typography>
+          <Typography variant="caption" color="text.secondary" sx={{ display: "block" }}>{formatDate(r.fechaRecepcion)}</Typography>
         </Box>
       ),
     },
+    { field: "cliente", headerName: "Cliente", minWidth: 160, renderCell: (r) => r.cliente?.nombre || "—" },
     {
-      field: "tipo",
-      headerName: "Tipo",
-      renderCell: (row) => (
-        <Chip
-          label={row.tipo}
-          size="small"
-          sx={{ bgcolor: (TIPO_COLOR[row.tipo] ?? "#6B7280") + "18", color: TIPO_COLOR[row.tipo] ?? "#6B7280", fontWeight: 600 }}
-        />
-      ),
-    },
-    { field: "magnitud",       headerName: "Magnitud" },
-    { field: "equipos",        headerName: "Equipos", align: "center" },
-    { field: "tecnico",        headerName: "Técnico" },
-    { field: "fechaRecepcion", headerName: "Recepción",  renderCell: (row) => formatDate(row.fechaRecepcion) },
-    { field: "fechaEmision",   headerName: "Emisión",    renderCell: (row) => formatDate(row.fechaEmision) },
-    {
-      field: "status",
-      headerName: "Estado",
-      renderCell: (row) => {
-        const s = STATUS_MAP[row.status] ?? { label: row.status, color: "default" };
-        return <Chip label={s.label} color={s.color} size="small" />;
+      field: "status", headerName: "Estatus", nowrap: true,
+      renderCell: (r) => {
+        const s = STATUS[r.status] || { label: r.status, color: "default" };
+        return <Chip size="small" label={s.label} color={s.color} />;
       },
     },
     {
-      field: "acciones",
-      headerName: "Acciones",
-      align: "center",
-      renderCell: (row) => (
-        <Box sx={{ display: "flex", gap: 0.5, justifyContent: "center" }}>
-          <Tooltip title="Ver reporte">
-            <IconButton size="small">
-              <VisibilityOutlinedIcon fontSize="small" sx={{ color: "secondary.main" }} />
-            </IconButton>
+      field: "cotizacion", headerName: "Cotización", nowrap: true, hideBelow: "lg",
+      renderCell: (r) =>
+        r.cotizacion?._id ? (
+          <Tooltip title="Abrir cotización ligada">
+            <Chip
+              size="small" clickable label={r.cotizacion.folio} icon={<RequestQuoteOutlinedIcon sx={{ fontSize: 14 }} />}
+              onClick={() => navigate(`/cotizaciones?editar=${r.cotizacion._id}`)}
+              sx={{
+                color: "info.main", borderColor: "info.main", borderRadius: "6px",
+                "& .MuiChip-icon": { color: "info.main" }, "& .MuiChip-label": { px: 1 },
+              }}
+              variant="outlined"
+            />
           </Tooltip>
-          <Tooltip title="Editar">
-            <IconButton size="small">
-              <EditOutlinedIcon fontSize="small" sx={{ color: "warning.main" }} />
-            </IconButton>
-          </Tooltip>
-          <Tooltip title="Descargar PDF">
-            <span>
-              <IconButton size="small" disabled={row.status === "proceso"}>
-                <FileDownloadOutlinedIcon fontSize="small" sx={{ color: row.status === "proceso" ? "text.disabled" : "success.main" }} />
-              </IconButton>
-            </span>
-          </Tooltip>
-        </Box>
+        ) : "—",
+    },
+    { field: "ordenCompra", headerName: "OC / Factura", nowrap: true, hideBelow: "xl", renderCell: (r) => r.ordenCompra || r.factura || "—" },
+    {
+      field: "equipos", headerName: "Equipos", align: "center", nowrap: true, hideBelow: "md",
+      renderCell: (r) => (
+        <Tooltip title="En proceso / total de asignaciones">
+          <span>{(r.cantidadEnProceso ?? 0)} / {(r.numEquipos ?? 0)}</span>
+        </Tooltip>
+      ),
+    },
+    {
+      field: "acciones", headerName: "Acciones", align: "center", nowrap: true,
+      renderCell: (r) => (
+        <Tooltip title="Descargar Reporte de Servicio (PDF)">
+          <IconButton size="small" onClick={() => window.open(`/informe/reporte/${r._id}`, "_blank")}>
+            <PictureAsPdfOutlinedIcon fontSize="small" sx={{ color: "error.main" }} />
+          </IconButton>
+        </Tooltip>
       ),
     },
   ];
 
   return (
     <Box>
-      <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 3.5 }}>
-        <Box>
-          <Typography variant="h5" fontWeight={700}>Reportes de Calibración</Typography>
-          <Typography variant="body2" color="text.secondary">{filtered.length} de {MOCK.length} registros</Typography>
-        </Box>
-        <Box sx={{ display: "flex", gap: 1.5 }}>
-          <AppButton
-            variant="outlined"
-            startIcon={<FileDownloadOutlinedIcon />}
-            onClick={() => navigate("/reportes/exportar")}
-            sx={{ borderRadius: 2 }}
-          >
-            Exportar
-          </AppButton>
-          <AppButton startIcon={<AddIcon />} sx={{ borderRadius: 2 }}>
-            Nuevo Reporte
-          </AppButton>
-        </Box>
-      </Box>
+      <PageHeader
+        icon={<FactCheckOutlinedIcon />}
+        title="Reportes de Servicio"
+        subtitle={`${total} reportes · cualquier usuario puede iniciar uno`}
+        actions={
+          <>
+            <AppButton variant="outlined" startIcon={<FileDownloadOutlinedIcon />} onClick={() => navigate("/reportes/exportar")} sx={{ borderRadius: 2 }}>
+              Exportar
+            </AppButton>
+            {puedeCrearReporte && (
+              <AppButton startIcon={<AddIcon />} onClick={() => setNuevoOpen(true)} sx={{ borderRadius: 2 }}>
+                Nuevo Reporte
+              </AppButton>
+            )}
+          </>
+        }
+      />
 
-      <Grid container spacing={3} sx={{ mb: 3.5 }}>
-        {stats.map((card) => (
-          <Grid key={card.titulo} size={{ xs: 12, sm: 6, md: 3 }}>
-            <Paper
-              elevation={0}
-              sx={{
-                p: 3,
-                borderRadius: 3,
-                border: 1,
-                borderColor: "divider",
-                transition: ".3s",
-                "&:hover": {
-                  transform: "translateY(-4px)",
-                  boxShadow: "0 12px 30px rgba(0,0,0,.08)",
-                },
-              }}
-            >
-              <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
-                <Box>
-                  <Typography color="text.secondary" variant="body2" mb={1}>
-                    {card.titulo}
-                  </Typography>
-                  <Typography variant="h4" fontWeight={800}>
-                    {card.valor}
-                  </Typography>
-                  <Typography variant="caption" color="text.secondary" mt={1} display="block">
-                    {card.sub}
-                  </Typography>
-                </Box>
-                <Box sx={{ width: 52, height: 52, flexShrink: 0, borderRadius: 3, background: card.color + "18", color: card.color, display: "flex", alignItems: "center", justifyContent: "center" }}>
-                  {card.icono}
-                </Box>
-              </Box>
-            </Paper>
+      <Grid container spacing={2.5} sx={{ mb: 3.5 }}>
+        {stats.map((s) => (
+          <Grid key={s.t} size={{ xs: 12, sm: 6, md: 3 }}>
+            <StatCard label={s.t} value={s.v} icon={s.icon} color={s.color} />
           </Grid>
         ))}
       </Grid>
 
       <Box sx={{ display: "flex", gap: 2, mb: 2, flexWrap: "wrap" }}>
         <TextField
-          placeholder="Buscar por folio, cliente o técnico..."
-          size="small"
-          value={search}
-          onChange={(e) => { setSearch(e.target.value); setPage(0); }}
-          sx={{ width: 340, "& .MuiOutlinedInput-root": { borderRadius: 2 } }}
-          InputProps={{
-            startAdornment: (
-              <InputAdornment position="start">
-                <SearchIcon fontSize="small" sx={{ color: "text.secondary" }} />
-              </InputAdornment>
-            ),
-          }}
+          placeholder="Buscar por folio, OC o factura…" size="small"
+          value={search} onChange={(e) => { setSearch(e.target.value); setPage(0); }}
+          sx={{ width: 300, "& .MuiOutlinedInput-root": { borderRadius: 2 } }}
+          slotProps={{ input: { startAdornment: <InputAdornment position="start"><SearchIcon fontSize="small" sx={{ color: "text.secondary" }} /></InputAdornment> } }}
         />
-        <FormControl size="small" sx={{ minWidth: 160 }}>
-          <InputLabel>Estado</InputLabel>
-          <Select label="Estado" value={statusFilter} onChange={(e) => { setStatusFilter(e.target.value); setPage(0); }} sx={{ borderRadius: 2 }}>
-            <MenuItem value="todos">Todos</MenuItem>
-            <MenuItem value="proceso">En Proceso</MenuItem>
-            <MenuItem value="revision">En Revisión</MenuItem>
-            <MenuItem value="emitido">Emitido</MenuItem>
-            <MenuItem value="entregado">Entregado</MenuItem>
+        <FormControl size="small" sx={{ minWidth: 150 }}>
+          <InputLabel>Mes</InputLabel>
+          <Select label="Mes" value={mes} onChange={(e) => { setMes(e.target.value); setPage(0); }} sx={{ borderRadius: 2 }}>
+            <MenuItem value="">Todos</MenuItem>
+            {MESES.map((m, i) => <MenuItem key={m} value={i + 1}>{m}</MenuItem>)}
           </Select>
         </FormControl>
-        <FormControl size="small" sx={{ minWidth: 160 }}>
-          <InputLabel>Tipo</InputLabel>
-          <Select label="Tipo" value={tipoFilter} onChange={(e) => { setTipoFilter(e.target.value); setPage(0); }} sx={{ borderRadius: 2 }}>
-            <MenuItem value="todos">Todos los tipos</MenuItem>
-            <MenuItem value="Dimensional">Dimensional</MenuItem>
-            <MenuItem value="Eléctrica">Eléctrica</MenuItem>
-            <MenuItem value="Temperatura">Temperatura</MenuItem>
-            <MenuItem value="Presión">Presión</MenuItem>
-            <MenuItem value="Fuerza">Fuerza</MenuItem>
-            <MenuItem value="Masa">Masa</MenuItem>
+        <FormControl size="small" sx={{ minWidth: 130 }}>
+          <InputLabel>Año</InputLabel>
+          <Select label="Año" value={anio} onChange={(e) => { setAnio(e.target.value); setPage(0); }} sx={{ borderRadius: 2 }}>
+            <MenuItem value="">Todos</MenuItem>
+            {ANIOS.map((a) => <MenuItem key={a} value={a}>{a}</MenuItem>)}
+          </Select>
+        </FormControl>
+        <FormControl size="small" sx={{ minWidth: 180 }}>
+          <InputLabel>Estado</InputLabel>
+          <Select label="Estado" value={status} onChange={(e) => { setStatus(e.target.value); setPage(0); }} sx={{ borderRadius: 2 }}>
+            <MenuItem value="todos">Todos</MenuItem>
+            {Object.entries(STATUS).map(([k, v]) => <MenuItem key={k} value={k}>{v.label}</MenuItem>)}
           </Select>
         </FormControl>
       </Box>
 
       <AppTable
-        columns={columns}
-        rows={filtered.slice(page * 10, page * 10 + 10)}
-        totalCount={filtered.length}
-        page={page}
-        rowsPerPage={10}
+        columns={columns} rows={rows} loading={loading}
+        totalCount={total} page={page} rowsPerPage={rowsPerPage}
         onPageChange={setPage}
+        onRowsPerPageChange={(n) => { setRowsPerPage(n); setPage(0); }}
+        emptyText="Sin reportes todavía"
+        onRowClick={(r) => navigate(`/reportes/${r._id}`)}
+      />
+
+      <NuevoReporteDialog
+        open={nuevoOpen} prefill={prefillReporte}
+        onClose={() => { setNuevoOpen(false); setPrefillReporte(null); setSearchParams({}, { replace: true }); }}
+        onDone={(r) => { setNuevoOpen(false); setPrefillReporte(null); setSearchParams({}, { replace: true }); cargar(); if (r?._id) navigate(`/reportes/${r._id}`); }}
       />
     </Box>
+  );
+}
+
+function NuevoReporteDialog({ open, onClose, onDone, prefill }) {
+  const cotizacionPendienteRef = useRef(null);
+  const [clientes, setClientes] = useState([]);
+  const [cliente, setCliente] = useState("");
+  const [contactos, setContactos] = useState([]);
+  const [contacto, setContacto] = useState("");
+  const [cotizaciones, setCotizaciones] = useState([]);
+  const [cotizacion, setCotizacion] = useState("");
+  const [oc, setOc] = useState("");
+  const [obs, setObs] = useState("");
+  const [error, setError] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [nuevoContacto, setNuevoContacto] = useState(null); // { nombre, telefono, correo } | null
+
+  // Al elegir una cotización se traen sola su OC y su contacto (no se teclean de nuevo).
+  const elegirCotizacion = (c, forzar = false) => {
+    setCotizacion(c?._id || "");
+    if (!c) return;
+    if (forzar || !oc) setOc(c.ordenCompra || "");
+    const contactoId = c.contacto?._id || c.contacto;
+    if (contactoId && (forzar || !contacto)) setContacto(contactoId);
+  };
+
+  useEffect(() => {
+    if (!open) return;
+    setCliente(prefill?.cliente || ""); setOc(""); setObs(""); setError(""); setNuevoContacto(null);
+    cotizacionPendienteRef.current = prefill?.cotizacion || null;
+    setContactos([]); setContacto(""); setCotizaciones([]); setCotizacion("");
+    listarClientes({ pageSize: 200 }).then(({ items }) => setClientes(items)).catch(() => {});
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open]);
+
+  useEffect(() => {
+    const pendiente = cotizacionPendienteRef.current;
+    if (!pendiente) { setContacto(""); setCotizacion(""); }
+    setNuevoContacto(null);
+    if (!cliente) { setContactos([]); setCotizaciones([]); return; }
+    listarContactos(cliente).then(setContactos).catch(() => setContactos([]));
+    listarCotizaciones({ clienteId: cliente, pageSize: 100 })
+      .then(({ items }) => {
+        setCotizaciones(items);
+        if (pendiente) {
+          cotizacionPendienteRef.current = null;
+          const c = items.find((x) => x._id === pendiente);
+          if (c) elegirCotizacion(c, true);
+        }
+      })
+      .catch(() => setCotizaciones([]));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cliente]);
+
+
+  const agregarContacto = async () => {
+    if (!nuevoContacto?.nombre?.trim()) { setError("Escribe el nombre del contacto."); return; }
+    try {
+      const c = await crearContacto(cliente, {
+        nombre: nuevoContacto.nombre.trim(),
+        telefono: nuevoContacto.telefono?.trim() || undefined,
+        correo: nuevoContacto.correo?.trim() || undefined,
+      });
+      const lista = await listarContactos(cliente).catch(() => contactos);
+      setContactos(lista); setContacto(c._id); setNuevoContacto(null); setError("");
+    } catch (e) {
+      setError(e?.response?.data?.message || "No se pudo agregar el contacto.");
+    }
+  };
+
+  const crear = async () => {
+    if (!cliente) { setError("Elige un cliente."); return; }
+    setSaving(true); setError("");
+    try {
+      const r = await crearReporte({
+        cliente, contacto: contacto || undefined, cotizacion: cotizacion || undefined,
+        ordenCompra: oc || undefined, observaciones: obs || undefined,
+      });
+      onDone(r);
+    } catch (e) {
+      setError(e?.response?.data?.message || "No se pudo crear el reporte.");
+    } finally { setSaving(false); }
+  };
+
+  return (
+    <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth>
+      <DialogTitle sx={{ fontWeight: 700 }}>Nuevo Reporte de Servicio</DialogTitle>
+      <DialogContent>
+        {error && <Alert severity="error" sx={{ mb: 2, borderRadius: 2 }}>{error}</Alert>}
+        <Box sx={{ display: "flex", flexDirection: "column", gap: 2, mt: 0.5 }}>
+          <TextField select fullWidth size="small" label="Cliente" value={cliente} onChange={(e) => setCliente(e.target.value)}>
+            {clientes.map((c) => <MenuItem key={c._id} value={c._id}>{c.nombre}</MenuItem>)}
+          </TextField>
+          <AvisoDeuda clienteId={cliente} />
+          <Box>
+            <TextField
+              select fullWidth size="small" label="Contacto (opcional)" value={contacto}
+              onChange={(e) => setContacto(e.target.value)} disabled={!cliente}
+              helperText={cliente && contactos.length === 0 ? "Este cliente no tiene contactos registrados" : ""}
+            >
+              <MenuItem value="">— Sin especificar —</MenuItem>
+              {contactos.map((c) => <MenuItem key={c._id} value={c._id}>{c.nombre}</MenuItem>)}
+            </TextField>
+            {cliente && (nuevoContacto ? (
+              <Box sx={{ mt: 1, p: 1.5, border: "1px dashed", borderColor: "divider", borderRadius: 2, display: "flex", flexDirection: "column", gap: 1.5 }}>
+                <Typography variant="caption" fontWeight={700} color="text.secondary">Nuevo contacto</Typography>
+                <TextField size="small" label="Nombre" value={nuevoContacto.nombre} onChange={(e) => setNuevoContacto({ ...nuevoContacto, nombre: e.target.value })} autoFocus />
+                <Box sx={{ display: "flex", gap: 1 }}>
+                  <TextField size="small" label="Teléfono" value={nuevoContacto.telefono} onChange={(e) => setNuevoContacto({ ...nuevoContacto, telefono: e.target.value })} fullWidth />
+                  <TextField size="small" label="Correo" value={nuevoContacto.correo} onChange={(e) => setNuevoContacto({ ...nuevoContacto, correo: e.target.value })} fullWidth />
+                </Box>
+                <Box sx={{ display: "flex", gap: 1, justifyContent: "flex-end" }}>
+                  <Button size="small" onClick={() => setNuevoContacto(null)}>Cancelar</Button>
+                  <Button size="small" variant="contained" onClick={agregarContacto} sx={{ borderRadius: 2 }}>Agregar</Button>
+                </Box>
+              </Box>
+            ) : (
+              <Button size="small" startIcon={<AddIcon />} onClick={() => setNuevoContacto({ nombre: "", telefono: "", correo: "" })} sx={{ mt: 0.5, borderRadius: 2 }}>
+                Nuevo contacto
+              </Button>
+            ))}
+          </Box>
+          <TextField
+            select fullWidth size="small" label="Cotización (opcional)" value={cotizacion}
+            onChange={(e) => elegirCotizacion(cotizaciones.find((c) => c._id === e.target.value))} disabled={!cliente}
+            helperText={cliente && cotizaciones.length === 0 ? "Este cliente no tiene cotizaciones registradas" : ""}
+          >
+            <MenuItem value="">— Sin especificar —</MenuItem>
+            {cotizaciones.map((c) => <MenuItem key={c._id} value={c._id}>{c.folio}</MenuItem>)}
+          </TextField>
+          <TextField fullWidth size="small" label="Orden de compra (opcional)" value={oc} onChange={(e) => setOc(e.target.value)} />
+          <TextField fullWidth size="small" label="Observaciones (opcional)" multiline minRows={2} value={obs} onChange={(e) => setObs(e.target.value)} />
+        </Box>
+      </DialogContent>
+      <DialogActions sx={{ px: 3, pb: 2 }}>
+        <Button onClick={onClose}>Cancelar</Button>
+        <Button variant="contained" onClick={crear} disabled={saving} sx={{ borderRadius: 2 }}>Crear</Button>
+      </DialogActions>
+    </Dialog>
   );
 }

@@ -1,0 +1,188 @@
+const { Schema, model } = require("mongoose");
+const crypto = require("crypto");
+const { eventoSchema } = require("./_shared");
+
+/**
+ * Certificado de calibración. En el legacy el "certificado" era sólo un estado
+ * de la asignación; aquí es una entidad propia con:
+ *  - folio legible (CERT-2026-0001)
+ *  - token público OPACO para el QR (no expone IDs internos)
+ *  - SNAPSHOT inmutable del equipo/patrones al momento de emitir (si luego se
+ *    edita el equipo, los certificados históricos no cambian)
+ *  - bitácora de verificaciones públicas (quién/cuándo escaneó el QR)
+ *  - historial de auditoría (nunca se sobreescribe)
+ */
+const ESTADOS = ["borrador", "vigente", "por_vencer", "vencido", "anulado"];
+
+function nuevoToken() {
+  // 32 hex chars, URL-safe, no secuencial, no adivinable.
+  return crypto.randomBytes(16).toString("hex");
+}
+
+const certificadoSchema = new Schema(
+  {
+    folio: { type: String, required: true, unique: true },
+    publicToken: {
+      type: String,
+      required: true,
+      unique: true,
+      index: true,
+      default: nuevoToken,
+    },
+
+    asignacion: { type: Schema.Types.ObjectId, ref: "Asignacion", index: true },
+    reporte: { type: Schema.Types.ObjectId, ref: "Reporte" },
+    cliente: { type: Schema.Types.ObjectId, ref: "Cliente", required: true, index: true },
+    equipo: { type: Schema.Types.ObjectId, ref: "Equipo" },
+
+    // Snapshot inmutable (se llena al emitir).
+    equipoSnapshot: {
+      idInterno: String,
+      marca: String,
+      modelo: String,
+      serie: String,
+      descripcion: String,
+      categoria: String,
+      subtipo: String,
+      accuracy: Number,
+      unidades: String,
+      divisionMinima: String,
+      resolucion: String,
+      rango: String,
+      rangoUso: String,
+      rangoCalibracion: String,
+      localizacion: String,
+    },
+    clienteSnapshot: { nombre: String, direccion: String },
+    patronesSnapshot: [
+      {
+        codigo: String,
+        nombre: String,
+        modelo: String,
+        trazabilidad: String,
+        numeroCertificado: String,
+        certificadoNo: String,
+        laboratorio: String,
+        vencimiento: Date,
+        incertidumbre: String,
+        _id: false,
+      },
+    ],
+
+    laboratorio: { nombre: String, acreditacion: String, remarks: String, notaCertificado: String },
+
+    fechaCalibracion: { type: Date, required: true },
+    fechaEmision: { type: Date, default: Date.now },
+    vigencia: Date, // opcional — "cuando aplique"
+
+    // Detalle del servicio que exige un certificado formal (antes solo se
+    // preguntaba la asignación) — captura lo mismo que ya se calcula en el
+    // sistema (resultado/criterio) más el contexto operativo del día de la
+    // calibración, que no vive en ningún otro lado.
+    servicio: {
+      razon: String, // "Calibración", "Revisión", "Reparación"...
+      tipo: String, // "Acreditado" | "No acreditado"
+      procedimiento: String, // PRO-CAL-023
+    },
+    condiciones: {
+      temperatura: Number, // °C
+      humedad: Number, // % HR
+    },
+    comentarios: String,
+
+    // Firmantes del certificado — se separan de `creadoPor` porque en un
+    // laboratorio real quien calibra, quien revisa técnicamente y quien
+    // autoriza calidad casi nunca son la misma persona.
+    revisadoPor: { id: { type: Schema.Types.ObjectId, ref: "Usuario" }, nombre: String },
+    autorizadoPor: { id: { type: Schema.Types.ObjectId, ref: "Usuario" }, nombre: String },
+
+    estado: { type: String, enum: ESTADOS, default: "borrador" },
+
+    // Resultado resumido de incertidumbre (el detalle vive en CalculoIncertidumbre).
+    resultado: {
+      valorMedido: Number,
+      unidad: String,
+      incertidumbreExpandida: Number,
+      k: Number,
+      nivelConfianza: String, // "~95%"
+    },
+
+    // Un renglón por punto de calibración — snapshot de los CalculoIncertidumbre
+    // APROBADOS de la asignación al momento de emitir. No cambian después.
+    puntos: [
+      {
+        calculo: { type: Schema.Types.ObjectId, ref: "CalculoIncertidumbre" },
+        folioCalculo: String,
+        mensurando: String,
+        condicion: String, // "encontrado" | "dejado" | "unico"
+        puntoNominal: Number,
+        lecturas: [Number],
+        valorMedido: Number, // promedio
+        desviacionStd: Number,
+        errorIndicacion: Number,
+        emp: Number,
+        criterio: String, // "pasa" | "no_pasa" | "sin_evaluar"
+        unidad: String,
+        uCombinada: Number,
+        incertidumbreExpandida: Number,
+        k: Number,
+        nivelConfianza: String,
+        _id: false,
+      },
+    ],
+
+    archivo: {
+      nombreArchivo: String, // nombre en disco
+      nombreOriginal: String,
+      mimetype: String,
+      tamano: Number,
+      subidoPor: { type: Schema.Types.ObjectId, ref: "Usuario" },
+      fecha: Date,
+    },
+
+    verificaciones: [
+      {
+        fecha: { type: Date, default: Date.now },
+        ipHash: String, // hash, nunca la IP en claro
+        userAgent: String,
+        _id: false,
+      },
+    ],
+
+    // Seguimiento del recordatorio automático por WhatsApp (ver
+    // jobs/recordatoriosWhatsApp.job.js) — permite saber cuándo se mandó el
+    // último para no repetirlo antes de que pase una semana, y separa el
+    // envío automático del manual (botón en pantalla / panel de pruebas, que
+    // no tocan este campo).
+    recordatorioWhatsApp: {
+      ultimoEnvio: Date,
+      ultimoResultado: { type: String, enum: ["enviado", "error"] },
+      ultimoError: String,
+    },
+
+    anulacion: {
+      motivo: String,
+      usuario: { id: { type: Schema.Types.ObjectId, ref: "Usuario" }, nombre: String },
+      fecha: Date,
+    },
+
+    creadoPor: { type: Schema.Types.ObjectId, ref: "Usuario" },
+    historial: [eventoSchema],
+  },
+  { timestamps: true }
+);
+
+certificadoSchema.statics.ESTADOS = ESTADOS;
+certificadoSchema.statics.nuevoToken = nuevoToken;
+
+/** Estado derivado por fechas (no toca `anulado` ni `borrador`). */
+certificadoSchema.methods.estadoCalculado = function () {
+  if (this.estado === "anulado" || this.estado === "borrador") return this.estado;
+  if (!this.vigencia) return "vigente";
+  const dias = Math.ceil((new Date(this.vigencia) - new Date()) / 86400000);
+  if (dias < 0) return "vencido";
+  if (dias <= 30) return "por_vencer";
+  return "vigente";
+};
+
+module.exports = model("Certificado", certificadoSchema);

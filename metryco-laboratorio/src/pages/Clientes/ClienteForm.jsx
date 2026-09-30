@@ -2,13 +2,22 @@ import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { useForm, Controller } from "react-hook-form";
 import {
-  Box, Typography, Grid, Alert, CircularProgress, Divider,
+  Box, Typography, Grid, Alert, CircularProgress,
   MenuItem, Select, FormControl, InputLabel, IconButton, InputAdornment, Tooltip,
-  Chip, OutlinedInput,
+  Chip, OutlinedInput, Avatar, Stack, Autocomplete, TextField,
 } from "@mui/material";
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
 import RefreshIcon from "@mui/icons-material/Refresh";
 import ContentCopyIcon from "@mui/icons-material/ContentCopy";
+import AddIcon from "@mui/icons-material/Add";
+import EditOutlinedIcon from "@mui/icons-material/EditOutlined";
+import DeleteOutlineIcon from "@mui/icons-material/DeleteOutlined";
+import BusinessOutlinedIcon from "@mui/icons-material/BusinessOutlined";
+import ContactPhoneOutlinedIcon from "@mui/icons-material/ContactPhoneOutlined";
+import LocationOnOutlinedIcon from "@mui/icons-material/LocationOnOutlined";
+import PaymentsOutlinedIcon from "@mui/icons-material/PaymentsOutlined";
+import TuneOutlinedIcon from "@mui/icons-material/TuneOutlined";
+import GroupsOutlinedIcon from "@mui/icons-material/GroupsOutlined";
 import AppButton from "../../shared/components/AppButton";
 import AppCard from "../../shared/components/AppCard";
 import AppInput from "../../shared/components/AppInput";
@@ -17,7 +26,10 @@ import {
   listarContactos, crearContacto, actualizarContacto, eliminarContacto,
 } from "../../services/contactos";
 import { generarPasswordSegura } from "../../shared/utils/generarPassword";
+import { SECTORES } from "../../shared/constants/sectores";
+import { REGIMENES_FISCALES, labelRegimenFiscal } from "../../shared/constants/regimenFiscal";
 import ContactoDialog from "./ContactoDialog";
+import ConfirmDialog from "../../shared/components/ConfirmDialog";
 
 const USO_CFDI = [
   { value: "G01", label: "G01 - Adquisición de mercancías" },
@@ -57,6 +69,16 @@ const DIAS_SEMANA = [
   { value: "domingo", label: "Domingo" },
 ];
 
+function SeccionTitulo({ icon: Icon, children }) {
+  return (
+    <Box sx={{ display: "flex", alignItems: "center", gap: 1.25, mb: 0.5 }}>
+      <Box sx={{ width: 4, height: 20, borderRadius: 1, bgcolor: "secondary.main", flexShrink: 0 }} />
+      {Icon && <Icon fontSize="small" sx={{ color: "secondary.main" }} />}
+      <Typography variant="h6" fontWeight={700}>{children}</Typography>
+    </Box>
+  );
+}
+
 export default function ClienteForm() {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -67,9 +89,9 @@ export default function ClienteForm() {
   const [copiado, setCopiado] = useState(false);
 
   const [contactos, setContactos] = useState([]);
-  const [contactoSeleccionadoId, setContactoSeleccionadoId] = useState("");
   const [dialogContactoAbierto, setDialogContactoAbierto] = useState(false);
   const [contactoEnEdicion, setContactoEnEdicion] = useState(null);
+  const [contactoAEliminar, setContactoAEliminar] = useState(null);
   const [guardandoContacto, setGuardandoContacto] = useState(false);
   const [errorContactos, setErrorContactos] = useState("");
 
@@ -108,15 +130,9 @@ export default function ClienteForm() {
     };
   }, [id, isEdit, reset]);
 
-  const recargarContactos = async (seleccionarId) => {
+  const recargarContactos = async () => {
     try {
-      const items = await listarContactos(id);
-      setContactos(items);
-      if (seleccionarId) {
-        setContactoSeleccionadoId(seleccionarId);
-      } else if (items.length && !items.some((c) => c._id === contactoSeleccionadoId)) {
-        setContactoSeleccionadoId(items[0]._id);
-      }
+      setContactos(await listarContactos(id));
     } catch {
       setErrorContactos("No se pudieron cargar los contactos.");
     }
@@ -128,16 +144,13 @@ export default function ClienteForm() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id, isEdit]);
 
-  const contactoActual = contactos.find((c) => c._id === contactoSeleccionadoId) ?? null;
-
   const abrirNuevoContacto = () => {
     setContactoEnEdicion(null);
     setDialogContactoAbierto(true);
   };
 
-  const abrirEditarContacto = () => {
-    if (!contactoActual) return;
-    setContactoEnEdicion(contactoActual);
+  const abrirEditarContacto = (contacto) => {
+    setContactoEnEdicion(contacto);
     setDialogContactoAbierto(true);
   };
 
@@ -147,11 +160,10 @@ export default function ClienteForm() {
     try {
       if (contactoEnEdicion) {
         await actualizarContacto(id, contactoEnEdicion._id, datos);
-        await recargarContactos(contactoEnEdicion._id);
       } else {
-        const nuevo = await crearContacto(id, datos);
-        await recargarContactos(nuevo._id);
+        await crearContacto(id, datos);
       }
+      await recargarContactos();
       setDialogContactoAbierto(false);
     } catch (err) {
       setErrorContactos(err.response?.data?.message || "No se pudo guardar el contacto.");
@@ -160,12 +172,12 @@ export default function ClienteForm() {
     }
   };
 
-  const borrarContactoActual = async () => {
-    if (!contactoActual) return;
+  const confirmarEliminarContacto = async () => {
+    if (!contactoAEliminar) return;
     setGuardandoContacto(true);
     try {
-      await eliminarContacto(id, contactoActual._id);
-      setContactoSeleccionadoId("");
+      await eliminarContacto(id, contactoAEliminar._id);
+      setContactoAEliminar(null);
       await recargarContactos();
     } catch {
       setErrorContactos("No se pudo eliminar el contacto.");
@@ -245,17 +257,15 @@ export default function ClienteForm() {
       )}
 
       <Box component="form" onSubmit={handleSubmit(onSubmit)}>
-        <AppCard sx={{ mb: 3 }}>
-          <Typography variant="caption" color="text.secondary" sx={{ display: "block", mb: 2 }}>
-            Los campos marcados con <Box component="span" sx={{ color: "error.main" }}>*</Box> son obligatorios
-          </Typography>
+        <Typography variant="caption" color="text.secondary" sx={{ display: "block", mb: 2 }}>
+          Los campos marcados con <Box component="span" sx={{ color: "error.main" }}>*</Box> son obligatorios
+        </Typography>
 
-          <Box sx={{ display: "flex", flexDirection: "row", flexWrap: "nowrap", alignItems: "center", gap: 1.25, mb: 2 }}>
-            <Box sx={{ width: 4, height: 20, borderRadius: 1, bgcolor: "secondary.main", flexShrink: 0 }} />
-            <Typography variant="h6" fontWeight={700}>
-              Información Fiscal
-            </Typography>
-          </Box>
+        <AppCard sx={{ mb: 2.5 }}>
+          <SeccionTitulo icon={BusinessOutlinedIcon}>Información Fiscal</SeccionTitulo>
+          <Typography variant="caption" color="text.secondary" sx={{ display: "block", mb: 2 }}>
+            Datos para facturar y los correos donde le llegan cotizaciones y facturas al cliente.
+          </Typography>
           <Grid container spacing={2}>
             <Grid size={{ xs: 12, sm: 6, md: 4 }}>
               <AppInput
@@ -279,10 +289,32 @@ export default function ClienteForm() {
               />
             </Grid>
             <Grid size={{ xs: 12, sm: 6, md: 4 }}>
-              <AppInput
-                label="Regimen Fiscal *"
-                error={errors.regimenFiscal}
-                {...register("regimenFiscal", { required: "Campo obligatorio" })}
+              <Controller
+                name="regimenFiscal"
+                control={control}
+                rules={{ required: true }}
+                render={({ field }) => (
+                  <Autocomplete
+                    size="small"
+                    options={REGIMENES_FISCALES}
+                    getOptionLabel={(r) => (typeof r === "string" ? labelRegimenFiscal(r) : `${r.value} - ${r.descripcion}`)}
+                    isOptionEqualToValue={(opt, val) => opt.value === val}
+                    value={field.value ?? null}
+                    onChange={(_, opt) => field.onChange(opt?.value || "")}
+                    renderOption={(props, r) => (
+                      <Box component="li" {...props} key={r.value}>
+                        <Box>
+                          <Typography variant="body2" fontWeight={700}>{r.value}</Typography>
+                          <Typography variant="caption" color="text.secondary">{r.descripcion}</Typography>
+                        </Box>
+                      </Box>
+                    )}
+                    renderInput={(params) => (
+                      <TextField {...params} label="Régimen Fiscal *" error={!!errors.regimenFiscal} />
+                    )}
+                    slotProps={{ paper: { sx: { maxHeight: 340 } } }}
+                  />
+                )}
               />
             </Grid>
             <Grid size={{ xs: 12, sm: 6, md: 4 }}>
@@ -302,16 +334,54 @@ export default function ClienteForm() {
                 />
               </FormControl>
             </Grid>
+            <Grid size={{ xs: 12, sm: 6, md: 4 }}>
+              <FormControl fullWidth size="small">
+                <InputLabel shrink>Días de crédito</InputLabel>
+                <Controller
+                  name="diasCredito"
+                  control={control}
+                  render={({ field }) => (
+                    <Select label="Días de crédito" notched displayEmpty {...field} value={field.value ?? ""} sx={{ borderRadius: 2 }}>
+                      <MenuItem value="">Sin definir</MenuItem>
+                      <MenuItem value={0}>Contado (0 días)</MenuItem>
+                      <MenuItem value={15}>15 días</MenuItem>
+                      <MenuItem value={30}>30 días</MenuItem>
+                      <MenuItem value={60}>60 días</MenuItem>
+                    </Select>
+                  )}
+                />
+              </FormControl>
+            </Grid>
+            <Grid size={{ xs: 12, sm: 6, md: 4 }}>
+              <AppInput label="Correo (Cotizaciones)" {...register("contacto.emailCotizaciones")} />
+            </Grid>
+            <Grid size={{ xs: 12, sm: 6, md: 4 }}>
+              <AppInput label="Correo (Facturación)" {...register("contacto.emailFacturacion")} />
+            </Grid>
           </Grid>
+        </AppCard>
 
-          <Divider sx={{ my: 3 }} />
+        <AppCard sx={{ mb: 2.5 }}>
+          <SeccionTitulo icon={ContactPhoneOutlinedIcon}>Contacto Principal</SeccionTitulo>
+          <Typography variant="caption" color="text.secondary" sx={{ display: "block", mb: 2 }}>
+            La persona con la que se coordina el servicio. Para más contactos del mismo cliente, usa la sección "Contactos" más abajo.
+          </Typography>
+          <Grid container spacing={2}>
+            <Grid size={{ xs: 12, sm: 6, md: 4 }}>
+              <AppInput label="Nombre Contacto" {...register("contacto.nombre")} />
+            </Grid>
+            <Grid size={{ xs: 12, sm: 6, md: 4 }}>
+              <AppInput label="Telefono" {...register("contacto.telefono")} />
+            </Grid>
+            <Grid size={{ xs: 12, sm: 6, md: 4 }}>
+              <AppInput label="Correo" {...register("contacto.correo")} />
+            </Grid>
+          </Grid>
+        </AppCard>
 
-          <Box sx={{ display: "flex", flexDirection: "row", flexWrap: "nowrap", alignItems: "center", gap: 1.25, mb: 2 }}>
-            <Box sx={{ width: 4, height: 20, borderRadius: 1, bgcolor: "secondary.main", flexShrink: 0 }} />
-            <Typography variant="h6" fontWeight={700}>
-              Domicilio Fiscal
-            </Typography>
-          </Box>
+        <AppCard sx={{ mb: 2.5 }}>
+          <SeccionTitulo icon={LocationOnOutlinedIcon}>Domicilio Fiscal</SeccionTitulo>
+          <Box sx={{ mb: 1 }} />
           <Grid container spacing={2}>
             <Grid size={{ xs: 12, sm: 6, md: 4 }}>
               <AppInput
@@ -376,38 +446,11 @@ export default function ClienteForm() {
               />
             </Grid>
           </Grid>
+        </AppCard>
 
-          <Divider sx={{ my: 3 }} />
-
-          <Box sx={{ display: "flex", flexDirection: "row", flexWrap: "nowrap", alignItems: "center", gap: 1.25, mb: 2 }}>
-            <Box sx={{ width: 4, height: 20, borderRadius: 1, bgcolor: "secondary.main", flexShrink: 0 }} />
-            <Typography variant="h6" fontWeight={700}>
-              Contacto
-            </Typography>
-          </Box>
-          <Grid container spacing={2}>
-            <Grid size={{ xs: 12, sm: 6, md: 4 }}>
-              <AppInput label="Nombre del Contacto" {...register("contacto.nombre")} />
-            </Grid>
-            <Grid size={{ xs: 12, sm: 6, md: 4 }}>
-              <AppInput label="Teléfono" {...register("contacto.telefono")} />
-            </Grid>
-            <Grid size={{ xs: 12, sm: 6, md: 4 }}>
-              <AppInput label="Email Cotizaciones" {...register("contacto.emailCotizaciones")} />
-            </Grid>
-            <Grid size={{ xs: 12, sm: 6, md: 4 }}>
-              <AppInput label="Email Facturacion" {...register("contacto.emailFacturacion")} />
-            </Grid>
-          </Grid>
-
-          <Divider sx={{ my: 3 }} />
-
-          <Box sx={{ display: "flex", flexDirection: "row", flexWrap: "nowrap", alignItems: "center", gap: 1.25, mb: 2 }}>
-            <Box sx={{ width: 4, height: 20, borderRadius: 1, bgcolor: "secondary.main", flexShrink: 0 }} />
-            <Typography variant="h6" fontWeight={700}>
-              Facturacion
-            </Typography>
-          </Box>
+        <AppCard sx={{ mb: 2.5 }}>
+          <SeccionTitulo icon={PaymentsOutlinedIcon}>Facturación</SeccionTitulo>
+          <Box sx={{ mb: 1 }} />
           <Grid container spacing={2}>
             <Grid size={{ xs: 12, sm: 6, md: 4 }}>
               <FormControl fullWidth size="small">
@@ -445,15 +488,11 @@ export default function ClienteForm() {
               <AppInput label="Numero de cuenta" {...register("facturacion.numCuenta")} />
             </Grid>
           </Grid>
+        </AppCard>
 
-          <Divider sx={{ my: 3 }} />
-
-          <Box sx={{ display: "flex", flexDirection: "row", flexWrap: "nowrap", alignItems: "center", gap: 1.25, mb: 2 }}>
-            <Box sx={{ width: 4, height: 20, borderRadius: 1, bgcolor: "secondary.main", flexShrink: 0 }} />
-            <Typography variant="h6" fontWeight={700}>
-              Operacion
-            </Typography>
-          </Box>
+        <AppCard sx={{ mb: 2.5 }}>
+          <SeccionTitulo icon={TuneOutlinedIcon}>Operación</SeccionTitulo>
+          <Box sx={{ mb: 1 }} />
           <Grid container spacing={2}>
             <Grid size={{ xs: 12, sm: 6, md: 4 }}>
               <FormControl fullWidth size="small">
@@ -464,6 +503,23 @@ export default function ClienteForm() {
                   render={({ field }) => (
                     <Select label="Sucursal" {...field} value={field.value ?? ""} sx={{ borderRadius: 2 }}>
                       {SUCURSALES.map((s) => (
+                        <MenuItem key={s.value} value={s.value}>{s.label}</MenuItem>
+                      ))}
+                    </Select>
+                  )}
+                />
+              </FormControl>
+            </Grid>
+            <Grid size={{ xs: 12, sm: 6, md: 4 }}>
+              <FormControl fullWidth size="small">
+                <InputLabel>Sector</InputLabel>
+                <Controller
+                  name="sector"
+                  control={control}
+                  render={({ field }) => (
+                    <Select label="Sector" {...field} value={field.value ?? ""} sx={{ borderRadius: 2 }}>
+                      <MenuItem value="">Sin especificar</MenuItem>
+                      {SECTORES.map((s) => (
                         <MenuItem key={s.value} value={s.value}>{s.label}</MenuItem>
                       ))}
                     </Select>
@@ -548,70 +604,71 @@ export default function ClienteForm() {
           </Grid>
         </AppCard>
 
-        {isEdit && (
-          <AppCard sx={{ mb: 3 }}>
-            <Box sx={{ display: "flex", flexDirection: "row", flexWrap: "nowrap", alignItems: "center", gap: 1.25, mb: 2 }}>
-              <Box sx={{ width: 4, height: 20, borderRadius: 1, bgcolor: "secondary.main", flexShrink: 0 }} />
-              <Typography variant="h6" fontWeight={700}>
-                Contacto
-              </Typography>
-            </Box>
-
-            {errorContactos && (
-              <Alert severity="error" sx={{ mb: 2, borderRadius: 2 }}>
-                {errorContactos}
-              </Alert>
+        <AppCard sx={{ mb: 2.5 }}>
+          <Box sx={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 2, mb: 0.5 }}>
+            <SeccionTitulo icon={GroupsOutlinedIcon}>Contactos</SeccionTitulo>
+            {isEdit && (
+              <AppButton type="button" size="small" startIcon={<AddIcon />} onClick={abrirNuevoContacto} sx={{ borderRadius: 2 }}>
+                Agregar contacto
+              </AppButton>
             )}
+          </Box>
+          <Typography variant="caption" color="text.secondary" sx={{ display: "block", mb: 2 }}>
+            Puedes registrar varios contactos de este cliente — se eligen al generar una cotización o un reporte.
+          </Typography>
 
-            <Grid container spacing={2} alignItems="center">
-              <Grid size={{ xs: 12, sm: 6, md: 4 }}>
-                <FormControl fullWidth size="small">
-                  <InputLabel shrink={contactos.length === 0 || undefined}>Nombre</InputLabel>
-                  <Select
-                    label="Nombre"
-                    value={contactoSeleccionadoId}
-                    onChange={(e) => setContactoSeleccionadoId(e.target.value)}
-                    sx={{ borderRadius: 2 }}
-                  >
-                    {contactos.length === 0 && (
-                      <MenuItem value="" disabled>Sin contactos registrados</MenuItem>
-                    )}
-                    {contactos.map((c) => (
-                      <MenuItem key={c._id} value={c._id}>{c.nombre}</MenuItem>
-                    ))}
-                  </Select>
-                </FormControl>
-              </Grid>
-              <Grid size={{ xs: 12, sm: 6, md: 8 }}>
-                <Box sx={{ display: "flex", gap: 1.5 }}>
-                  <AppButton variant="outlined" onClick={abrirNuevoContacto} sx={{ borderRadius: 2 }}>
-                    Agregar
-                  </AppButton>
-                  <AppButton
-                    variant="outlined"
-                    onClick={abrirEditarContacto}
-                    disabled={!contactoActual}
-                    sx={{ borderRadius: 2 }}
-                  >
-                    Editar
-                  </AppButton>
-                  <AppButton
-                    variant="outlined"
-                    color="error"
-                    onClick={borrarContactoActual}
-                    disabled={!contactoActual || guardandoContacto}
-                    sx={{ borderRadius: 2 }}
-                  >
-                    Eliminar
-                  </AppButton>
+          {errorContactos && (
+            <Alert severity="error" sx={{ mb: 2, borderRadius: 2 }} onClose={() => setErrorContactos("")}>
+              {errorContactos}
+            </Alert>
+          )}
+
+          {!isEdit ? (
+            <Typography variant="body2" color="text.secondary" sx={{ py: 1.5 }}>
+              Guarda el cliente primero para poder agregarle contactos.
+            </Typography>
+          ) : contactos.length === 0 ? (
+            <Typography variant="body2" color="text.secondary" sx={{ py: 1.5 }}>
+              Este cliente todavía no tiene contactos registrados.
+            </Typography>
+          ) : (
+            <Stack spacing={1.25}>
+              {contactos.map((c) => (
+                <Box
+                  key={c._id}
+                  sx={{
+                    display: "flex", alignItems: "center", gap: 1.5, p: 1.25, borderRadius: 2,
+                    border: 1, borderColor: "divider",
+                  }}
+                >
+                  <Avatar sx={{ width: 34, height: 34, fontSize: 13, bgcolor: "secondary.main" }}>
+                    {c.nombre?.charAt(0) || "?"}
+                  </Avatar>
+                  <Box sx={{ flex: 1, minWidth: 0 }}>
+                    <Typography variant="body2" fontWeight={600} noWrap>{c.nombre}</Typography>
+                    <Typography variant="caption" color="text.secondary" sx={{ display: "block" }} noWrap>
+                      {[c.telefono, c.correo].filter(Boolean).join(" · ") || "Sin más datos"}
+                    </Typography>
+                  </Box>
+                  <Tooltip title="Editar contacto">
+                    <IconButton size="small" onClick={() => abrirEditarContacto(c)}>
+                      <EditOutlinedIcon fontSize="small" />
+                    </IconButton>
+                  </Tooltip>
+                  <Tooltip title="Eliminar contacto">
+                    <IconButton size="small" onClick={() => setContactoAEliminar(c)}>
+                      <DeleteOutlineIcon fontSize="small" sx={{ color: "error.main" }} />
+                    </IconButton>
+                  </Tooltip>
                 </Box>
-              </Grid>
-            </Grid>
-          </AppCard>
-        )}
+              ))}
+            </Stack>
+          )}
+        </AppCard>
 
         <Box sx={{ display: "flex", gap: 2, justifyContent: "flex-end" }}>
           <AppButton
+            type="button"
             variant="outlined"
             onClick={() => navigate("/clientes")}
             sx={{ borderRadius: 2 }}
@@ -625,13 +682,23 @@ export default function ClienteForm() {
       </Box>
 
       {isEdit && (
-        <ContactoDialog
-          open={dialogContactoAbierto}
-          contacto={contactoEnEdicion}
-          loading={guardandoContacto}
-          onClose={() => setDialogContactoAbierto(false)}
-          onSave={guardarContacto}
-        />
+        <>
+          <ContactoDialog
+            open={dialogContactoAbierto}
+            contacto={contactoEnEdicion}
+            loading={guardandoContacto}
+            onClose={() => setDialogContactoAbierto(false)}
+            onSave={guardarContacto}
+          />
+          <ConfirmDialog
+            open={!!contactoAEliminar}
+            title="Eliminar contacto"
+            message={`¿Eliminar a "${contactoAEliminar?.nombre}"? Ya no aparecerá para elegirlo en nuevas cotizaciones o reportes.`}
+            loading={guardandoContacto}
+            onCancel={() => setContactoAEliminar(null)}
+            onConfirm={confirmarEliminarContacto}
+          />
+        </>
       )}
     </Box>
   );

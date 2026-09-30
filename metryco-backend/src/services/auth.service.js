@@ -38,6 +38,9 @@ async function login(usuarioInput, password) {
       email: usuario.email,
       rol: usuario.rol,
       sucursal: usuario.sucursal,
+      fotoUrl: usuario.fotoUrl,
+      avatarColor: usuario.avatarColor,
+      firmaUrl: usuario.firmaUrl,
     },
   };
 }

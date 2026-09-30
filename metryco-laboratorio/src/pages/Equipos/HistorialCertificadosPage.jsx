@@ -1,22 +1,41 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import {
-  Box, Typography, TextField, MenuItem, Select, FormControl, InputLabel,
-  Button, Dialog, DialogTitle, DialogContent, DialogActions, Alert, IconButton, Tooltip,
+  Box, Typography, TextField, MenuItem, Select, FormControl, InputLabel, Grid,
+  Button, Dialog, DialogTitle, DialogContent, DialogActions, Alert, IconButton, Tooltip, Chip, Avatar,
 } from "@mui/material";
 import FileDownloadOutlinedIcon from "@mui/icons-material/FileDownloadOutlined";
 import NotificationsActiveOutlinedIcon from "@mui/icons-material/NotificationsActiveOutlined";
 import EditOutlinedIcon from "@mui/icons-material/EditOutlined";
 import DescriptionOutlinedIcon from "@mui/icons-material/DescriptionOutlined";
-import InsertChartOutlinedIcon from "@mui/icons-material/InsertChartOutlined";
+import HistoryOutlinedIcon from "@mui/icons-material/HistoryOutlined";
+import VerifiedOutlinedIcon from "@mui/icons-material/VerifiedOutlined";
+import ScheduleOutlinedIcon from "@mui/icons-material/ScheduleOutlined";
+import ReportGmailerrorredOutlinedIcon from "@mui/icons-material/ReportGmailerrorredOutlined";
 
 import AppButton from "../../shared/components/AppButton";
 import AppTable from "../../shared/components/AppTable";
+import PageHeader from "../../shared/components/PageHeader";
+import StatCard from "../../shared/components/StatCard";
 import { listarClientes } from "../../services/clientes";
 import { exportCsv } from "../../shared/utils/exportCsv";
-import { EQUIPOS_MOCK, PATRONES_MOCK } from "./mockData";
+import { listarPatrones } from "../../services/patrones";
+import { listarCertificados } from "../../services/certificados";
+import { formatDate } from "../../shared/utils/formatDate";
+import { iconoCategoria, colorCategoria } from "./categorias";
+import { usePolling } from "../../shared/hooks/usePolling";
+
+const ESTADO_MAP = {
+  vigente: { label: "Vigente", color: "success" },
+  por_vencer: { label: "Por vencer", color: "warning" },
+  vencido: { label: "Vencido", color: "error" },
+  anulado: { label: "Anulado", color: "default" },
+  borrador: { label: "Borrador", color: "info" },
+};
 
 function VencimientoAutomaticoDialog({ open, onClose }) {
   const [confirmado, setConfirmado] = useState(false);
+  const [proximosAVencer, setProximosAVencer] = useState([]);
 
   const cerrar = () => { setConfirmado(false); onClose(); };
 
@@ -24,10 +43,20 @@ function VencimientoAutomaticoDialog({ open, onClose }) {
   // son los que el job de correos automáticos (automatic/due_date_certificate.php
   // en el legacy) notificaría. Aquí no hay backend de correo todavía, así que se
   // muestra la vista previa en vez de simular un envío que no ocurrió de verdad.
-  const proximosAVencer = PATRONES_MOCK.filter((p) => {
-    const dias = Math.ceil((new Date(p.fechaVencimiento) - new Date()) / 86400000);
-    return dias >= 0 && dias < 30;
-  });
+  const confirmar = () => {
+    setConfirmado(true);
+    listarPatrones({ pageSize: 500 })
+      .then(({ items }) => {
+        const dentroDeRango = items.filter((p) => {
+          const venc = p.calibracion?.vencimiento || p.ultimaCalibracion?.vencimiento;
+          if (!venc) return false;
+          const dias = Math.ceil((new Date(venc) - new Date()) / 86400000);
+          return dias >= 0 && dias < 30;
+        });
+        setProximosAVencer(dentroDeRango);
+      })
+      .catch(() => setProximosAVencer([]));
+  };
 
   return (
     <Dialog open={open} onClose={cerrar} fullWidth maxWidth="sm">
@@ -47,9 +76,9 @@ function VencimientoAutomaticoDialog({ open, onClose }) {
               <Typography variant="body2" color="text.secondary">No hay patrones por vencer en los próximos 30 días.</Typography>
             ) : (
               proximosAVencer.map((p) => (
-                <Box key={p.id} sx={{ display: "flex", justifyContent: "space-between", py: 0.75, borderBottom: 1, borderColor: "divider" }}>
-                  <Typography variant="body2">{p.idInterno} — {p.descripcion}</Typography>
-                  <Typography variant="body2" color="warning.main" fontWeight={600}>{p.fechaVencimiento}</Typography>
+                <Box key={p._id} sx={{ display: "flex", justifyContent: "space-between", py: 0.75, borderBottom: 1, borderColor: "divider" }}>
+                  <Typography variant="body2">{p.codigo} — {p.descripcion}</Typography>
+                  <Typography variant="body2" color="warning.main" fontWeight={600}>{p.calibracion?.vencimiento || p.ultimaCalibracion?.vencimiento}</Typography>
                 </Box>
               ))
             )}
@@ -59,7 +88,7 @@ function VencimientoAutomaticoDialog({ open, onClose }) {
       <DialogActions sx={{ px: 3, pb: 2 }}>
         <AppButton variant="outlined" onClick={cerrar} sx={{ borderRadius: 2 }}>Cerrar</AppButton>
         {!confirmado && (
-          <AppButton onClick={() => setConfirmado(true)} sx={{ borderRadius: 2 }}>Confirmar</AppButton>
+          <AppButton onClick={confirmar} sx={{ borderRadius: 2 }}>Confirmar</AppButton>
         )}
       </DialogActions>
     </Dialog>
@@ -67,13 +96,21 @@ function VencimientoAutomaticoDialog({ open, onClose }) {
 }
 
 // Refleja php/historial_certificados_buscar.php: filtro por Cliente o por ID
-// Planta (id_interno del equipo), listado de certificados emitidos por equipo.
+// Planta (id_interno del equipo), listado de CERTIFICADOS emitidos (uno o
+// varios por equipo a lo largo del tiempo).
 export default function HistorialCertificadosPage() {
+  const navigate = useNavigate();
   const [clientes, setClientes] = useState([]);
   const [clienteFiltro, setClienteFiltro] = useState("");
   const [idPlanta, setIdPlanta] = useState("");
+  const [buscar, setBuscar] = useState("");
   const [page, setPage] = useState(0);
+  const [rowsPerPage, setRowsPerPage] = useState(10);
   const [vencimientoOpen, setVencimientoOpen] = useState(false);
+  const [items, setItems] = useState([]);
+  const [total, setTotal] = useState(0);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
 
   useEffect(() => {
     listarClientes({ pageSize: 200 })
@@ -81,56 +118,102 @@ export default function HistorialCertificadosPage() {
       .catch(() => setClientes([]));
   }, []);
 
-  const filtered = EQUIPOS_MOCK.filter((e) => {
-    const matchCliente = !clienteFiltro || String(e.clienteId) === String(clienteFiltro);
-    const matchPlanta = !idPlanta || e.idInterno.toLowerCase().includes(idPlanta.toLowerCase());
-    return matchCliente && matchPlanta;
-  });
+  const cargar = useCallback((silencioso = false) => {
+    if (!silencioso) setLoading(true);
+    listarCertificados({ search: buscar, clienteId: clienteFiltro, page, pageSize: rowsPerPage })
+      .then(({ items, total }) => { setItems(items); setTotal(total); })
+      .catch(() => { if (!silencioso) { setItems([]); setTotal(0); } })
+      .finally(() => { if (!silencioso) setLoading(false); });
+  }, [buscar, clienteFiltro, page, rowsPerPage]);
+
+  useEffect(() => { cargar(); }, [cargar]);
+  usePolling(() => cargar(true));
+
+  const cuenta = (estado) => items.filter((c) => (c.estadoEfectivo || c.estado) === estado).length;
+
+
+  const verCertificado = (c) => window.open(`/informe/certificado/${c._id}`, "_blank");
 
   const columns = [
-    { field: "id", headerName: "Equipo" },
-    { field: "clienteNombre", headerName: "Cliente" },
-    { field: "idInterno", headerName: "ID Cliente" },
-    { field: "marca", headerName: "Marca" },
-    { field: "modelo", headerName: "Modelo" },
-    { field: "serie", headerName: "Serie" },
     {
-      field: "editarPortada",
-      headerName: "Editar Portada",
-      align: "center",
-      renderCell: () => (
-        <Tooltip title="Editar portada (requiere asignación de calibración)">
-          <span><IconButton size="small" disabled><EditOutlinedIcon fontSize="small" /></IconButton></span>
-        </Tooltip>
+      field: "folio", headerName: "Certificado", minWidth: 220,
+      renderCell: (c) => {
+        const Icono = iconoCategoria(c.equipoSnapshot?.categoria);
+        const color = colorCategoria(c.equipoSnapshot?.categoria);
+        return (
+          <Box sx={{ display: "flex", alignItems: "center", gap: 1.25 }}>
+            <Avatar sx={{ width: 32, height: 32, bgcolor: `${color}1a`, color }}>
+              <Icono fontSize="small" />
+            </Avatar>
+            <Box sx={{ minWidth: 0 }}>
+              <Typography variant="body2" fontWeight={700}>{c.folio}</Typography>
+              <Typography variant="caption" color="text.secondary" sx={{ display: "block" }}>
+                {c.equipoSnapshot?.idInterno || "—"} · {c.equipoSnapshot?.descripcion || "—"}
+              </Typography>
+            </Box>
+          </Box>
+        );
+      },
+    },
+    { field: "cliente", headerName: "Cliente", minWidth: 150, renderCell: (c) => c.cliente?.nombre || c.clienteSnapshot?.nombre || "—" },
+    {
+      field: "marcaModelo", headerName: "Marca / Modelo", minWidth: 150, hideBelow: "md",
+      renderCell: (c) => (
+        <Box>
+          <Typography variant="body2">{[c.equipoSnapshot?.marca, c.equipoSnapshot?.modelo].filter(Boolean).join(" / ") || "—"}</Typography>
+          <Typography variant="caption" color="text.secondary" sx={{ display: "block" }}>
+            {c.equipoSnapshot?.serie ? `Serie: ${c.equipoSnapshot.serie}` : "Sin serie"}
+          </Typography>
+        </Box>
       ),
     },
+    { field: "fecha", headerName: "Calibración", nowrap: true, renderCell: (c) => formatDate(c.fechaCalibracion) },
     {
-      field: "portada",
-      headerName: "Portada",
-      align: "center",
-      renderCell: () => (
-        <Tooltip title="Disponible cuando exista la asignación de calibración">
-          <span><IconButton size="small" disabled><DescriptionOutlinedIcon fontSize="small" /></IconButton></span>
-        </Tooltip>
-      ),
+      field: "estado", headerName: "Estado", nowrap: true,
+      renderCell: (c) => {
+        const e = ESTADO_MAP[c.estadoEfectivo || c.estado] || ESTADO_MAP.borrador;
+        return <Chip size="small" label={e.label} color={e.color} />;
+      },
     },
     {
-      field: "grafica",
-      headerName: "Gráfica",
+      field: "acciones",
+      headerName: "Acciones",
       align: "center",
-      renderCell: () => (
-        <Tooltip title="Disponible cuando exista la asignación de calibración">
-          <span><IconButton size="small" disabled><InsertChartOutlinedIcon fontSize="small" /></IconButton></span>
-        </Tooltip>
+      nowrap: true,
+      renderCell: (c) => (
+        <Box sx={{ display: "flex", alignItems: "center", justifyContent: "center", flexWrap: "nowrap" }}>
+          <Tooltip title={c.reporte ? "Editar en el reporte de origen" : "Sin reporte ligado"}>
+            <span data-no-row-click>
+              <IconButton
+                size="small"
+                disabled={!c.reporte}
+                onClick={() => navigate(`/reportes/${c.reporte?._id || c.reporte}`)}
+              >
+                <EditOutlinedIcon fontSize="small" sx={{ color: "secondary.main" }} />
+              </IconButton>
+            </span>
+          </Tooltip>
+          <Tooltip title="Ver / descargar certificado (Portada)">
+            <IconButton size="small" onClick={() => verCertificado(c)}>
+              <DescriptionOutlinedIcon fontSize="small" sx={{ color: "primary.main" }} />
+            </IconButton>
+          </Tooltip>
+        </Box>
       ),
     },
   ];
 
   const exportarCertificados = () => {
     exportCsv(
-      filtered.map((e) => ({
-        Equipo: e.id, Cliente: e.clienteNombre, IDCliente: e.idInterno,
-        Marca: e.marca, Modelo: e.modelo, Serie: e.serie,
+      items.map((c) => ({
+        Certificado: c.folio,
+        IDCliente: c.equipoSnapshot?.idInterno || "",
+        Cliente: c.cliente?.nombre || c.clienteSnapshot?.nombre || "",
+        Marca: c.equipoSnapshot?.marca || "",
+        Modelo: c.equipoSnapshot?.modelo || "",
+        Serie: c.equipoSnapshot?.serie || "",
+        FechaCalibracion: c.fechaCalibracion ? formatDate(c.fechaCalibracion) : "",
+        Estado: c.estadoEfectivo || c.estado,
       })),
       "historial_certificados.csv"
     );
@@ -138,27 +221,40 @@ export default function HistorialCertificadosPage() {
 
   return (
     <Box>
-      <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", mb: 3, flexWrap: "wrap", gap: 2 }}>
-        <Box>
-          <Typography variant="h5" fontWeight={700}>Historial de Certificados</Typography>
-          <Typography variant="body2" color="text.secondary">
-            {filtered.length} equipos con certificados asociados
-          </Typography>
-        </Box>
-        <Box sx={{ display: "flex", gap: 1.5 }}>
-          <AppButton
-            variant="outlined"
-            startIcon={<NotificationsActiveOutlinedIcon />}
-            onClick={() => setVencimientoOpen(true)}
-            sx={{ borderRadius: 2 }}
-          >
-            Vencimiento Automático
-          </AppButton>
-          <AppButton startIcon={<FileDownloadOutlinedIcon />} onClick={exportarCertificados} sx={{ borderRadius: 2 }}>
-            Exportar Excel Certificados
-          </AppButton>
-        </Box>
-      </Box>
+      <PageHeader
+        icon={<HistoryOutlinedIcon />}
+        title="Historial de Certificados"
+        subtitle={`${total} certificados emitidos`}
+        actions={
+          <>
+            <AppButton
+              variant="outlined"
+              startIcon={<NotificationsActiveOutlinedIcon />}
+              onClick={() => setVencimientoOpen(true)}
+              sx={{ borderRadius: 2 }}
+            >
+              Vencimiento Automático
+            </AppButton>
+            <AppButton startIcon={<FileDownloadOutlinedIcon />} onClick={exportarCertificados} sx={{ borderRadius: 2 }}>
+              Exportar Excel Certificados
+            </AppButton>
+          </>
+        }
+      />
+
+      <Grid container spacing={2.5} sx={{ mb: 3.5 }}>
+        <Grid size={{ xs: 12, sm: 4 }}>
+          <StatCard label="Vigentes (página)" value={cuenta("vigente")} icon={<VerifiedOutlinedIcon />} color="#16A34A" />
+        </Grid>
+        <Grid size={{ xs: 12, sm: 4 }}>
+          <StatCard label="Por vencer" value={cuenta("por_vencer")} icon={<ScheduleOutlinedIcon />} color="#D97706" />
+        </Grid>
+        <Grid size={{ xs: 12, sm: 4 }}>
+          <StatCard label="Vencidos" value={cuenta("vencido")} icon={<ReportGmailerrorredOutlinedIcon />} color="#DC2626" />
+        </Grid>
+      </Grid>
+
+      {error && <Alert severity="warning" sx={{ mb: 2, borderRadius: 2 }} onClose={() => setError("")}>{error}</Alert>}
 
       <Box sx={{ display: "flex", gap: 2, mb: 2, flexWrap: "wrap", alignItems: "center" }}>
         <FormControl size="small" sx={{ minWidth: 260 }}>
@@ -174,23 +270,27 @@ export default function HistorialCertificadosPage() {
           </Select>
         </FormControl>
         <TextField
-          label="ID Cliente (Historial Certificados)"
+          label="ID Cliente / folio"
           size="small"
           value={idPlanta}
-          onChange={(e) => { setIdPlanta(e.target.value); setPage(0); }}
-          sx={{ width: 260, "& .MuiOutlinedInput-root": { borderRadius: 2 } }}
+          onChange={(e) => setIdPlanta(e.target.value)}
+          onKeyDown={(e) => { if (e.key === "Enter") { setPage(0); setBuscar(idPlanta); } }}
+          sx={{ width: 280, "& .MuiOutlinedInput-root": { borderRadius: 2 } }}
         />
-        <Button variant="contained" onClick={() => setPage(0)} sx={{ borderRadius: 2 }}>Buscar</Button>
+        <Button variant="contained" onClick={() => { setPage(0); setBuscar(idPlanta); }} sx={{ borderRadius: 2 }}>Buscar</Button>
       </Box>
 
       <AppTable
         columns={columns}
-        rows={filtered.slice(page * 10, page * 10 + 10)}
-        totalCount={filtered.length}
+        rows={items}
+        loading={loading}
+        totalCount={total}
         page={page}
-        rowsPerPage={10}
+        rowsPerPage={rowsPerPage}
         onPageChange={setPage}
+        onRowsPerPageChange={(n) => { setRowsPerPage(n); setPage(0); }}
         emptyText="Sin certificados para este filtro"
+        onRowClick={verCertificado}
       />
 
       <VencimientoAutomaticoDialog open={vencimientoOpen} onClose={() => setVencimientoOpen(false)} />

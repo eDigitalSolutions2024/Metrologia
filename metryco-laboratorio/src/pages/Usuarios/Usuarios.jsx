@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import {
   Box,
   Typography,
@@ -9,10 +9,6 @@ import {
   Tooltip,
   Avatar,
   Alert,
-  Menu,
-  MenuItem,
-  ListItemIcon,
-  ListItemText,
   Grid,
   Paper,
 } from "@mui/material";
@@ -23,22 +19,26 @@ import EditOutlinedIcon from "@mui/icons-material/EditOutlined";
 import BlockOutlinedIcon from "@mui/icons-material/BlockOutlined";
 import DeleteOutlineIcon from "@mui/icons-material/DeleteOutlineOutlined";
 import ChatBubbleOutlineIcon from "@mui/icons-material/ChatBubbleOutlineOutlined";
-import MoreVertIcon from "@mui/icons-material/MoreVert";
 import GroupsOutlinedIcon from "@mui/icons-material/GroupsOutlined";
 import CheckCircleOutlineIcon from "@mui/icons-material/CheckCircleOutlineOutlined";
 import BlockOutlined from "@mui/icons-material/BlockOutlined";
 import AdminPanelSettingsOutlinedIcon from "@mui/icons-material/AdminPanelSettingsOutlined";
 
 import AppButton from "../../shared/components/AppButton";
+import MenuAcciones from "../../shared/components/MenuAcciones";
 import AppTable from "../../shared/components/AppTable";
+import PageHeader from "../../shared/components/PageHeader";
+import StatCard from "../../shared/components/StatCard";
+import ManageAccountsOutlinedIcon from "@mui/icons-material/ManageAccountsOutlined";
 import ConfirmDialog from "../../shared/components/ConfirmDialog";
 
 import PasswordConfirmDialog from "../../shared/components/PasswordConfirmDialog";
 import NuevoUsuario from "../../shared/components/NuevoUsuario/NuevoUsuario";
 import EditarUsuario from "../../shared/components/EditarUsuario/EditarUsuario";
 import ObservacionesUsuario from "../../shared/components/ObservacionesUsuario/ObservacionesUsuario";
-import { listarUsuarios, desactivarUsuario, eliminarUsuario } from "../../services/usuarios";
+import { listarUsuarios, desactivarUsuario, reactivarUsuario, eliminarUsuario } from "../../services/usuarios";
 import { useDebounce } from "../../shared/hooks/useDebounce";
+import { usePolling } from "../../shared/hooks/usePolling";
 
 const ROL_MAP = {
   admin: { label: "Administrador", color: "error" },
@@ -55,11 +55,10 @@ export default function Usuarios() {
   const [deactivateTarget, setDeactivateTarget] = useState(null);
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [observacionesTarget, setObservacionesTarget] = useState(null);
-  const [menuAnchor, setMenuAnchor] = useState(null);
-  const [menuRow, setMenuRow] = useState(null);
 
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(0);
+  const [rowsPerPage, setRowsPerPage] = useState(5);
 
   const [rows, setRows] = useState([]);
   const [totalCount, setTotalCount] = useState(0);
@@ -75,32 +74,25 @@ export default function Usuarios() {
     setPage(0);
   }
 
-  useEffect(() => {
-    let cancelado = false;
+  const cargarUsuarios = useCallback(async (silencioso = false) => {
+    if (!silencioso) { setLoading(true); setError(""); }
+    try {
+      const { items, total } = await listarUsuarios({
+        search: debouncedSearch,
+        page,
+        pageSize: rowsPerPage,
+      });
+      setRows(items.map((u) => ({ ...u, id: u._id })));
+      setTotalCount(total);
+    } catch {
+      if (!silencioso) setError("No se pudieron cargar los usuarios. Intenta de nuevo.");
+    } finally {
+      if (!silencioso) setLoading(false);
+    }
+  }, [debouncedSearch, page, rowsPerPage]);
 
-    (async () => {
-      setLoading(true);
-      setError("");
-      try {
-        const { items, total } = await listarUsuarios({
-          search: debouncedSearch,
-          page,
-          pageSize: 5,
-        });
-        if (cancelado) return;
-        setRows(items.map((u) => ({ ...u, id: u._id })));
-        setTotalCount(total);
-      } catch {
-        if (!cancelado) setError("No se pudieron cargar los usuarios. Intenta de nuevo.");
-      } finally {
-        if (!cancelado) setLoading(false);
-      }
-    })();
-
-    return () => {
-      cancelado = true;
-    };
-  }, [debouncedSearch, page, reloadKey]);
+  useEffect(() => { cargarUsuarios(); }, [cargarUsuarios, reloadKey]);
+  usePolling(() => cargarUsuarios(true));
 
   useEffect(() => {
     let cancelado = false;
@@ -139,15 +131,6 @@ export default function Usuarios() {
 
   const recargar = () => setReloadKey((k) => k + 1);
 
-  const abrirMenu = (e, row) => {
-    setMenuAnchor(e.currentTarget);
-    setMenuRow(row);
-  };
-  const cerrarMenu = () => {
-    setMenuAnchor(null);
-    setMenuRow(null);
-  };
-
   const handleDesactivar = async () => {
     const target = deactivateTarget;
     setDeactivateTarget(null);
@@ -156,6 +139,16 @@ export default function Usuarios() {
       recargar();
     } catch {
       setError("No se pudo desactivar el usuario. Intenta de nuevo.");
+    }
+  };
+
+  const handleReactivar = async (row) => {
+    setError("");
+    try {
+      await reactivarUsuario(row.id);
+      recargar();
+    } catch {
+      setError("No se pudo reactivar el usuario. Intenta de nuevo.");
     }
   };
 
@@ -170,6 +163,7 @@ export default function Usuarios() {
     {
       field: "nombre",
       headerName: "Usuario",
+      minWidth: 200,
       renderCell: (row) => (
         <Box sx={{ display: "flex", alignItems: "center", gap: 1.5 }}>
           <Avatar
@@ -193,10 +187,11 @@ export default function Usuarios() {
         </Box>
       ),
     },
-    { field: "email", headerName: "Correo" },
+    { field: "email", headerName: "Correo", hideBelow: "md", renderCell: (row) => row.email || "—" },
     {
       field: "rol",
       headerName: "Rol",
+      nowrap: true,
       renderCell: (row) => {
         const r = ROL_MAP[row.rol] ?? { label: row.rol, color: "default" };
         return <Chip label={r.label} color={r.color} size="small" />;
@@ -205,6 +200,7 @@ export default function Usuarios() {
     {
       field: "status",
       headerName: "Estado",
+      nowrap: true,
       renderCell: (row) => (
         <Chip
           label={row.status === "activo" ? "Activo" : "Inactivo"}
@@ -217,23 +213,23 @@ export default function Usuarios() {
       field: "acciones",
       headerName: "Acciones",
       align: "center",
+      nowrap: true,
       renderCell: (row) => (
-        <Box sx={{ display: "flex", gap: 1, justifyContent: "center" }}>
+        <Box sx={{ display: "flex", gap: 1, justifyContent: "center", alignItems: "center" }}>
           <Tooltip title="Editar">
             <IconButton size="small" onClick={() => setEditTarget(row)}>
               <EditOutlinedIcon fontSize="small" sx={{ color: "secondary.main" }} />
             </IconButton>
           </Tooltip>
-          <Tooltip title="Observaciones">
-            <IconButton size="small" onClick={() => setObservacionesTarget(row)}>
-              <ChatBubbleOutlineIcon fontSize="small" sx={{ color: "secondary.main" }} />
-            </IconButton>
-          </Tooltip>
-          <Tooltip title="Más opciones">
-            <IconButton size="small" onClick={(e) => abrirMenu(e, row)}>
-              <MoreVertIcon fontSize="small" />
-            </IconButton>
-          </Tooltip>
+          <MenuAcciones
+            acciones={[
+              { label: "Observaciones", icon: <ChatBubbleOutlineIcon fontSize="small" />, onClick: () => setObservacionesTarget(row) },
+              row.status === "inactivo"
+                ? { label: "Activar", icon: <CheckCircleOutlineIcon fontSize="small" />, color: "success", onClick: () => handleReactivar(row), separador: true }
+                : { label: "Desactivar", icon: <BlockOutlinedIcon fontSize="small" />, color: "error", onClick: () => setDeactivateTarget(row), separador: true },
+              { label: "Eliminar permanentemente", icon: <DeleteOutlineIcon fontSize="small" />, color: "error", onClick: () => setDeleteTarget(row) },
+            ]}
+          />
         </Box>
       ),
     },
@@ -241,66 +237,23 @@ export default function Usuarios() {
 
   return (
     <Box sx={{ "& > * + *": { mt: 3 } }}>
-      <Box sx={{ display: "flex", justifyContent: "space-between", pb: 3, borderBottom: "1px solid", borderColor: "divider" }}>
-        <Box>
-          <Box>
-            <Typography variant="h5" fontWeight={700}>
-              Usuarios del Sistema
-            </Typography>
-          </Box>
-          <Box sx={{ mt: 1 }}>
-            <Typography variant="body2" color="text.secondary">
-              {totalCount} usuarios
-            </Typography>
-          </Box>
-        </Box>
-        <Box sx={{ mt: 2 }}>
-          <AppButton
-            startIcon={<AddIcon />}
-            sx={{ borderRadius: 2 }}
-            onClick={() => setOpenNuevoUsuario(true)}
-          >
+      <PageHeader
+        icon={<ManageAccountsOutlinedIcon />}
+        title="Usuarios del Sistema"
+        subtitle={`${totalCount} usuarios`}
+        actions={
+          <AppButton startIcon={<AddIcon />} sx={{ borderRadius: 2 }} onClick={() => setOpenNuevoUsuario(true)}>
             Nuevo Usuario
           </AppButton>
-        </Box>
-      </Box>
+        }
+      />
 
       {error && <Alert severity="error" sx={{ borderRadius: 2 }}>{error}</Alert>}
 
-      <Grid container spacing={3}>
+      <Grid container spacing={2.5}>
         {statCards.map((card) => (
           <Grid key={card.titulo} size={{ xs: 12, sm: 6, md: 3 }}>
-            <Paper
-              elevation={0}
-              sx={{
-                p: 3,
-                borderRadius: 3,
-                border: 1,
-                borderColor: "divider",
-                transition: ".3s",
-                "&:hover": {
-                  transform: "translateY(-4px)",
-                  boxShadow: "0 12px 30px rgba(0,0,0,.08)",
-                },
-              }}
-            >
-              <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
-                <Box>
-                  <Typography color="text.secondary" variant="body2" mb={1}>
-                    {card.titulo}
-                  </Typography>
-                  <Typography variant="h4" fontWeight={800}>
-                    {card.valor}
-                  </Typography>
-                  <Typography variant="caption" color="text.secondary" mt={1} display="block">
-                    {card.sub}
-                  </Typography>
-                </Box>
-                <Box sx={{ width: 52, height: 52, flexShrink: 0, borderRadius: 3, background: card.color + "18", color: card.color, display: "flex", alignItems: "center", justifyContent: "center" }}>
-                  {card.icono}
-                </Box>
-              </Box>
-            </Paper>
+            <StatCard label={card.titulo} value={card.valor} icon={card.icono} color={card.color} hint={card.sub} />
           </Grid>
         ))}
       </Grid>
@@ -311,16 +264,15 @@ export default function Usuarios() {
           size="small"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          sx={{
-            width: 340,
-            "& .MuiOutlinedInput-root": { borderRadius: 2 },
-          }}
-          InputProps={{
-            startAdornment: (
-              <InputAdornment position="start">
-                <SearchIcon fontSize="small" sx={{ color: "text.secondary" }} />
-              </InputAdornment>
-            ),
+          sx={{ width: 340, "& .MuiOutlinedInput-root": { borderRadius: 2 } }}
+          slotProps={{
+            input: {
+              startAdornment: (
+                <InputAdornment position="start">
+                  <SearchIcon fontSize="small" sx={{ color: "text.secondary" }} />
+                </InputAdornment>
+              ),
+            },
           }}
         />
       </Box>
@@ -329,10 +281,12 @@ export default function Usuarios() {
         columns={columns}
         rows={rows}
         loading={loading}
+        onRowClick={setEditTarget}
         totalCount={totalCount}
         page={page}
-        rowsPerPage={5}
+        rowsPerPage={rowsPerPage}
         onPageChange={setPage}
+        onRowsPerPageChange={(n) => { setRowsPerPage(n); setPage(0); }}
       />
 
       <NuevoUsuario
@@ -370,37 +324,6 @@ export default function Usuarios() {
         onClose={() => setObservacionesTarget(null)}
         onSaved={recargar}
       />
-
-      <Menu
-        anchorEl={menuAnchor}
-        open={!!menuAnchor}
-        onClose={cerrarMenu}
-        slotProps={{ paper: { sx: { borderRadius: 2, minWidth: 200 } } }}
-      >
-        <MenuItem
-          disabled={menuRow?.status === "inactivo"}
-          onClick={() => {
-            setDeactivateTarget(menuRow);
-            cerrarMenu();
-          }}
-        >
-          <ListItemIcon>
-            <BlockOutlinedIcon fontSize="small" sx={{ color: "error.main" }} />
-          </ListItemIcon>
-          <ListItemText>Desactivar</ListItemText>
-        </MenuItem>
-        <MenuItem
-          onClick={() => {
-            setDeleteTarget(menuRow);
-            cerrarMenu();
-          }}
-        >
-          <ListItemIcon>
-            <DeleteOutlineIcon fontSize="small" sx={{ color: "error.dark" }} />
-          </ListItemIcon>
-          <ListItemText>Eliminar permanentemente</ListItemText>
-        </MenuItem>
-      </Menu>
     </Box>
   );
 }

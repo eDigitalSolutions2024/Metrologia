@@ -12,11 +12,14 @@ async function listar({ year, month } = {}) {
 
   return Actividad.find(filtro)
     .populate("tecnico", "nombre")
+    .populate({ path: "reporte", select: "folio cliente", populate: { path: "cliente", select: "nombre" } })
     .sort({ fechaActividad: 1 });
 }
 
 async function obtener(id) {
-  const actividad = await Actividad.findById(id).populate("tecnico", "nombre");
+  const actividad = await Actividad.findById(id)
+    .populate("tecnico", "nombre")
+    .populate({ path: "reporte", select: "folio cliente", populate: { path: "cliente", select: "nombre" } });
   if (!actividad) throw new AppError("Actividad no encontrada", 404);
   return actividad;
 }
