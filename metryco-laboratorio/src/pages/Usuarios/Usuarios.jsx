@@ -187,7 +187,7 @@ export default function Usuarios() {
         </Box>
       ),
     },
-    { field: "email", headerName: "Correo", hideBelow: "md", renderCell: (row) => row.email || "—" },
+    { field: "email", headerName: "Correo", hideBelow: 900, renderCell: (row) => row.email || "—" },
     {
       field: "rol",
       headerName: "Rol",

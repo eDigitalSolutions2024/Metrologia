@@ -157,7 +157,7 @@ export default function HistorialCertificadosPage() {
     },
     { field: "cliente", headerName: "Cliente", minWidth: 150, renderCell: (c) => c.cliente?.nombre || c.clienteSnapshot?.nombre || "—" },
     {
-      field: "marcaModelo", headerName: "Marca / Modelo", minWidth: 150, hideBelow: "md",
+      field: "marcaModelo", headerName: "Marca / Modelo", minWidth: 150, hideBelow: 900,
       renderCell: (c) => (
         <Box>
           <Typography variant="body2">{[c.equipoSnapshot?.marca, c.equipoSnapshot?.modelo].filter(Boolean).join(" / ") || "—"}</Typography>

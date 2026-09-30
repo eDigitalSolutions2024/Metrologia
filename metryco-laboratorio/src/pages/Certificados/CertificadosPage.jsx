@@ -127,7 +127,7 @@ export default function CertificadosPage() {
   const columns = [
     { field: "folio", headerName: "Certificado", minWidth: 220, renderCell: celdaCertificado },
     { field: "cliente", headerName: "Cliente", minWidth: 150, renderCell: (r) => r.clienteSnapshot?.nombre || r.cliente?.nombre || "—" },
-    { field: "fechaCalibracion", headerName: "Calibración", nowrap: true, hideBelow: "md", renderCell: (r) => formatDate(r.fechaCalibracion) },
+    { field: "fechaCalibracion", headerName: "Calibración", nowrap: true, hideBelow: 900, renderCell: (r) => formatDate(r.fechaCalibracion) },
     { field: "vigencia", headerName: "Vigencia", nowrap: true, renderCell: (r) => formatDate(r.vigencia) },
     {
       field: "estado",

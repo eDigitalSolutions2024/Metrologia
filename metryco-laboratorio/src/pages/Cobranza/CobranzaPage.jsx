@@ -408,13 +408,13 @@ export default function CobranzaPage() {
 
   const columns = [
     { field: "cliente", headerName: "Cliente", minWidth: 180, renderCell: (r) => <CeldaIcono icon={BusinessOutlinedIcon}>{r.cliente?.nombre || "—"}</CeldaIcono> },
-    { field: "oc", headerName: "OC", nowrap: true, hideBelow: "lg", renderCell: (r) => <CeldaIcono icon={AssignmentOutlinedIcon}>{r.oc || "—"}</CeldaIcono> },
+    { field: "oc", headerName: "OC", nowrap: true, hideBelow: 1000, renderCell: (r) => <CeldaIcono icon={AssignmentOutlinedIcon}>{r.oc || "—"}</CeldaIcono> },
     {
       field: "folio", headerName: "Folio", nowrap: true,
-      renderCell: (r) => (
+      renderCell: (r, { compacto }) => (
         <Box sx={{ display: "flex", alignItems: "center", gap: 0.75 }}>
           <CeldaIcono icon={ReceiptLongOutlinedIcon}>{r.folio || "—"}</CeldaIcono>
-          {r.comprobante && (
+          {r.comprobante && !compacto && (
             <Tooltip title="Creada automáticamente al timbrar el CFDI">
               <Chip size="small" color="success" variant="outlined" label="CFDI" sx={{ height: 18, fontSize: 10 }} />
             </Tooltip>
@@ -422,17 +422,18 @@ export default function CobranzaPage() {
         </Box>
       ),
     },
-    { field: "monto", headerName: "Monto", nowrap: true, renderCell: (r) => <Typography variant="body2" fontWeight={700} fontSize={13}>{formatCurrency(r.monto)}</Typography> },
+    { field: "monto", headerName: "Monto", nowrap: true, hideBelow: 820, renderCell: (r) => <Typography variant="body2" fontWeight={700} fontSize={13}>{formatCurrency(r.monto)}</Typography> },
     ...(tab !== 2
       ? [{
           field: "saldo", headerName: "Saldo", minWidth: 130,
-          renderCell: (r) => {
+          renderCell: (r, { estrecho }) => {
             const cobrado = cobradoDe(r);
             return (
               <Box>
                 <Typography variant="body2" fontSize={13} fontWeight={700} color={cobrado > 0 ? "warning.main" : "text.primary"}>
                   {formatCurrency(saldoDe(r))}
                 </Typography>
+                {estrecho && <Typography variant="caption" color="text.secondary" sx={{ display: "block" }}>de {formatCurrency(r.monto)}</Typography>}
                 {cobrado > 0 && (
                   <>
                     <LinearProgress variant="determinate" value={Math.min(100, (cobrado / r.monto) * 100)} color="success" sx={{ height: 4, borderRadius: 2, my: 0.4 }} />
@@ -444,7 +445,7 @@ export default function CobranzaPage() {
           },
         }]
       : []),
-    { field: "fechaCr", headerName: "Fecha C/R", nowrap: true, hideBelow: "xl", renderCell: (r) => <CeldaIcono icon={EventOutlinedIcon}>{formatDate(r.fechaCr)}</CeldaIcono> },
+    { field: "fechaCr", headerName: "Fecha C/R", nowrap: true, hideBelow: 1300, renderCell: (r) => <CeldaIcono icon={EventOutlinedIcon}>{formatDate(r.fechaCr)}</CeldaIcono> },
     {
       field: "fechaPago",
       headerName: "Fecha de Pago",
@@ -460,7 +461,7 @@ export default function CobranzaPage() {
       ),
     },
     {
-      field: "comentarios", headerName: "Comentarios", hideBelow: "xl", minWidth: 180,
+      field: "comentarios", headerName: "Comentarios", hideBelow: 1300, minWidth: 180,
       renderCell: (r) => r.comentarios
         ? <Box sx={{ maxWidth: 280 }}><CeldaIcono icon={ChatBubbleOutlineOutlinedIcon} top>{r.comentarios}</CeldaIcono></Box>
         : <Typography variant="caption" color="text.secondary">—</Typography>,
@@ -469,7 +470,7 @@ export default function CobranzaPage() {
       ? [{ field: "fechaPagada", headerName: "Fecha Pagada", nowrap: true, renderCell: (r) => <CeldaIcono icon={TaskAltOutlinedIcon} color="success.main">{formatDate(r.fechaPagada)}</CeldaIcono> }]
       : []),
     {
-      field: "acciones", headerName: "Pagos", align: "center",
+      field: "acciones", headerName: "Pagos", align: "center", sticky: "right",
       renderCell: (r) => (
         <Tooltip title={r.statusPago === 1 ? "Ver pagos / reabrir" : "Abonos y pagos"}>
           <IconButton size="small" onClick={() => setCuentaId(r._id)}>
@@ -542,6 +543,7 @@ export default function CobranzaPage() {
         onRowsPerPageChange={(n) => { setRowsPerPage(n); setPage(0); }}
         loading={loading}
         emptyText="Sin registros en esta pestaña"
+        dense
         onRowClick={(r) => setCuentaId(r._id)}
       />
 

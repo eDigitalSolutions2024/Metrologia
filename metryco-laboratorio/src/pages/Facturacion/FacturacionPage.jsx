@@ -14,16 +14,12 @@ import CodeOutlinedIcon from "@mui/icons-material/CodeOutlined";
 import PaymentsOutlinedIcon from "@mui/icons-material/PaymentsOutlined";
 import CancelOutlinedIcon from "@mui/icons-material/CancelOutlined";
 import DeleteOutlineIcon from "@mui/icons-material/DeleteOutlined";
-import CheckCircleOutlineIcon from "@mui/icons-material/CheckCircleOutlined";
 import AccountBalanceOutlinedIcon from "@mui/icons-material/AccountBalanceOutlined";
 import CreditCardOutlinedIcon from "@mui/icons-material/CreditCardOutlined";
 import HelpOutlineOutlinedIcon from "@mui/icons-material/HelpOutlineOutlined";
-import ScheduleOutlinedIcon from "@mui/icons-material/ScheduleOutlined";
 import SearchIcon from "@mui/icons-material/Search";
 import MenuBookOutlinedIcon from "@mui/icons-material/MenuBookOutlined";
 import BusinessOutlinedIcon from "@mui/icons-material/BusinessOutlined";
-import BadgeOutlinedIcon from "@mui/icons-material/BadgeOutlined";
-import EventOutlinedIcon from "@mui/icons-material/EventOutlined";
 import NumbersOutlinedIcon from "@mui/icons-material/NumbersOutlined";
 
 import AppButton from "../../shared/components/AppButton";
@@ -50,11 +46,11 @@ const ICONOS_FORMA_PAGO = {
   "99": HelpOutlineOutlinedIcon,
 };
 
-function CeldaIcono({ icon: Icon, children }) {
+function CeldaIcono({ icon: Icon, wrap = false, children }) {
   return (
     <Box sx={{ display: "flex", alignItems: "center", gap: 0.9 }}>
       <Icon sx={{ fontSize: 16, color: "text.secondary", flexShrink: 0 }} />
-      <Typography variant="body2" fontSize={13} sx={{ whiteSpace: "nowrap" }}>{children}</Typography>
+      <Typography variant="body2" fontSize={13.5} fontWeight={wrap ? 600 : 400} sx={{ whiteSpace: wrap ? "normal" : "nowrap", lineHeight: 1.3 }}>{children}</Typography>
     </Box>
   );
 }
@@ -204,14 +200,19 @@ export default function FacturacionPage() {
 
   const columns = [
     {
-      field: "folio", headerName: "Comprobante", width: 210, minWidth: 180,
-      renderCell: (r) => (
-        <Box component="button" type="button" onClick={() => setDetalle(r)} sx={{ border: "none", background: "none", p: 0, cursor: "pointer", textAlign: "left", maxWidth: "100%" }}>
+      field: "folio", headerName: "Comprobante", minWidth: 130,
+      renderCell: (r, { compacto, estrecho }) => (
+        <Box component="button" type="button" onClick={() => setDetalle(r)} sx={{ border: "none", background: "none", p: 0, cursor: "pointer", textAlign: "left", display: "block", width: "100%", maxWidth: 150 }}>
           <Box sx={{ display: "flex", alignItems: "center", gap: 0.7 }}>
             <NumbersOutlinedIcon sx={{ fontSize: 16, color: "secondary.main" }} />
-            <Typography variant="body2" fontWeight={700} color="secondary.main">{r.folioInterno}</Typography>
+            <Tooltip title={compacto && r.uuid ? r.uuid : ""}>
+              <Typography variant="body2" fontWeight={700} color="secondary.main">{r.folioInterno}</Typography>
+            </Tooltip>
           </Box>
-          {r.uuid && (
+          {estrecho && (
+            <Chip size="small" label={(ESTADO_CFDI_CHIP[r.estado] || { label: r.estado }).label} color={(ESTADO_CFDI_CHIP[r.estado] || {}).color || "default"} sx={{ mt: 0.5, height: 20, fontSize: 11 }} />
+          )}
+          {r.uuid && !compacto && (
             <Tooltip title={r.uuid}>
               <Typography variant="caption" color="text.secondary" sx={{ display: "block", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                 {r.uuid}
@@ -221,22 +222,28 @@ export default function FacturacionPage() {
         </Box>
       ),
     },
-    { field: "cliente", headerName: "Cliente", minWidth: 180, renderCell: (r) => <CeldaIcono icon={BusinessOutlinedIcon}>{r.receptor?.nombre || r.cliente?.nombre || "—"}</CeldaIcono> },
-    { field: "rfc", headerName: "RFC", width: 150, nowrap: true, hideBelow: "lg", renderCell: (r) => <CeldaIcono icon={BadgeOutlinedIcon}>{r.receptor?.rfc || "—"}</CeldaIcono> },
-    { field: "fecha", headerName: "Fecha", width: 130, nowrap: true, hideBelow: "md", renderCell: (r) => <CeldaIcono icon={EventOutlinedIcon}>{formatDateShort(r.createdAt)}</CeldaIcono> },
-    { field: "total", headerName: "Total", width: 120, align: "right", nowrap: true, renderCell: (r) => <Typography fontWeight={700} fontSize={13}>{formatCurrency(r.total)}</Typography> },
     {
-      field: "pago", headerName: "Pago", width: 210,
-      renderCell: (r) => {
+      field: "cliente", headerName: "Cliente", minWidth: 170,
+      renderCell: (r) => (
+        <Box sx={{ maxWidth: 190 }}>
+          <CeldaIcono icon={BusinessOutlinedIcon} wrap>{r.receptor?.nombre || r.cliente?.nombre || "—"}</CeldaIcono>
+          <Typography variant="caption" color="text.secondary" sx={{ display: "block", whiteSpace: "nowrap", pl: 2.6 }}>
+            {[r.receptor?.rfc, formatDateShort(r.createdAt)].filter(Boolean).join(" · ")}
+          </Typography>
+        </Box>
+      ),
+    },
+    { field: "total", headerName: "Total", width: 100, align: "right", nowrap: true, renderCell: (r) => <Typography fontWeight={700} fontSize={13.5}>{formatCurrency(r.total)}</Typography> },
+    {
+      field: "pago", headerName: "Pago", minWidth: 130, nowrap: true,
+      renderCell: (r, { estrecho }) => {
         // Complemento de Pago: lo que interesa es cuánto se abonó.
         if (r.tipoComprobante === "P") {
           return (
             <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
               <PaymentsOutlinedIcon fontSize="small" sx={{ color: "success.main" }} />
               <Box>
-                <Typography variant="body2" fontSize={13} fontWeight={600} sx={{ lineHeight: 1.2 }}>
-                  Abono {formatCurrency(r.pago?.monto)}
-                </Typography>
+                <Typography variant="body2" fontSize={13} fontWeight={600} sx={{ lineHeight: 1.2 }}>Abono {formatCurrency(r.pago?.monto)}</Typography>
                 <Typography variant="caption" color="text.secondary">Complemento de pago</Typography>
               </Box>
             </Box>
@@ -255,32 +262,25 @@ export default function FacturacionPage() {
                 {FORMAS_PAGO_SAT[r.formaPago] || "—"}
               </Typography>
               <Typography variant="caption" color="text.secondary" sx={{ display: "block", lineHeight: 1.3 }}>
-                {esPPD ? "En parcialidades" : "Una exhibición"}
+                {/* Con poco espacio se muestra solo lo más importante: cuánto debe / si está pagada. */}
+                {!(estrecho && (saldo > 0 || (timbrada && saldo === 0))) && (esPPD ? "Parcialidades" : "Una exhibición")}
+                {saldo > 0 && <Box component="span" sx={{ color: "warning.main", fontWeight: 700 }}>{estrecho ? "" : " · "}Debe {formatCurrency(saldo)}</Box>}
+                {timbrada && saldo === 0 && <Box component="span" sx={{ color: "success.main", fontWeight: 700 }}>{estrecho ? "" : " · "}Pagada</Box>}
               </Typography>
-              {saldo > 0 && (
-                <Typography variant="caption" color="warning.main" fontWeight={700} sx={{ display: "flex", alignItems: "center", gap: 0.4 }}>
-                  <ScheduleOutlinedIcon sx={{ fontSize: 13 }} /> Debe {formatCurrency(saldo)}
-                </Typography>
-              )}
-              {timbrada && saldo === 0 && (
-                <Typography variant="caption" color="success.main" fontWeight={700} sx={{ display: "flex", alignItems: "center", gap: 0.4 }}>
-                  <CheckCircleOutlineIcon sx={{ fontSize: 13 }} /> {esPPD ? "Pagada totalmente" : "Pagada"}
-                </Typography>
-              )}
             </Box>
           </Box>
         );
       },
     },
     {
-      field: "estado", headerName: "Estado", width: 140, nowrap: true,
+      field: "estado", headerName: "Estado", width: 120, nowrap: true, hideBelow: 820,
       renderCell: (r) => {
         const s = ESTADO_CFDI_CHIP[r.estado] || { label: r.estado, color: "default" };
         return <Chip size="small" label={s.label} color={s.color} />;
       },
     },
     {
-      field: "acciones", headerName: "Acciones", align: "center", width: 90,
+      field: "acciones", headerName: "Acciones", align: "center", width: 70, sticky: "right",
       renderCell: (r) => (
         <AccionesMenu
           row={r}
@@ -392,6 +392,7 @@ export default function FacturacionPage() {
         rowsPerPage={rowsPerPage}
         onPageChange={setPage}
         onRowsPerPageChange={(n) => { setRowsPerPage(n); setPage(0); }}
+        dense
         emptyText="Sin comprobantes fiscales"
         onRowClick={(row) => { setAccionInicial(null); setDetalle(row); }}
       />

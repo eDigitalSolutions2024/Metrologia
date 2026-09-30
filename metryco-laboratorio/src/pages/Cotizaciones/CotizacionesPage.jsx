@@ -257,16 +257,16 @@ export default function CotizacionesPage() {
           </Tooltip>
         ) : (row.clienteInfo?.nombre || "—"),
     },
-    { field: "descripcion", headerName: "Descripción", hideBelow: "lg", minWidth: 200, renderCell: (row) => <Box sx={{ maxWidth: 300 }}>{descripcionResumen(row.items)}</Box> },
+    { field: "descripcion", headerName: "Descripción", hideBelow: 1000, minWidth: 200, renderCell: (row) => <Box sx={{ maxWidth: 300 }}>{descripcionResumen(row.items)}</Box> },
     { field: "total",       headerName: "Total", nowrap: true, align: "right", renderCell: (row) => (
       <Typography fontWeight={700} fontSize={13.5}>{formatCurrency(row.total)}</Typography>
     )},
-    { field: "fecha",       headerName: "Fecha", nowrap: true, hideBelow: "md", renderCell: (row) => formatDate(row.fecha) },
+    { field: "fecha",       headerName: "Fecha", nowrap: true, hideBelow: 900, renderCell: (row) => formatDate(row.fecha) },
     { field: "vendedor",    headerName: "Vendedor", nowrap: true, hideBelow: "xl", renderCell: (row) => row.vendedorInfo?.nombre || "—" },
     {
       field: "status",
       headerName: "Estatus",
-      nowrap: true,
+      minWidth: 140,
       renderCell: (row) => {
         const s = STATUS_MAP[row.status] ?? { label: row.status, color: "default" };
         const f = row.cfdi;
@@ -300,6 +300,7 @@ export default function CotizacionesPage() {
       field: "acciones",
       headerName: "Acciones",
       align: "center",
+      sticky: "right",
       renderCell: (row) => (
         <Box sx={{ display: "flex", gap: 0.5, justifyContent: "center" }}>
           <MenuAcciones
@@ -407,6 +408,7 @@ export default function CotizacionesPage() {
         rowsPerPage={rowsPerPage}
         onPageChange={setPage}
         onRowsPerPageChange={(n) => { setRowsPerPage(n); setPage(0); }}
+        dense
         onRowClick={abrirEditar}
       />
 

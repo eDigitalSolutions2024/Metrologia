@@ -14,6 +14,7 @@ import { DeleteOutlined as DeleteOutlineIcon } from "@mui/icons-material";
 import AppButton from "../../shared/components/AppButton";
 import AppTable from "../../shared/components/AppTable";
 import PageHeader from "../../shared/components/PageHeader";
+import MenuAcciones from "../../shared/components/MenuAcciones";
 import GroupsOutlinedIcon from "@mui/icons-material/GroupsOutlined";
 import ConfirmDialog from "../../shared/components/ConfirmDialog";
 import PasswordConfirmDialog from "../../shared/components/PasswordConfirmDialog";
@@ -126,7 +127,7 @@ export default function ClientesPage() {
     {
       field: "nombre", headerName: "Cliente", minWidth: 220,
       renderCell: (row) => (
-        <Box sx={{ minWidth: 0, maxWidth: 280 }}>
+        <Box sx={{ minWidth: 0, maxWidth: 240 }}>
           <CeldaIcono icon={BusinessOutlinedIcon} bold>{row.nombre}</CeldaIcono>
           <Typography variant="caption" color="text.secondary" noWrap sx={{ display: "block", pl: 2.6 }}>
             {[row.rfc, row.domicilioFiscal?.ciudad].filter(Boolean).join(" · ") || "—"}
@@ -146,7 +147,7 @@ export default function ClientesPage() {
       ),
     },
     {
-      field: "email", headerName: "Correo", minWidth: 180, hideBelow: "lg",
+      field: "email", headerName: "Correo", minWidth: 180, hideBelow: 1000,
       renderCell: (row) => (
         <Tooltip title={row.contacto?.emailCotizaciones || ""}>
           <Box sx={{ minWidth: 0, maxWidth: 210 }}>
@@ -197,26 +198,23 @@ export default function ClientesPage() {
       field: "acciones",
       headerName: "Acciones",
       align: "center",
-      width: 120,
+      width: 100,
+      sticky: "right",
       renderCell: (row) => (
-        <Box onClick={(e) => e.stopPropagation()} sx={{ display: "flex", gap: 0.5, justifyContent: "center" }}>
+        <Box sx={{ display: "flex", gap: 0.75, justifyContent: "center", alignItems: "center" }}>
           <Tooltip title="Editar">
             <IconButton size="small" onClick={() => navigate(`/clientes/${row.id}/editar`)}>
               <EditOutlinedIcon fontSize="small" sx={{ color: "secondary.main" }} />
             </IconButton>
           </Tooltip>
-          <Tooltip title={row.status === "activo" ? "Desactivar" : "Activar"}>
-            <IconButton size="small" onClick={() => setToggleTarget(row)}>
-              {row.status === "activo"
-                ? <ToggleOnIcon fontSize="small" sx={{ color: "success.main" }} />
-                : <ToggleOffOutlinedIcon fontSize="small" sx={{ color: "text.disabled" }} />}
-            </IconButton>
-          </Tooltip>
-          <Tooltip title="Eliminar">
-            <IconButton size="small" onClick={() => setDeleteTarget(row)}>
-              <DeleteOutlineIcon fontSize="small" sx={{ color: "error.main" }} />
-            </IconButton>
-          </Tooltip>
+          <MenuAcciones
+            acciones={[
+              row.status === "activo"
+                ? { label: "Desactivar", icon: <ToggleOffOutlinedIcon fontSize="small" />, onClick: () => setToggleTarget(row) }
+                : { label: "Activar", icon: <ToggleOnIcon fontSize="small" />, color: "success", onClick: () => setToggleTarget(row) },
+              { label: "Eliminar", icon: <DeleteOutlineIcon fontSize="small" />, color: "error", separador: true, onClick: () => setDeleteTarget(row) },
+            ]}
+          />
         </Box>
       ),
     },
@@ -274,6 +272,7 @@ export default function ClientesPage() {
         rowsPerPage={rowsPerPage}
         onPageChange={setPage}
         onRowsPerPageChange={(n) => { setRowsPerPage(n); setPage(0); }}
+        dense
         onRowClick={(row) => setFichaId(row.id)}
       />
 

@@ -69,7 +69,7 @@ export default function MisAsignacionesPage() {
       ),
     },
     {
-      field: "marca", headerName: "Marca / Modelo", minWidth: 140, hideBelow: "md",
+      field: "marca", headerName: "Marca / Modelo", minWidth: 140, hideBelow: 900,
       renderCell: (r) => [r.equipo?.marca, r.equipo?.modelo].filter(Boolean).join(" ") || "—",
     },
     {
