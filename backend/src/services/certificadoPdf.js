@@ -21,6 +21,7 @@ const puppeteer = require("puppeteer");
 const { uploadsDir } = require("../config/env");
 const qr = require("../utils/qr");
 const certificadoService = require("./certificado.service");
+const { traductor, idiomaValido } = require("./certificadoTextos");
 
 function esc(v) {
   return String(v ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
@@ -46,7 +47,6 @@ function decimalesDe(divMin) {
   return i >= 0 ? s.length - i - 1 : 0;
 }
 
-const CRIT = { pasa: "PASO", no_pasa: "NO PASA", sin_evaluar: "—" };
 
 /** Lee un archivo local (logo/firma) y lo regresa como data URI, o null si no existe. */
 function archivoADataUri(rutaRelativa, mime = "image/png") {
@@ -64,7 +64,7 @@ function campos(filas) {
 }
 
 /** Puerto directo de GraficaCalibracion (HojaCertificado.jsx) a SVG estático. */
-function graficaCalibracionSvg(titulo, filas) {
+function graficaCalibracionSvg(titulo, filas, t) {
   const datos = filas
     .map((p) => ({
       x: p.puntoNominal,
@@ -93,7 +93,7 @@ function graficaCalibracionSvg(titulo, filas) {
 
   return `
     <div class="grafica-wrap">
-      <div class="grafica-titulo">DIAGRAMA DE CALIBRACIÓN · ${esc(titulo)}</div>
+      <div class="grafica-titulo">${esc(t("tituloGrafica"))} · ${esc(titulo)}</div>
       <svg viewBox="0 0 ${W} ${H}" width="100%" height="${H}" style="display:block">
         <rect x="0.5" y="0.5" width="${W - 1}" height="${H - 1}" fill="#fff" stroke="#cbd5e1"/>
         <rect x="${padL}" y="${empArribaY}" width="${plotW}" height="${Math.max(empAbajoY - empArribaY, 0.5)}" fill="#fecaca" opacity="0.35"/>
@@ -105,13 +105,13 @@ function graficaCalibracionSvg(titulo, filas) {
         <polyline points="${puntosSvg}" fill="none" stroke="#2563EB" stroke-width="1.6"/>
         ${puntosCirculos}
         ${etiquetasX}
-        <text x="${padL + plotW / 2}" y="${H - 4}" text-anchor="middle" font-size="8.5" fill="#334155">Punto nominal</text>
+        <text x="${padL + plotW / 2}" y="${H - 4}" text-anchor="middle" font-size="8.5" fill="#334155">${esc(t("puntoNominal"))}</text>
         <text x="10" y="${padT - 3}" font-size="8" fill="#dc2626">± EMP</text>
       </svg>
     </div>`;
 }
 
-function tablaPatrones(patronesSnapshot) {
+function tablaPatrones(patronesSnapshot, t) {
   if (!patronesSnapshot?.length) return "";
   const filas = patronesSnapshot.map((p) => `
     <tr>
@@ -122,16 +122,17 @@ function tablaPatrones(patronesSnapshot) {
       <td>${esc(fmtFecha(p.vencimiento))}</td>
     </tr>`).join("");
   return `
-    <div class="banda">Instrument Used</div>
+    <div class="banda">${esc(t("secPatrones"))}</div>
     <div class="caja-tabla">
       <table class="rep-table" style="font-size:10.5px">
-        <thead><tr><th>Instrument ID No.</th><th>NIST Traceable #</th><th>Description</th><th>Model#</th><th>Cal Due Date</th></tr></thead>
+        <thead><tr><th>${esc(t("thIdPatron"))}</th><th>${esc(t("thTrazable"))}</th><th>${esc(t("thDescripcion"))}</th><th>${esc(t("thModelo"))}</th><th>${esc(t("thVencePatron"))}</th></tr></thead>
         <tbody>${filas}</tbody>
       </table>
     </div>`;
 }
 
-function tablaResultados(titulo, filas, dec) {
+function tablaResultados(titulo, filas, dec, t) {
+  const CRIT = { pasa: t("critPasa"), no_pasa: t("critNoPasa"), sin_evaluar: "—" };
   const nLecturas = Math.min(10, Math.max(3, ...filas.map((p) => (p.lecturas || []).length)));
   const colsHead = Array.from({ length: nLecturas }, (_, k) => `<th>${k + 1}</th>`).join("");
   const filasHtml = filas.map((p) => {
@@ -156,17 +157,19 @@ function tablaResultados(titulo, filas, dec) {
       <table class="rep-table">
         <thead>
           <tr>
-            <th>NOMINAL</th>${colsHead}<th>PROMEDIO</th><th>DESVIACIÓN STD</th><th>CRITERIO</th><th>U Expan.</th>
+            <th>${esc(t("thNominal"))}</th>${colsHead}<th>${esc(t("thPromedio"))}</th><th>${esc(t("thDesv"))}</th><th>${esc(t("thCriterio"))}</th><th>${esc(t("thU"))}</th>
           </tr>
         </thead>
         <tbody>${filasHtml}</tbody>
       </table>
-      ${graficaCalibracionSvg(titulo, filas)}
+      ${graficaCalibracionSvg(titulo, filas, t)}
     </div>`;
 }
 
 /** Arma el HTML completo (independiente, sin llamadas a red) de un certificado. */
-function construirHtml(cert, qrDataUrl) {
+function construirHtml(cert, qrDataUrl, idioma) {
+  const lang = idiomaValido(idioma);
+  const t = traductor(lang);
   const eq = cert.equipoSnapshot || {};
   const cli = cert.clienteSnapshot || {};
   const dec = decimalesDe(eq.divisionMinima);
@@ -177,9 +180,9 @@ function construirHtml(cert, qrDataUrl) {
   const unicos = puntos.filter((p) => !p.condicion || p.condicion === "unico");
 
   const grupos = [];
-  if (encontrado.length) grupos.push(["COMO SE ENCONTRÓ", encontrado]);
-  if (dejado.length) grupos.push(["COMO SE DEJÓ", dejado]);
-  if (unicos.length) grupos.push([encontrado.length || dejado.length ? "RESULTADOS" : "RESULTADOS DE CALIBRACIÓN", unicos]);
+  if (encontrado.length) grupos.push([t("grpEncontrado"), encontrado]);
+  if (dejado.length) grupos.push([t("grpDejado"), dejado]);
+  if (unicos.length) grupos.push([encontrado.length || dejado.length ? t("grpResultados") : t("grpResultadosCal"), unicos]);
 
   const revisor = cert.revisadoPor;
   const autorizador = cert.autorizadoPor;
@@ -191,35 +194,42 @@ function construirHtml(cert, qrDataUrl) {
   const firmaRevisor = archivoADataUri(revisor?.id?.firmaUrl ? `firmas/${revisor.id.firmaUrl}` : null);
   const firmaAutorizador = archivoADataUri(autorizador?.id?.firmaUrl ? `firmas/${autorizador.id.firmaUrl}` : null);
 
+  const marcaAguaUri = cert.laboratorio?.marcaAgua?.nombreArchivo
+    ? archivoADataUri(`logos/${cert.laboratorio.marcaAgua.nombreArchivo}`)
+    : null;
+  const esAcreditado = cert.servicio?.tipo === "Acreditado";
+  const acreditadoraUri = esAcreditado && cert.laboratorio?.logoAcreditadora?.nombreArchivo
+    ? archivoADataUri(`logos/${cert.laboratorio.logoAcreditadora.nombreArchivo}`)
+    : null;
+  const marcaImg = marcaAguaUri || logoDataUri;
   const watermarkTexto = cert.laboratorio?.nombre || "CERTIFICADO ORIGINAL";
   const watermarkFontSize = Math.min(150, Math.max(72, Math.round(2100 / (watermarkTexto.length || 1))));
 
-  const remarks = cert.laboratorio?.remarks ||
-    `The instrument(s) listed in this certification have been calibrated against standards traceable to N.I.S.T. (National Institute of Standards and Technology) derived from ratio type measurements, or compared to national or internationally recognized consensus standards. A calibration uncertainty ratio of 4:1 was maintained and a K=2 coverage factor with a confidence level of 95%, unless otherwise stated. ${cert.laboratorio?.nombre || "The laboratory"} quality system complies with applicable requirements of ISO/IEC 17025:2017. All results contained within this certification relate only to item(s) calibrated. This calibration report shall not be reproduced except in full and with the written consent of ${cert.laboratorio?.nombre || "the laboratory"}. Decision rule: Simple acceptance / Shared risk.`;
+  const nombreLab = cert.laboratorio?.nombre || (lang === "en" ? "The laboratory" : "El laboratorio");
+  const remarks = cert.laboratorio?.remarks || t("remarksDefault").replaceAll("{lab}", nombreLab);
 
   const asFound = puntos.some((p) => p.condicion === "encontrado")
-    ? (encontrado.every((p) => p.criterio === "pasa") ? "Dentro de Tolerancia" : "Fuera de Tolerancia") : "—";
+    ? (encontrado.every((p) => p.criterio === "pasa") ? t("dentroTol") : t("fueraTol")) : "—";
   const asLeft = puntos.length
-    ? (puntos.every((p) => p.criterio !== "no_pasa") ? "Dentro de Tolerancia" : "Fuera de Tolerancia") : "—";
+    ? (puntos.every((p) => p.criterio !== "no_pasa") ? t("dentroTol") : t("fueraTol")) : "—";
 
   const bloqueResultados = puntos.length === 0
-    ? `<div class="rep-band" style="margin-top:16px">SIN PUNTOS DE CALIBRACIÓN LIGADOS</div>`
+    ? `<div class="rep-band" style="margin-top:16px">${esc(t("sinPuntos"))}</div>`
     : `
       <div style="page-break-before:always;padding-top:16px">
-        <div class="titulo-informe">INFORME DE CALIBRACIÓN</div>
-        <div class="subtitulo-informe">CALIBRATION REPORT · ${esc(cert.folio)}</div>
+        <div class="titulo-informe">${esc(t("tituloInforme"))}</div>
+        <div class="subtitulo-informe">${esc(t("subtituloInforme"))} · ${esc(cert.folio)}</div>
         <div class="grid-instrumento">
-          <b>INSTRUMENTO:</b><span>${esc(eq.descripcion || eq.categoria || "—")}</span>
-          <b>ALCANCE:</b><span>${esc(eq.rango || "—")}</span>
-          <b>IDENTIFICACIÓN:</b><span style="font-weight:700">${esc(eq.idInterno || "—")}</span>
-          <b>RESOLUCIÓN:</b><span>${esc(eq.resolucion || eq.divisionMinima || "—")}</span>
+          <b>${esc(t("instrumento"))}</b><span>${esc(eq.descripcion || eq.categoria || "—")}</span>
+          <b>${esc(t("alcanceMayus"))}</b><span>${esc(eq.rango || "—")}</span>
+          <b>${esc(t("identificacion"))}</b><span style="font-weight:700">${esc(eq.idInterno || "—")}</span>
+          <b>${esc(t("resolucionMayus"))}</b><span>${esc(eq.resolucion || eq.divisionMinima || "—")}</span>
         </div>
-        ${grupos.map(([titulo, filas]) => tablaResultados(titulo, filas, dec)).join("")}
-        <div class="rep-band" style="margin-top:16px">Factor de conversión 1 in = 25.4 mm</div>
+        ${grupos.map(([titulo, filas]) => tablaResultados(titulo, filas, dec, t)).join("")}
       </div>`;
 
   return `<!DOCTYPE html>
-<html lang="es">
+<html lang="${lang}">
 <head>
 <meta charset="utf-8">
 <style>
@@ -271,79 +281,81 @@ function construirHtml(cert, qrDataUrl) {
 <body>
   <div class="hoja">
     <div class="marca-agua">
-      ${logoDataUri ? `<img src="${logoDataUri}" alt=""/>` : `<span>${esc(watermarkTexto)}</span>`}
+      ${marcaImg ? `<img src="${marcaImg}" alt=""/>` : `<span>${esc(watermarkTexto)}</span>`}
     </div>
     <div class="contenido">
       <div class="encabezado">
         ${logoDataUri ? `<img src="${logoDataUri}" alt="Logo"/>` : ""}
         <div style="flex:1;min-width:0">
           <div class="lab-nombre">${esc(cert.laboratorio?.nombre || "Laboratorio de Metrología")}</div>
-          ${cert.laboratorio?.acreditacion ? `<div class="lab-acred">Acreditación ${esc(cert.laboratorio.acreditacion)}</div>` : ""}
+          ${cert.laboratorio?.acreditacion && esAcreditado ? `<div class="lab-acred">${esc(t("acreditacion"))} ${esc(cert.laboratorio.acreditacion)}</div>` : ""}
         </div>
+        ${acreditadoraUri ? `<img src="${acreditadoraUri}" alt="Acreditadora" style="width:auto;height:46px;max-width:110px"/>` : ""}
         <div style="flex-shrink:0">
-          <div class="cert-titulo">CERTIFICADO DE CALIBRACIÓN</div>
-          <div class="cert-subtitulo">Calibration Certificate</div>
+          <div class="cert-titulo">${esc(t("tituloCert"))}</div>
+          <div class="cert-subtitulo">${esc(t("subtituloCert"))}</div>
         </div>
       </div>
       <div class="folio">${esc(cert.folio)}</div>
 
-      <div class="banda">Customer Information</div>
-      <div class="campos">${campos([["Company Name:", cli.nombre], ["Address:", cli.direccion]])}</div>
+      <div class="banda">${esc(t("secCliente"))}</div>
+      <div class="campos">${campos([[t("cliente"), cli.nombre], [t("direccion"), cli.direccion]])}</div>
 
-      <div class="banda">Equipment Information</div>
+      <div class="banda">${esc(t("secEquipo"))}</div>
       <div class="campos">${campos([
-        ["Description:", eq.descripcion || eq.categoria], ["Instrument ID:", eq.idInterno],
-        ["Serial No.:", eq.serie], ["Units:", unidad],
-        ["Manufacturer:", eq.marca], ["Range:", eq.rango],
-        ["Model:", eq.modelo], ["Resolution:", eq.resolucion || eq.divisionMinima],
-        ["Location:", eq.localizacion], ["Range Cal.:", eq.rangoCalibracion],
-        ["Service Report:", cert.reporte?.folio], ["Range Used:", eq.rangoUso],
+        [t("descripcion"), eq.descripcion || eq.categoria], [t("idInstrumento"), eq.idInterno],
+        [t("serie"), eq.serie], [t("unidades"), unidad],
+        [t("fabricante"), eq.marca], [t("alcance"), eq.rango],
+        [t("modelo"), eq.modelo], [t("resolucion"), eq.resolucion || eq.divisionMinima],
+        [t("ubicacion"), eq.localizacion], [t("rangoCal"), eq.rangoCalibracion],
+        [t("reporteServicio"), cert.reporte?.folio], [t("rangoUso"), eq.rangoUso],
       ])}</div>
 
-      <div class="banda">Calibration Information</div>
+      <div class="banda">${esc(t("secCalibracion"))}</div>
       <div class="campos">${campos([
-        ["Reason of Service:", cert.servicio?.razon], ["Procedure:", cert.servicio?.procedimiento],
-        ["Type of Service:", cert.servicio?.tipo], ["Cal Date:", fmtFecha(cert.fechaCalibracion)],
-        ["As Found:", asFound], ["Cal Due:", fmtFecha(cert.vigencia)],
-        ["As Left:", asLeft], ["Temperature:", cert.condiciones?.temperatura != null ? `${cert.condiciones.temperatura} °C` : "—"],
-        ["Calibration Report:", cert.folio], ["Humidity:", cert.condiciones?.humedad != null ? `${cert.condiciones.humedad} % HR` : "—"],
-        ["Comments:", cert.comentarios], ["", ""],
+        [t("motivo"), cert.servicio?.razon], [t("procedimiento"), cert.servicio?.procedimiento],
+        [t("tipoServicio"), cert.servicio?.tipo], [t("fechaIngreso"), fmtFecha(cert.fechaIngreso || cert.reporte?.fechaRecepcion)],
+        [t("fechaCalibracion"), fmtFecha(cert.fechaCalibracion)], [t("fechaLiberacion"), fmtFecha(cert.fechaEmision)],
+        [t("fechaVencimiento"), fmtFecha(cert.vigencia)], [t("temperatura"), cert.condiciones?.temperatura != null ? `${cert.condiciones.temperatura} °C` : "—"],
+        [t("comoSeEncontro"), asFound], [t("humedad"), cert.condiciones?.humedad != null ? `${cert.condiciones.humedad} % HR` : "—"],
+        [t("comoSeDejo"), asLeft], [t("informeCal"), cert.folio],
+        [t("comentarios"), cert.comentarios], ["", ""],
       ])}</div>
 
-      ${tablaPatrones(cert.patronesSnapshot)}
+      ${tablaPatrones(cert.patronesSnapshot, t)}
 
-      <div class="banda">Remarks</div>
+      <div class="banda">${esc(t("secObservaciones"))}</div>
       <div class="remarks">${esc(remarks)}</div>
 
       ${bloqueResultados}
 
-      <div class="banda">Credits</div>
+      <div class="banda">${esc(t("secCreditos"))}</div>
       <div class="credits-box">
         <div class="firmas">
           <div class="firma-col">
             <div class="firma-img-wrap">${firmaCreador ? `<img src="${firmaCreador}"/>` : ""}</div>
-            <div class="firma-linea"><b>Elaboró</b><br/>${esc(cert.creadoPor?.nombre || "—")}</div>
+            <div class="firma-linea"><b>${esc(t("elaboro"))}</b><br/>${esc(cert.creadoPor?.nombre || "—")}</div>
           </div>
           <div class="firma-col">
             <div class="firma-img-wrap">${firmaRevisor ? `<img src="${firmaRevisor}"/>` : ""}</div>
-            <div class="firma-linea"><b>Technical Approval</b><br/>${esc(revisor?.nombre || "—")}</div>
+            <div class="firma-linea"><b>${esc(t("aprobTecnica"))}</b><br/>${esc(revisor?.nombre || "—")}</div>
           </div>
           <div class="firma-col">
             <div class="firma-img-wrap">${firmaAutorizador ? `<img src="${firmaAutorizador}"/>` : ""}</div>
-            <div class="firma-linea"><b>Quality Assurance</b><br/>${esc(autorizador?.nombre || "—")}</div>
+            <div class="firma-linea"><b>${esc(t("aseguramiento"))}</b><br/>${esc(autorizador?.nombre || "—")}</div>
           </div>
         </div>
         ${qrDataUrl ? `
         <div class="qr-box">
-          <div class="qr-label">SELLO DE VERIFICACIÓN</div>
+          <div class="qr-label">${esc(t("selloVerif"))}</div>
           <div class="qr-circle"><img src="${qrDataUrl}"/></div>
-          <div class="qr-nota">Escanea para comprobar la autenticidad de este certificado en línea.</div>
+          <div class="qr-nota">${esc(t("selloNota"))}</div>
         </div>` : ""}
       </div>
 
       <div class="pie">
-        ${esc(cert.folio)} · emitido ${fmtFecha(cert.fechaEmision)} · nivel de confianza ${esc(cert.puntos?.[0]?.nivelConfianza || "95,45 %")} ·
-        ${esc(cert.laboratorio?.notaCertificado || "método GUM (JCGM 100:2008) — cálculo determinístico. Verificable en línea con el QR del certificado.")}
+        ${esc(cert.folio)} · ${esc(t("pieEmitido"))} ${fmtFecha(cert.fechaEmision)} · ${esc(t("pieConfianza"))} ${esc(cert.puntos?.[0]?.nivelConfianza || "95,45 %")} ·
+        ${esc(cert.laboratorio?.notaCertificado || t("pieNotaDefault"))}
       </div>
     </div>
   </div>
@@ -366,13 +378,13 @@ function obtenerNavegador() {
  * Genera el PDF del certificado tal como se ve en "Informe de calibración".
  * @returns {Promise<Buffer>}
  */
-async function generarPdfCertificado(certificadoId) {
+async function generarPdfCertificado(certificadoId, { idioma = "es" } = {}) {
   const cert = await certificadoService.obtener(certificadoId);
   const qrDataUrl = cert.publicToken
     ? await qr.dataUrl(certificadoService.urlPublica(cert.publicToken))
     : null;
 
-  const html = construirHtml(cert, qrDataUrl);
+  const html = construirHtml(cert, qrDataUrl, idioma);
 
   const browser = await obtenerNavegador();
   const page = await browser.newPage();

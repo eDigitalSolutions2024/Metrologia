@@ -122,7 +122,8 @@ async function crear(datos) {
   }
 
   const passwordHash = await bcrypt.hash(password, 10);
-  const cliente = await Cliente.create({ ...resto, passwordHash });
+  const nombre = resto.nombre?.trim() || resto.nombreComercial?.trim() || resto.rfc?.trim().toUpperCase();
+  const cliente = await Cliente.create({ ...resto, nombre, passwordHash });
   await sincronizarContactoPrincipal(cliente._id, resto.contacto);
   return cliente;
 }
@@ -130,6 +131,7 @@ async function crear(datos) {
 async function actualizar(id, datos) {
   const { password, ...resto } = datos;
   const cambios = { ...resto };
+  if (cambios.nombre !== undefined && !cambios.nombre.trim()) delete cambios.nombre; // nunca dejar al cliente sin nombre
 
   if (password) {
     if (password.length < 8) {

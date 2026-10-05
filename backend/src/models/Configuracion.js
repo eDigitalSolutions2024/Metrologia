@@ -51,6 +51,11 @@ const configuracionSchema = new Schema(
       fecha: Date,
     },
 
+    // Marca de agua propia del certificado (si no hay, se usa el logo) y logo
+    // de la casa acreditadora (solo sale en certificados de tipo "Acreditado").
+    marcaAgua: { nombreArchivo: String, nombreOriginal: String, mimetype: String, tamano: Number, fecha: Date },
+    logoAcreditadora: { nombreArchivo: String, nombreOriginal: String, mimetype: String, tamano: Number, fecha: Date },
+
     // Colores de marca de la interfaz — antes fijos en theme/theme.js.
     // primario = tono oscuro (sidebar, botones principales); secundario =
     // acento (botones de acción, enlaces, focos); acento = color "info"

@@ -25,6 +25,19 @@ const subirLogo = asyncHandler(async (req, res) => {
   res.json({ success: true, data: await service.subirLogo(req.file) });
 });
 
+const obtenerImagen = asyncHandler(async (req, res) => {
+  res.json({ success: true, data: await service.obtenerImagen(req.params.tipo) });
+});
+
+const subirImagen = asyncHandler(async (req, res) => {
+  res.json({ success: true, data: await service.subirImagen(req.params.tipo, req.file) });
+});
+
+const eliminarImagen = asyncHandler(async (req, res) => {
+  await service.eliminarImagen(req.params.tipo);
+  res.json({ success: true });
+});
+
 const eliminarLogo = asyncHandler(async (req, res) => {
   await service.eliminarLogo();
   res.json({ success: true, data: null });
@@ -41,5 +54,6 @@ const actualizarColores = asyncHandler(async (req, res) => {
 module.exports = {
   obtenerMenuPermisos, actualizarMenuPermisos, obtenerLaboratorio, actualizarLaboratorio,
   obtenerLogo, subirLogo, eliminarLogo,
+  obtenerImagen, subirImagen, eliminarImagen,
   obtenerColores, actualizarColores,
 };

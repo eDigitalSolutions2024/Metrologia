@@ -31,6 +31,7 @@ const emitirCertificadoSchema = z.object({
   cliente: objectId.optional(),
   patrones: z.array(objectId).optional(),
   fechaCalibracion: z.coerce.date().optional(),
+  fechaIngreso: z.coerce.date().optional(),
   fechaEmision: z.coerce.date().optional(),
   vigencia: z.coerce.date().optional(),
   resultado: resultadoSchema,
@@ -46,6 +47,7 @@ const emitirCertificadoSchema = z.object({
 
 const actualizarCertificadoSchema = z.object({
   fechaCalibracion: z.coerce.date().optional(),
+  fechaIngreso: z.coerce.date().optional(),
   fechaEmision: z.coerce.date().optional(),
   vigencia: z.coerce.date().optional(),
   resultado: resultadoSchema,

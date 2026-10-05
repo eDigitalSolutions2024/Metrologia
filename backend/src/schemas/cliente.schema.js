@@ -38,7 +38,7 @@ const facturacionSchema = z.object({
 }).partial().optional();
 
 const baseCliente = {
-  nombre: z.string().trim().min(1, "El nombre es obligatorio"),
+  nombre: z.string().trim().optional(), // si falta, el servicio usa nombre comercial o RFC
   nombreComercial: z.string().trim().optional(),
   rfc: z.string().trim().min(1, "El RFC es obligatorio"),
   regimenFiscal: z.string().trim().optional(),

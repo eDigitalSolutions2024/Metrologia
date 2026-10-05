@@ -112,6 +112,43 @@ async function eliminarLogo() {
   }
 }
 
+// Imágenes extra del certificado (misma carpeta que el logo).
+const TIPOS_IMAGEN = ["marcaAgua", "logoAcreditadora"];
+
+function validarTipoImagen(tipo) {
+  if (!TIPOS_IMAGEN.includes(tipo)) throw new AppError("Tipo de imagen no válido", 400);
+}
+
+async function obtenerImagen(tipo) {
+  validarTipoImagen(tipo);
+  const cfg = await obtenerDoc();
+  if (!cfg[tipo]?.nombreArchivo) return null;
+  return { nombreArchivo: cfg[tipo].nombreArchivo };
+}
+
+async function subirImagen(tipo, archivo) {
+  validarTipoImagen(tipo);
+  if (!archivo) throw new AppError("No se recibió ninguna imagen", 400);
+  const cfg = await obtenerDoc();
+  const anterior = cfg[tipo]?.nombreArchivo;
+  cfg[tipo] = {
+    nombreArchivo: archivo.filename, nombreOriginal: archivo.originalname,
+    mimetype: archivo.mimetype, tamano: archivo.size, fecha: new Date(),
+  };
+  await cfg.save();
+  if (anterior) fs.unlink(path.join(destinoLogos, anterior), () => {});
+  return { nombreArchivo: cfg[tipo].nombreArchivo };
+}
+
+async function eliminarImagen(tipo) {
+  validarTipoImagen(tipo);
+  const cfg = await obtenerDoc();
+  const anterior = cfg[tipo]?.nombreArchivo;
+  cfg[tipo] = undefined;
+  await cfg.save();
+  if (anterior) fs.unlink(path.join(destinoLogos, anterior), () => {});
+}
+
 const COLORES_DEFAULT = { primario: "#0F172A", secundario: "#2563EB", acento: "#0891B2" };
 const HEX_VALIDO = /^#[0-9A-Fa-f]{6}$/;
 
@@ -140,5 +177,6 @@ async function actualizarColores(datos) {
 module.exports = {
   obtenerMenuPermisos, actualizarMenuPermisos, obtenerLaboratorio, actualizarLaboratorio,
   obtenerLogo, subirLogo, eliminarLogo,
+  obtenerImagen, subirImagen, eliminarImagen,
   obtenerColores, actualizarColores,
 };

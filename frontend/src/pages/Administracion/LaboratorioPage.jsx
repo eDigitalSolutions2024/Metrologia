@@ -10,6 +10,7 @@ import PageHeader from "../../shared/components/PageHeader";
 import {
   obtenerLaboratorio, actualizarLaboratorio,
   obtenerLogo, subirLogo, eliminarLogo, logoUrl,
+  obtenerImagenCertificado, subirImagenCertificado, eliminarImagenCertificado,
 } from "../../services/configuracion";
 import { useLogoMarca } from "../../theme/AppThemeProvider";
 import { REGIMENES_FISCALES, labelRegimenFiscal } from "../../shared/constants/regimenFiscal";
@@ -28,7 +29,7 @@ const CAMPOS_CERT = [
     label: "Remarks del certificado",
     placeholder: "Declaración de trazabilidad, cumplimiento ISO/IEC 17025, regla de decisión…",
     rows: 7,
-    ayuda: "Bloque «Remarks» del certificado. Si lo dejas vacío se usa el texto por defecto en inglés.",
+    ayuda: "Bloque «Remarks» del certificado. Si lo dejas vacío se usa el texto por defecto, que se traduce solo al idioma elegido al imprimir. Si escribes uno propio, sale igual en español e inglés.",
   },
   {
     key: "notaCertificado",
@@ -125,6 +126,60 @@ function LogoCard({ setError }) {
   );
 }
 
+function ImagenCertificadoCard({ tipo, titulo, ayuda, vacio, setError }) {
+  const [imagen, setImagen] = useState(null);
+  const [subiendo, setSubiendo] = useState(false);
+  const inputRef = useRef(null);
+
+  const cargar = () => { obtenerImagenCertificado(tipo).then(setImagen).catch(() => {}); };
+  useEffect(() => { cargar(); }, []);
+
+  const onArchivo = async (e) => {
+    const archivo = e.target.files?.[0];
+    e.target.value = "";
+    if (!archivo) return;
+    setSubiendo(true); setError("");
+    try { await subirImagenCertificado(tipo, archivo); cargar(); }
+    catch (err) { setError(err?.response?.data?.message || "No se pudo subir la imagen."); }
+    finally { setSubiendo(false); }
+  };
+
+  const quitar = async () => {
+    setSubiendo(true); setError("");
+    try { await eliminarImagenCertificado(tipo); setImagen(null); }
+    catch { setError("No se pudo quitar la imagen."); }
+    finally { setSubiendo(false); }
+  };
+
+  return (
+    <Paper variant="outlined" sx={{ p: 3, borderRadius: "12px", maxWidth: 720, mb: 2.5 }}>
+      <Typography variant="subtitle2" fontWeight={700} sx={{ mb: 2 }}>{titulo}</Typography>
+      <Box sx={{ display: "flex", alignItems: "center", gap: 2.5, flexWrap: "wrap" }}>
+        <Avatar variant="rounded" src={imagen ? logoUrl(imagen.nombreArchivo) : undefined} sx={{ width: 64, height: 64, borderRadius: "10px", bgcolor: "background.default", border: 1, borderColor: "divider" }}>
+          <ImageOutlinedIcon color="disabled" />
+        </Avatar>
+        <Box sx={{ flex: 1, minWidth: 200 }}>
+          <Typography variant="body2" color="text.secondary">{imagen ? ayuda : vacio}</Typography>
+        </Box>
+        <Box sx={{ display: "flex", gap: 1 }}>
+          <AppButton type="button" variant="outlined" size="small" startIcon={<UploadOutlinedIcon />} onClick={() => inputRef.current?.click()} disabled={subiendo} sx={{ borderRadius: "10px" }}>
+            {imagen ? "Cambiar" : "Subir imagen"}
+          </AppButton>
+          {imagen && (
+            <AppButton type="button" variant="outlined" color="error" size="small" startIcon={<DeleteOutlineIcon />} onClick={quitar} disabled={subiendo} sx={{ borderRadius: "10px" }}>
+              Quitar
+            </AppButton>
+          )}
+        </Box>
+      </Box>
+      <input ref={inputRef} type="file" accept="image/png,image/jpeg,image/svg+xml,image/webp" hidden onChange={onArchivo} />
+      <Typography variant="caption" color="text.secondary" sx={{ display: "block", mt: 1.5 }}>
+        PNG, JPG, SVG o WEBP — máximo 3 MB.
+      </Typography>
+    </Paper>
+  );
+}
+
 export default function LaboratorioPage() {
   const [datos, setDatos] = useState(VACIO);
   const [loading, setLoading] = useState(true);
@@ -169,6 +224,18 @@ export default function LaboratorioPage() {
       {guardado && <Alert severity="success" sx={{ mb: 2, borderRadius: "10px" }} onClose={() => setGuardado(false)}>Datos guardados.</Alert>}
 
       <LogoCard setError={setError} />
+      <ImagenCertificadoCard
+        tipo="marcaAgua" setError={setError}
+        titulo="Marca de agua del certificado"
+        ayuda="Se usa como marca de agua en los certificados en lugar del logotipo."
+        vacio="Sin marca de agua propia — los certificados usan el logotipo (o el nombre del laboratorio si no hay logo)."
+      />
+      <ImagenCertificadoCard
+        tipo="logoAcreditadora" setError={setError}
+        titulo="Logo de la casa acreditadora"
+        ayuda="Aparece en el encabezado SOLO de los certificados con tipo de servicio «Acreditado»."
+        vacio="Sin logo de acreditadora — los certificados acreditados no mostrarán ninguno."
+      />
 
       <Paper variant="outlined" sx={{ p: 3, borderRadius: "12px", maxWidth: 720 }}>
         {loading ? (

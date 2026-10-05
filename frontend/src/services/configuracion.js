@@ -53,3 +53,22 @@ export async function actualizarColores(colores) {
   const { data } = await api.put(`${ENDPOINTS.CONFIGURACION}/colores`, colores);
   return data.data;
 }
+
+// Imágenes extra del certificado: "marcaAgua" y "logoAcreditadora".
+export async function obtenerImagenCertificado(tipo) {
+  const { data } = await api.get(`${ENDPOINTS.CONFIGURACION}/imagenes/${tipo}`);
+  return data.data; // { nombreArchivo } | null
+}
+
+export async function subirImagenCertificado(tipo, archivo) {
+  const form = new FormData();
+  form.append("archivo", archivo);
+  const { data } = await api.post(`${ENDPOINTS.CONFIGURACION}/imagenes/${tipo}`, form, {
+    headers: { "Content-Type": "multipart/form-data" },
+  });
+  return data.data;
+}
+
+export async function eliminarImagenCertificado(tipo) {
+  await api.delete(`${ENDPOINTS.CONFIGURACION}/imagenes/${tipo}`);
+}

@@ -178,17 +178,32 @@ async function exportar({ clienteId = "", mes = "", anio = "", factura = "todos"
 // El logo NO se guarda en el snapshot del certificado (a diferencia de
 // nombre/acreditación): es puramente branding, no un dato que deba quedar
 // congelado en el tiempo — se toma el vigente, igual que en Reportes/Cotización.
-async function conLogo(obj) {
-  const logo = await configuracionService.obtenerLogo();
-  if (logo && obj.laboratorio) obj.laboratorio.logo = logo;
+async function brandingVigente() {
+  const [logo, marcaAgua, logoAcreditadora] = await Promise.all([
+    configuracionService.obtenerLogo(),
+    configuracionService.obtenerImagen("marcaAgua"),
+    configuracionService.obtenerImagen("logoAcreditadora"),
+  ]);
+  return { logo, marcaAgua, logoAcreditadora };
+}
+
+function aplicarBranding(obj, b) {
+  if (!obj.laboratorio) return obj;
+  if (b.logo) obj.laboratorio.logo = b.logo;
+  if (b.marcaAgua) obj.laboratorio.marcaAgua = b.marcaAgua;
+  if (b.logoAcreditadora) obj.laboratorio.logoAcreditadora = b.logoAcreditadora;
   return obj;
+}
+
+async function conLogo(obj) {
+  return aplicarBranding(obj, await brandingVigente());
 }
 
 async function obtener(id) {
   const cert = await Certificado.findById(id)
     .populate("cliente", "nombre rfc")
     .populate("equipo", "idInterno marca modelo serie")
-    .populate("reporte", "folio")
+    .populate("reporte", "folio fechaRecepcion")
     .populate("asignacion", "folio estados")
     .populate("creadoPor", "nombre usuario firmaUrl")
     .populate("revisadoPor.id", "firmaUrl")
@@ -257,16 +272,13 @@ async function porReporte(reporteId) {
   if (!oid(reporteId)) throw new AppError("Reporte inválido", 400);
   const certs = await Certificado.find({ reporte: reporteId })
     .populate("cliente", "nombre rfc")
-    .populate("reporte", "folio")
+    .populate("reporte", "folio fechaRecepcion")
     .populate("creadoPor", "nombre usuario firmaUrl")
     .populate("revisadoPor.id", "firmaUrl")
     .populate("autorizadoPor.id", "firmaUrl")
     .sort({ createdAt: 1 });
-  const logo = await configuracionService.obtenerLogo();
-  return certs.map(conEstadoVigente).map((obj) => {
-    if (logo && obj.laboratorio) obj.laboratorio.logo = logo;
-    return obj;
-  });
+  const branding = await brandingVigente();
+  return certs.map(conEstadoVigente).map((obj) => aplicarBranding(obj, branding));
 }
 
 /**
@@ -284,6 +296,7 @@ async function emitir(datos, reqUser) {
   let asignacionDoc;
   let patronesDocs = [];
   let fechaCalibracion = datos.fechaCalibracion;
+  let fechaIngreso = datos.fechaIngreso;
 
   if (datos.asignacion) {
     if (!oid(datos.asignacion)) throw new AppError("Asignación inválida", 400);
@@ -300,8 +313,9 @@ async function emitir(datos, reqUser) {
     asignacionId = asig._id;
     asignacionDoc = asig;
     reporteId = asig.reporte;
-    const rep = await Reporte.findById(asig.reporte).select("cliente");
+    const rep = await Reporte.findById(asig.reporte).select("cliente fechaRecepcion");
     clienteId = rep?.cliente;
+    fechaIngreso = datos.fechaIngreso || rep?.fechaRecepcion;
     fechaCalibracion = fechaCalibracion || asig.fechaCalibracion;
   } else {
     if (!oid(datos.equipo)) throw new AppError("Falta el equipo (o una asignación)", 400);
@@ -450,6 +464,7 @@ async function emitir(datos, reqUser) {
       remarks: laboratorioActual.remarks, notaCertificado: laboratorioActual.notaCertificado,
     },
     fechaCalibracion,
+    fechaIngreso,
     fechaEmision: datos.fechaEmision || new Date(),
     vigencia: datos.vigencia || undefined,
     // Si no vienen explícitos, se toman de la asignación — ahí quedaron
@@ -498,7 +513,7 @@ async function previsualizar(asignacionId) {
   const laboratorioActual = await configuracionService.obtenerLaboratorio();
   const equipoDoc = asig.equipo;
   const patronesDocs = asig.patrones || [];
-  const rep = await Reporte.findById(asig.reporte).select("cliente folio");
+  const rep = await Reporte.findById(asig.reporte).select("cliente folio fechaRecepcion");
 
   const Cliente = require("../models/Cliente");
   const clienteDoc = await Cliente.findById(rep?.cliente).select("nombre domicilioFiscal");
@@ -531,7 +546,7 @@ async function previsualizar(asignacionId) {
     nivelConfianza: c.resultado?.nivelConfianza,
   }));
 
-  return {
+  return conLogo({
     _id: `preview-${asig._id}`,
     folio: `VISTA PREVIA${rep?.folio ? " · " + rep.folio : ""}`,
     preview: true,
@@ -558,18 +573,20 @@ async function previsualizar(asignacionId) {
       remarks: laboratorioActual.remarks, notaCertificado: laboratorioActual.notaCertificado,
     },
     fechaCalibracion: asig.fechaCalibracion,
+    fechaIngreso: rep?.fechaRecepcion,
     fechaEmision: new Date(),
+    servicio: asig.servicio,
     puntos,
     resultado: puntos.length
       ? { valorMedido: puntos[0].valorMedido, unidad: puntos[0].unidad, incertidumbreExpandida: puntos[0].incertidumbreExpandida, k: puntos[0].k, nivelConfianza: puntos[0].nivelConfianza }
       : undefined,
-  };
+  });
 }
 
 // Fechas/resultado son datos de la calibración en sí — solo se pueden tocar
 // mientras el certificado está en borrador (antes de que Calidad lo autorice).
 // Servicio/condiciones/comentarios son texto/formato y siempre son editables.
-const CAMPOS_TEXTO = ["servicio", "condiciones", "comentarios"];
+const CAMPOS_TEXTO = ["servicio", "condiciones", "comentarios", "fechaIngreso"];
 const CAMPOS_CALIBRACION = ["fechaCalibracion", "fechaEmision", "vigencia", "resultado"];
 
 async function actualizar(id, datos, reqUser) {

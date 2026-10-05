@@ -31,6 +31,10 @@ router.put("/laboratorio", requireRole("admin"), validate(actualizarLaboratorioS
 router.post("/logo", requireRole("admin"), subirLogoMiddleware, c.subirLogo);
 router.delete("/logo", requireRole("admin"), c.eliminarLogo);
 
+router.get("/imagenes/:tipo", c.obtenerImagen);
+router.post("/imagenes/:tipo", requireRole("admin"), subirLogoMiddleware, c.subirImagen);
+router.delete("/imagenes/:tipo", requireRole("admin"), c.eliminarImagen);
+
 router.put("/colores", requireRole("admin"), validate(actualizarColoresSchema), c.actualizarColores);
 
 module.exports = router;

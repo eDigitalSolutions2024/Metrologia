@@ -5,6 +5,7 @@ import PrintOutlinedIcon from "@mui/icons-material/PrintOutlined";
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
 import { listarCertificadosPorReporte } from "../../services/certificados";
 import HojaCertificado from "./HojaCertificado";
+import SelectorIdioma, { useIdiomaCertificado } from "./SelectorIdioma";
 
 // Paquete de certificados de un mismo reporte, uno por equipo calibrado,
 // combinados en un solo documento imprimible (equivalente al "portada_merge"
@@ -12,6 +13,7 @@ import HojaCertificado from "./HojaCertificado";
 // suelto por equipo).
 export default function InformeReporteCertificados() {
   const { id } = useParams();
+  const [idioma, setIdioma] = useIdiomaCertificado();
   const [certs, setCerts] = useState(null);
   const [folioReporte, setFolioReporte] = useState("");
   const [estado, setEstado] = useState("cargando");
@@ -39,12 +41,13 @@ export default function InformeReporteCertificados() {
           px: 3, py: 1.5, borderBottom: "1px solid #e5e7eb", bgcolor: "#fff",
         }}
       >
-        <Button startIcon={<ArrowBackIcon />} onClick={() => window.close()} size="small">Cerrar</Button>
+        <Button type="button" startIcon={<ArrowBackIcon />} onClick={() => window.close()} size="small" sx={{ color: "#334155", fontWeight: 700, "&:hover": { bgcolor: "#e2e8f0" } }}>Cerrar</Button>
         <Box sx={{ flex: 1 }} />
         <Typography variant="body2" sx={{ color: "#6b7280" }}>
           {certs.length} certificado{certs.length === 1 ? "" : "s"}{folioReporte ? ` · ${folioReporte}` : ""} — Imprimir → destino <b>“Guardar como PDF”</b>
         </Typography>
-        <Button variant="contained" startIcon={<PrintOutlinedIcon />} onClick={() => window.print()}>
+        <SelectorIdioma idioma={idioma} onChange={setIdioma} />
+        <Button type="button" variant="contained" startIcon={<PrintOutlinedIcon />} onClick={() => window.print()} sx={{ bgcolor: "#10265c", color: "#fff", fontWeight: 700, "&:hover": { bgcolor: "#1a3a85" } }}>
           Imprimir / PDF
         </Button>
       </Box>
@@ -61,7 +64,7 @@ export default function InformeReporteCertificados() {
       `}</style>
 
       {certs.map((cert, i) => (
-        <HojaCertificado key={cert._id} cert={cert} ultima={i === certs.length - 1} />
+        <HojaCertificado key={cert._id} cert={cert} idioma={idioma} ultima={i === certs.length - 1} />
       ))}
     </Box>
   );

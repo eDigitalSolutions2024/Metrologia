@@ -264,14 +264,14 @@ export default function ClienteForm() {
         <AppCard sx={{ mb: 2.5 }}>
           <SeccionTitulo icon={BusinessOutlinedIcon}>Información Fiscal</SeccionTitulo>
           <Typography variant="caption" color="text.secondary" sx={{ display: "block", mb: 2 }}>
-            Datos para facturar y los correos donde le llegan cotizaciones y facturas al cliente.
+            Solo el RFC es obligatorio — es el usuario con el que el cliente entra a consultar sus certificados. Todo lo demás es opcional.
           </Typography>
           <Grid container spacing={2}>
             <Grid size={{ xs: 12, sm: 6, md: 4 }}>
               <AppInput
-                label="Razón Social *"
+                label="Razón Social"
                 error={errors.nombre}
-                {...register("nombre", { required: "Campo obligatorio" })}
+                {...register("nombre")}
               />
             </Grid>
             <Grid size={{ xs: 12, sm: 6, md: 4 }}>
@@ -292,7 +292,6 @@ export default function ClienteForm() {
               <Controller
                 name="regimenFiscal"
                 control={control}
-                rules={{ required: true }}
                 render={({ field }) => (
                   <Autocomplete
                     size="small"
@@ -310,7 +309,7 @@ export default function ClienteForm() {
                       </Box>
                     )}
                     renderInput={(params) => (
-                      <TextField {...params} label="Régimen Fiscal *" error={!!errors.regimenFiscal} />
+                      <TextField {...params} label="Régimen Fiscal" />
                     )}
                     slotProps={{ paper: { sx: { maxHeight: 340 } } }}
                   />
@@ -319,13 +318,13 @@ export default function ClienteForm() {
             </Grid>
             <Grid size={{ xs: 12, sm: 6, md: 4 }}>
               <FormControl fullWidth size="small" error={!!errors.usoCFDI}>
-                <InputLabel>Uso de CFDI *</InputLabel>
+                <InputLabel>Uso de CFDI</InputLabel>
                 <Controller
                   name="usoCFDI"
                   control={control}
-                  rules={{ required: true }}
                   render={({ field }) => (
-                    <Select label="Uso de CFDI *" {...field} value={field.value ?? ""} sx={{ borderRadius: 2 }}>
+                    <Select label="Uso de CFDI" {...field} value={field.value ?? ""} sx={{ borderRadius: 2 }}>
+                      <MenuItem value="">Sin definir</MenuItem>
                       {USO_CFDI.map((o) => (
                         <MenuItem key={o.value} value={o.value}>{o.label}</MenuItem>
                       ))}
@@ -359,6 +358,66 @@ export default function ClienteForm() {
               <AppInput label="Correo (Facturación)" {...register("contacto.emailFacturacion")} />
             </Grid>
           </Grid>
+
+          <Typography variant="subtitle2" fontWeight={700} sx={{ mt: 3, mb: 1.5, display: "flex", alignItems: "center", gap: 1 }}>
+            <LocationOnOutlinedIcon fontSize="small" color="primary" /> Domicilio Fiscal
+          </Typography>
+          <Grid container spacing={2}>
+            <Grid size={{ xs: 12, sm: 6, md: 4 }}>
+              <AppInput
+                label="Calle"
+                {...register("domicilioFiscal.calle")}
+              />
+            </Grid>
+            <Grid size={{ xs: 12, sm: 6, md: 4 }}>
+              <AppInput
+                label="Numero Exterior"
+                {...register("domicilioFiscal.numExterior")}
+              />
+            </Grid>
+            <Grid size={{ xs: 12, sm: 6, md: 4 }}>
+              <AppInput
+                label="Numero Interior"
+                {...register("domicilioFiscal.numInterior")}
+              />
+            </Grid>
+            <Grid size={{ xs: 12, sm: 6, md: 4 }}>
+              <AppInput
+                label="Colonia"
+                {...register("domicilioFiscal.colonia")}
+              />
+            </Grid>
+            <Grid size={{ xs: 12, sm: 6, md: 4 }}>
+              <AppInput
+                label="Municipio"
+                {...register("domicilioFiscal.municipio")}
+              />
+            </Grid>
+            <Grid size={{ xs: 12, sm: 6, md: 4 }}>
+              <AppInput
+                label="Ciudad"
+                {...register("domicilioFiscal.ciudad")}
+              />
+            </Grid>
+            <Grid size={{ xs: 12, sm: 6, md: 4 }}>
+              <AppInput
+                label="Estado"
+                {...register("domicilioFiscal.estado")}
+              />
+            </Grid>
+            <Grid size={{ xs: 12, sm: 6, md: 4 }}>
+              <AppInput
+                label="Pais"
+                {...register("domicilioFiscal.pais")}
+              />
+            </Grid>
+            <Grid size={{ xs: 12, sm: 6, md: 4 }}>
+              <AppInput
+                label="C.P."
+                {...register("domicilioFiscal.cp")}
+              />
+            </Grid>
+          </Grid>
         </AppCard>
 
         <AppCard sx={{ mb: 2.5 }}>
@@ -375,75 +434,6 @@ export default function ClienteForm() {
             </Grid>
             <Grid size={{ xs: 12, sm: 6, md: 4 }}>
               <AppInput label="Correo" {...register("contacto.correo")} />
-            </Grid>
-          </Grid>
-        </AppCard>
-
-        <AppCard sx={{ mb: 2.5 }}>
-          <SeccionTitulo icon={LocationOnOutlinedIcon}>Domicilio Fiscal</SeccionTitulo>
-          <Box sx={{ mb: 1 }} />
-          <Grid container spacing={2}>
-            <Grid size={{ xs: 12, sm: 6, md: 4 }}>
-              <AppInput
-                label="Calle *"
-                error={errors.domicilioFiscal?.calle}
-                {...register("domicilioFiscal.calle", { required: "Campo obligatorio" })}
-              />
-            </Grid>
-            <Grid size={{ xs: 12, sm: 6, md: 4 }}>
-              <AppInput
-                label="Numero Exterior *"
-                error={errors.domicilioFiscal?.numExterior}
-                {...register("domicilioFiscal.numExterior", { required: "Campo obligatorio" })}
-              />
-            </Grid>
-            <Grid size={{ xs: 12, sm: 6, md: 4 }}>
-              <AppInput
-                label="Numero Interior"
-                {...register("domicilioFiscal.numInterior")}
-              />
-            </Grid>
-            <Grid size={{ xs: 12, sm: 6, md: 4 }}>
-              <AppInput
-                label="Colonia *"
-                error={errors.domicilioFiscal?.colonia}
-                {...register("domicilioFiscal.colonia", { required: "Campo obligatorio" })}
-              />
-            </Grid>
-            <Grid size={{ xs: 12, sm: 6, md: 4 }}>
-              <AppInput
-                label="Municipio *"
-                error={errors.domicilioFiscal?.municipio}
-                {...register("domicilioFiscal.municipio", { required: "Campo obligatorio" })}
-              />
-            </Grid>
-            <Grid size={{ xs: 12, sm: 6, md: 4 }}>
-              <AppInput
-                label="Ciudad *"
-                error={errors.domicilioFiscal?.ciudad}
-                {...register("domicilioFiscal.ciudad", { required: "Campo obligatorio" })}
-              />
-            </Grid>
-            <Grid size={{ xs: 12, sm: 6, md: 4 }}>
-              <AppInput
-                label="Estado *"
-                error={errors.domicilioFiscal?.estado}
-                {...register("domicilioFiscal.estado", { required: "Campo obligatorio" })}
-              />
-            </Grid>
-            <Grid size={{ xs: 12, sm: 6, md: 4 }}>
-              <AppInput
-                label="Pais *"
-                error={errors.domicilioFiscal?.pais}
-                {...register("domicilioFiscal.pais", { required: "Campo obligatorio" })}
-              />
-            </Grid>
-            <Grid size={{ xs: 12, sm: 6, md: 4 }}>
-              <AppInput
-                label="C.P. *"
-                error={errors.domicilioFiscal?.cp}
-                {...register("domicilioFiscal.cp", { required: "Campo obligatorio" })}
-              />
             </Grid>
           </Grid>
         </AppCard>

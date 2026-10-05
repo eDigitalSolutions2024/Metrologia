@@ -72,6 +72,9 @@ const certificadoSchema = new Schema(
     laboratorio: { nombre: String, acreditacion: String, remarks: String, notaCertificado: String },
 
     fechaCalibracion: { type: Date, required: true },
+    // Las 4 fechas del certificado: ingreso (recepción del equipo, se toma del
+    // reporte), calibración, liberación (= fechaEmision) y vencimiento (= vigencia).
+    fechaIngreso: Date,
     fechaEmision: { type: Date, default: Date.now },
     vigencia: Date, // opcional — "cuando aplique"
 

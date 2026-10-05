@@ -43,7 +43,7 @@ const facturacionSchema = new Schema(
 
 const clienteSchema = new Schema(
   {
-    nombre: { type: String, required: true, trim: true }, // razón social
+    nombre: { type: String, trim: true }, // razón social (si no se captura, el servicio usa nombre comercial o RFC)
     nombreComercial: { type: String, trim: true },
     rfc: { type: String, required: true, trim: true, uppercase: true, unique: true },
     regimenFiscal: String,

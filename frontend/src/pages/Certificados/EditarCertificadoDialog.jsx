@@ -6,7 +6,7 @@ import { obtenerCertificado, actualizarCertificado } from "../../services/certif
 const RAZONES_SERVICIO = ["Calibración", "Revisión", "Reparación", "Verificación"];
 const TIPOS_SERVICIO = ["Acreditado", "No acreditado"];
 
-const vacio = { razon: "", tipo: "", procedimiento: "", temperatura: "", humedad: "", comentarios: "" };
+const vacio = { fechaIngreso: "", razon: "", tipo: "", procedimiento: "", temperatura: "", humedad: "", comentarios: "" };
 
 /**
  * Edición de un certificado ya AUTORIZADO por Calidad — restringida a
@@ -28,6 +28,7 @@ export default function EditarCertificadoDialog({ certificadoId, onClose, onDone
     obtenerCertificado(certificadoId)
       .then((c) => {
         setF({
+          fechaIngreso: c.fechaIngreso ? String(c.fechaIngreso).slice(0, 10) : (c.reporte?.fechaRecepcion ? String(c.reporte.fechaRecepcion).slice(0, 10) : ""),
           razon: c.servicio?.razon || "",
           tipo: c.servicio?.tipo || "",
           procedimiento: c.servicio?.procedimiento || "",
@@ -46,6 +47,7 @@ export default function EditarCertificadoDialog({ certificadoId, onClose, onDone
     setGuardando(true); setError("");
     try {
       await actualizarCertificado(certificadoId, {
+        fechaIngreso: f.fechaIngreso || undefined,
         servicio: { razon: f.razon, tipo: f.tipo, procedimiento: f.procedimiento },
         condiciones: {
           temperatura: f.temperatura === "" ? undefined : Number(f.temperatura),
@@ -66,7 +68,7 @@ export default function EditarCertificadoDialog({ certificadoId, onClose, onDone
       <DialogTitle sx={{ fontWeight: 700 }}>Editar certificado</DialogTitle>
       <DialogContent>
         <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-          Este certificado ya fue autorizado por Calidad — solo se pueden ajustar el servicio,
+          Este certificado ya fue autorizado por Calidad — solo se pueden ajustar la fecha de ingreso, el servicio,
           las condiciones ambientales y los comentarios. Los resultados de la calibración no se
           pueden modificar aquí.
         </Typography>
@@ -79,6 +81,7 @@ export default function EditarCertificadoDialog({ certificadoId, onClose, onDone
             <TextField select size="small" label="Tipo de servicio" value={f.tipo} onChange={set("tipo")}>
               {TIPOS_SERVICIO.map((t) => <MenuItem key={t} value={t}>{t}</MenuItem>)}
             </TextField>
+            <TextField size="small" type="date" label="Fecha de ingreso del equipo" value={f.fechaIngreso} onChange={set("fechaIngreso")} slotProps={{ inputLabel: { shrink: true } }} sx={{ gridColumn: { sm: "span 2" } }} />
             <TextField size="small" label="Procedimiento" placeholder="PRO-CAL-023" value={f.procedimiento} onChange={set("procedimiento")} sx={{ gridColumn: { sm: "span 2" } }} />
             <TextField size="small" type="number" label="Temperatura (°C)" value={f.temperatura} onChange={set("temperatura")} />
             <TextField size="small" type="number" label="Humedad (% HR)" value={f.humedad} onChange={set("humedad")} />
