@@ -1,5 +1,5 @@
 // Catálogo de Magnitudes + tipos de instrumento, alineado con las categorías
-// reales que ya usan Equipo/Patrón (metryco-laboratorio/src/pages/Equipos/categorias.js).
+// reales que ya usan Equipo/Patrón (frontend/src/pages/Equipos/categorias.js).
 // Sin este catálogo el selector "Magnitud" de Análisis de Incertidumbre queda
 // vacío y las plantillas (ModeloIncertidumbre) son inalcanzables desde la UI.
 require("dotenv/config");

@@ -48,8 +48,8 @@ Además: menú y rutas protegidos por rol, refresco automático de las tablas ca
 
 | Parte | Carpeta | Puerto local | Tecnologías principales |
 |---|---|---|---|
-| **Backend (API)** | `metryco-backend` | `4000` | [Node.js](https://nodejs.org/) · [Express 4](https://expressjs.com/) · [MongoDB](https://www.mongodb.com/) con [Mongoose 8](https://mongoosejs.com/) · [Zod](https://zod.dev/) (validación) · [JWT](https://github.com/auth0/node-jsonwebtoken) · [Helmet](https://helmetjs.github.io/) y [express-rate-limit](https://github.com/express-rate-limit/express-rate-limit) (seguridad) |
-| **Frontend (web)** | `metryco-laboratorio` | `5174` | [React 19](https://react.dev/) · [Vite](https://vite.dev/) · [Material UI (MUI)](https://mui.com/) · [React Router](https://reactrouter.com/) · [React Hook Form](https://react-hook-form.com/) · [Axios](https://axios-http.com/) |
+| **Backend (API)** | `backend` | `4000` | [Node.js](https://nodejs.org/) · [Express 4](https://expressjs.com/) · [MongoDB](https://www.mongodb.com/) con [Mongoose 8](https://mongoosejs.com/) · [Zod](https://zod.dev/) (validación) · [JWT](https://github.com/auth0/node-jsonwebtoken) · [Helmet](https://helmetjs.github.io/) y [express-rate-limit](https://github.com/express-rate-limit/express-rate-limit) (seguridad) |
+| **Frontend (web)** | `frontend` | `5174` | [React 19](https://react.dev/) · [Vite](https://vite.dev/) · [Material UI (MUI)](https://mui.com/) · [React Router](https://reactrouter.com/) · [React Hook Form](https://react-hook-form.com/) · [Axios](https://axios-http.com/) |
 
 **Librerías del backend por función:**
 
@@ -129,7 +129,7 @@ cd Metryco_Dev
 ### Paso 3 — Configurar y arrancar el backend
 
 ```bash
-cd metryco-backend
+cd backend
 npm install
 ```
 
@@ -181,7 +181,7 @@ Debe imprimir: `API de Metrología corriendo en http://localhost:4000`. Déjala 
 En **otra terminal**, desde la carpeta raíz del repositorio:
 
 ```bash
-cd metryco-laboratorio
+cd frontend
 npm install
 
 # macOS / Linux / Git Bash
@@ -209,7 +209,7 @@ Entra a **<http://localhost:5174>** e inicia sesión con el usuario y contraseñ
 
 ## 5. Variables de entorno
 
-### Backend — `metryco-backend/.env` (plantilla: `.env.example`)
+### Backend — `backend/.env` (plantilla: `.env.example`)
 
 | Variable | Obligatoria | Descripción |
 |---|---|---|
@@ -225,7 +225,7 @@ Entra a **<http://localhost:5174>** e inicia sesión con el usuario y contraseñ
 | `PAC_*` | Para facturar | Proveedor de timbrado y CSD (ver sección 6). |
 | `WHATSAPP_*` | Para WhatsApp | Credenciales de la API de WhatsApp Business (ver sección 6). |
 
-### Frontend — `metryco-laboratorio/.env`
+### Frontend — `frontend/.env`
 
 | Variable | Descripción |
 |---|---|
@@ -258,7 +258,7 @@ PAC_CSD_PASSWORD=<contraseña del CSD>
 ```
 
 Notas importantes:
-- Coloca los archivos del CSD en `metryco-backend/csd/` (carpeta ignorada por git). Para pruebas sirven los certificados públicos de prueba del SAT; en la carpeta `Facturacion/` del repositorio hay un conjunto de ellos.
+- Coloca los archivos del CSD en `backend/csd/` (carpeta ignorada por git). Para pruebas sirven los certificados públicos de prueba del SAT; en la carpeta `Facturacion/` del repositorio hay un conjunto de ellos.
 - En el sandbox, el **RFC y la razón social del laboratorio** (Administración → Datos del laboratorio) y los del cliente deben coincidir **exactamente** con los registrados en el SAT para ese RFC de prueba.
 - Para **producción**: contrato con el PAC, credenciales y URL de producción, y el **CSD real** del laboratorio. Detalle técnico en [`docs/FACTURACION.md`](docs/FACTURACION.md).
 
@@ -284,7 +284,7 @@ El menú y las rutas se protegen por rol (configurable en *Administración → R
 
 ```
 .
-├── metryco-backend/            API (Node + Express + MongoDB)
+├── backend/            API (Node + Express + MongoDB)
 │   ├── src/
 │   │   ├── models/             Esquemas de MongoDB (Mongoose)
 │   │   ├── routes/             Rutas de la API por módulo
@@ -296,7 +296,7 @@ El menú y las rutas se protegen por rol (configurable en *Administración → R
 │   │   └── assets/sat-xslt/    Hojas XSLT oficiales del SAT (cadena original del CFDI)
 │   ├── scripts/                Seeds de datos y pruebas de integración
 │   └── csd/                    (local, ignorada por git) certificados de sello digital
-├── metryco-laboratorio/        Interfaz web (React + Vite + MUI)
+├── frontend/        Interfaz web (React + Vite + MUI)
 │   └── src/
 │       ├── pages/              Una carpeta por módulo (Clientes, Cotizaciones, Facturacion…)
 │       ├── components/         Navbar, Sidebar, alertas
@@ -312,7 +312,7 @@ El menú y las rutas se protegen por rol (configurable en *Administración → R
 
 ## 9. Comandos útiles
 
-**Backend** (`metryco-backend`)
+**Backend** (`backend`)
 
 | Comando | Qué hace |
 |---|---|
@@ -323,7 +323,7 @@ El menú y las rutas se protegen por rol (configurable en *Administración → R
 | `npm run seed:demo` | Datos de demostración básicos. |
 | `npm run seed:completo` | Demostración completa de todos los módulos (idempotente). |
 
-**Frontend** (`metryco-laboratorio`)
+**Frontend** (`frontend`)
 
 | Comando | Qué hace |
 |---|---|

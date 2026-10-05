@@ -128,7 +128,7 @@ Sources:
 Este script queda **permanente en el repo** (a diferencia de los scripts de verificación puntual que se borran al terminar) porque es la suite de pruebas de integración del módulo. Se corre con:
 
 ```bash
-cd metryco-backend
+cd backend
 node scripts/testCfdiPacIntegracion.js
 ```
 
